@@ -25,7 +25,7 @@ addopts = [
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    envlist = py311
+    envlist = py311, pep8
     skipsdist = True
     isolated_build = True
 
@@ -40,9 +40,13 @@ legacy_tox_ini = """
     package = wheel
     wheel_build_env = .pkg
     deps =
+        flake8
         -rrequirements.txt
         pytest>=6
     commands =
         pytest {tty:--color=yes} {posargs:tests}
+
+    [testenv:pep8]
+    commands = flake8 src tests
 
 """

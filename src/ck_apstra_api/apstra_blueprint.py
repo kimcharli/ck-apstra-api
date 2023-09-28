@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-# import yaml
-import time
 import logging
 import uuid
 
@@ -22,11 +20,15 @@ class CkEnum:
     GENERIC_SYSTEM_INTERFACE = 'gs-intf'
     TAGGED_VLANS = 'tagged-vlans'
     UNTAGGED_VLAN = 'untagged-vlan'
-    REDUNDANCY_GROUP = 'redundancy-group'    
+    REDUNDANCY_GROUP = 'redundancy-group'
+
 
 class CkApstraBlueprint:
 
-    def __init__(self, session: CkApstraSession, label: str, id: str = None) -> None:
+    def __init__(self,
+                 session: CkApstraSession,
+                 label: str,
+                 id: str = None) -> None:
         """
         Initialize a CkApstraBlueprint object.
 
@@ -45,9 +47,10 @@ class CkApstraBlueprint:
         self.url_prefix = f"{self.session.url_prefix}/blueprints/{self.id}"
         self.logger = logging.getLogger(f"CkApstraBlueprint({label})")
 
-        self.system_label_2_id_cache = {} # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
-        self.system_id_2_label_cache = {} # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
+        self.system_label_2_id_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
+        self.system_id_2_label_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
         self.logger.debug(f"{self.id=}")
+
 
     def get_id(self) -> str:
         """
@@ -406,10 +409,11 @@ class CkApstraBlueprint:
                     .out().node('ep_endpoint_policy', policy_type_name='batch', name='batch')
             ).distinct(['batch'])
         """
-        ct_list = [ x['batch']['id'] for x in self.query(ct_list_spec, multiline=True) ]
+        ct_list = [x['batch']['id']
+                   for x in self.query(ct_list_spec, multiline=True)]
         return ct_list
 
-    def add_single_vlan_ct(self, vni: str, is_tagged: bool ) -> str:
+    def add_single_vlan_ct(self, vni: str, is_tagged: bool) -> str:
         '''
         Create a single VLAN CT
         '''
@@ -432,12 +436,12 @@ class CkApstraBlueprint:
                     "visible": True,
                     "policy_type_name": "batch",
                     "attributes": {
-                        "subpolicies": [ uuid_pipeline ]
+                        "subpolicies": [uuid_pipeline]
                     },
                     "id": uuid_batch
                 },
                 {
-                    "description": "Add a single VLAN to interfaces, as tagged or untagged.",
+                    "description": "Add a single VLAN to interfaces",
                     "label": "Virtual Network (Single)",
                     "visible": False,
                     "attributes": {
@@ -448,7 +452,7 @@ class CkApstraBlueprint:
                     "id": uuid_vlan
                 },
                 {
-                    "description": "Add a single VLAN to interfaces, as tagged or untagged.",
+                    "description": "Add a single VLAN to interfaces",
                     "label": "Virtual Network (Single) (pipeline)",
                     "visible": False,
                     "attributes": {
@@ -472,13 +476,14 @@ class CkApstraBlueprint:
         url = f"{self.url_prefix}/cabling-maps"
         return self.session.session.get(url).json()
 
-
     def revert(self):
         '''
         Revert the blueprint
         '''
         url = f"{self.url_prefix}/revert"
-        revert_result = self.session.session.post(url, json="", params={"aync": "full"})
+        revert_result = self.session.session.post(url,
+                                                  json="",
+                                                  params={"aync": "full"})
         self.logger.info(f"Revert result: {revert_result.json()}")
 
 
@@ -488,4 +493,3 @@ if __name__ == "__main__":
     apstra = CkApstraSession("10.85.192.50", 443, "admin", "zaq1@WSXcde3$RFV")
     bp = CkApstraBlueprint(apstra, "terra")
     print(bp.get_id())
-

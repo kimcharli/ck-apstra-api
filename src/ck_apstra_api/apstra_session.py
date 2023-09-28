@@ -5,6 +5,7 @@ import logging
 import time
 from datetime import datetime
 
+
 class CustomFormatter(logging.Formatter):
     grey = "\x1b[38;20m"
     yellow = "\x1b[33;20m"
@@ -25,6 +26,7 @@ class CustomFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
+
 def prep_logging(log_level: str = 'INFO'):
     '''Configure logging options'''
     timestamp = datetime.now().strftime("%Y%m%d-%H:%H:%S")
@@ -40,7 +42,11 @@ def prep_logging(log_level: str = 'INFO'):
 # https client session to Apstra Controller
 class CkApstraSession:
 
-    def __init__(self, host: str, port: int, username: str, password: str) -> None:
+    def __init__(self, 
+                 host: str, 
+                 port: int, 
+                 username: str, 
+                 password: str) -> None:
         self.host = host
         self.port = port
         self.username = username
@@ -57,7 +63,7 @@ class CkApstraSession:
 
         self.login()
 
-        self.device_profile_cache = {} # { device_profile_id: data }
+        self.device_profile_cache = {}  # { device_profile_id: data }
 
     def login(self) -> None:
         """
@@ -89,7 +95,7 @@ class CkApstraSession:
         if device_profile_name not in self.device_profile_cache:
             # url = f"{self.url_prefix}/device-profiles"
             device_profiles = self.get_items('device-profiles')['items']
-            self.device_profile_cache[device_profile_name] = [ x for x in device_profiles if x['id'] == device_profile_name ][0]
+            self.device_profile_cache[device_profile_name] = [x for x in device_profiles if x['id'] == device_profile_name][0]
         return self.device_profile_cache[device_profile_name]
 
     def get_logical_device(self, id: int) -> dict:
@@ -141,11 +147,11 @@ class CkApstraSession:
         try:
             while True:
                 # http 429 too many requests
-                if patched.status_code != 429:                
+                if patched.status_code != 429:
                     break
                 self.logger.info(f"sleeping {throttle_seconds} seconds due to: {patched.text}")
                 time.sleep(throttle_seconds)
-                patched = patched = self.session.patch(url, json=spec, params=params)
+                patched = self.session.patch(url, json=spec, params=params)
                 if patched.content:
                     return patched.json()
                 else:
@@ -173,6 +179,7 @@ class CkApstraSession:
         """
         url = f"{self.url_prefix}/blueprints"
         return self.session.options(url).json()['items']
+
 
 if __name__ == "__main__":
     log_level = logging.DEBUG
