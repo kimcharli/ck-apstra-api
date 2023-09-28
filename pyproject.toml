@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "ck_apstra_api"
+version = "0.1.0"
+description = "An implementation to use Apstra API"
+authors = [ "Charlie Kim <ckim@juniper.net>" ]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.31.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.pytest.ini_options]
+pythonpath = "src"
+addopts = [
+    "--import-mode=importlib",
+]
+
+[tool.tox]
+legacy_tox_ini = """
+    [tox]
+    envlist = py311
+    skipsdist = True
+    isolated_build = True
+
+    [pytest]
+    log_cli = True
+    log_cli_level = DEBUG
+    console_output_style = progress
+
+    [testenv]
+    usedevelop=True
+    description = run the tests with pytest
+    package = wheel
+    wheel_build_env = .pkg
+    deps =
+        -rrequirements.txt
+        pytest>=6
+    commands =
+        pytest {tty:--color=yes} {posargs:tests}
+
+"""
