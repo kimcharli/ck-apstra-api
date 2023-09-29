@@ -75,7 +75,7 @@ class CkApstraSession:
             "password": self.password
         }
         response = self.session.post(url, json=payload)
-        # print(f"{response.raw=}")
+        # print(f"{response.content=}")
         self.token = response.json()["token"]
         self.session.headers.update({'AuthToken': self.token})
 
@@ -182,7 +182,17 @@ class CkApstraSession:
 
 
 if __name__ == "__main__":
-    log_level = logging.DEBUG
+    from dotenv import load_dotenv
+    import os
+
+    load_dotenv()
+    log_level = os.getenv('logging_level', 'DEBUG')
     prep_logging(log_level)
-    apstra = CkApstraSession("10.85.192.50", 443, "admin", "zaq1@WSXcde3$RFV")
+
+    apstra_server_host = os.getenv('apstra_server_host')
+    apstra_server_port = os.getenv('apstra_server_port')
+    apstra_server_username = os.getenv('apstra_server_username')
+    apstra_server_password = os.getenv('apstra_server_password')
+
+    apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     apstra.print_token()

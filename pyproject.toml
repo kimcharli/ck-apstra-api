@@ -12,6 +12,7 @@ requests = "^2.31.0"
 pandas = "^2.1.1"
 pydantic = "^2.4.2"
 openpyxl = "^3.1.2"
+python-dotenv = "^1.0.0"
 
 
 [build-system]
@@ -47,7 +48,7 @@ legacy_tox_ini = """
         -rrequirements.txt
         pytest>=6
     commands =
-        pytest {tty:--color=yes} {posargs:tests}
+        pytest --capture=tee-sys {tty:--color=yes} {posargs:tests}
 
 
 """
