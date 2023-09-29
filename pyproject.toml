@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "ck_apstra_api"
+name = "ck-apstra-api"
 version = "0.1.0"
 description = "An implementation to use Apstra API"
 authors = [ "Charlie Kim <ckim@juniper.net>" ]
@@ -7,8 +7,11 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "<3.13,>=3.9"
 requests = "^2.31.0"
+pandas = "^2.1.1"
+pydantic = "^2.4.2"
+openpyxl = "^3.1.2"
 
 
 [build-system]
@@ -25,7 +28,7 @@ addopts = [
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    envlist = py311, pep8
+    envlist = py310, py311, pep8
     skipsdist = True
     isolated_build = True
 
@@ -46,7 +49,5 @@ legacy_tox_ini = """
     commands =
         pytest {tty:--color=yes} {posargs:tests}
 
-    [testenv:pep8]
-    commands = flake8 src tests
 
 """

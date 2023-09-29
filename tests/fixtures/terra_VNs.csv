@@ -1,0 +1,7 @@
+vn_node_id,vn_name,rz_name,vn_type,vn_id,reserved_vlan_id,dhcp_service,ipv4_enabled,ipv6_enabled,virtual_gateway_ipv4_enabled,virtual_gateway_ipv6_enabled,ipv4_subnet,ipv6_subnet,virtual_gateway_ipv4,virtual_gateway_ipv6,bound_to_border-pair,bound_to_server-pair
+ADNCXGm5D3pTWL7wz0I,vn100,vrf1,vxlan,200100,,,x,,x,,10.0.100.0/24,,10.0.100.1,,100,100
+,vn101,vrf1,vxlan,200101,,,x,,x,,10.0.101.0/24,,,,101,101
+,vn102,vrf1,vxlan,200102,,,,,,,,,,,102,102
+,vn200,vrf2,vxlan,200200,,,x,,x,,10.0.200.0/24,,,,200,200
+,vn201,vrf2,vxlan,200201,,,x,,x,,10.0.201.0/24,,,,201,201
+,vn202,vrf2,vxlan,200202,,,,,,,,,,,202,202

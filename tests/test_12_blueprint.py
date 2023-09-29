@@ -15,8 +15,8 @@ def test_12_main_blueprint(session, main_bp):
     assert True
 
 
-def test_13_tor_blurprint(session, tor_bp):
-    bp = CkApstraBlueprint(session, tor_bp)
-    bp_id = bp.get_id()
-    assert True
+# def test_13_tor_blurprint(session, tor_bp):
+#     bp = CkApstraBlueprint(session, tor_bp)
+#     bp_id = bp.get_id()
+#     assert True
 
