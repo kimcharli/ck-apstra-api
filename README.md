@@ -8,7 +8,15 @@ apstra_server_host=34.214.126.200
 apstra_server_port=443
 apstra_server_username=admin
 apstra_server_password=zaq1@WSXcde3$RFV
+excel_input_file=./tests/fixtures/ApstraProvisiongTemplate.xlsx
 config_yaml_input_file=tests/fixtures/config.yaml
 logging_level=DEBUG
+main_blueprint=terra
 cabling_maps_yaml_file=tests/fixtures/sample-cabling-maps.yaml
+```
+
+## run the commands
+
+```
+ck-api read-generic-system
 ```

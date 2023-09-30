@@ -6,6 +6,9 @@ from pathlib import Path
 from pydantic import BaseModel, validator
 from typing import List, Optional, Any, TypeVar, Annotated
 import numpy as np
+import os
+
+import click
 
 from ck_apstra_api.apstra_session import prep_logging
 
@@ -46,14 +49,16 @@ def process_row(row):
     # logging.debug(f"{pydantic_data=}")
 
 
-def read_generic_system(input_file_path_string, sheet_name):    
+@click.command()
+def read_generic_system(input_file_path_string: str = None, sheet_name: str = 'generic_systems'):    
     logging.debug("Hello World!")
-    input_file_path = Path(input_file_path_string) 
+    excel_file_sting = input_file_path_string or os.getenv('excel_input_file')
+    input_file_path = Path(excel_file_sting) 
     df = pd.read_excel(input_file_path, sheet_name=sheet_name, header=[1])
     df = df.replace({np.nan: None})
 
     df.apply(process_row, axis=1)
-    return generic_system_data.items()
+    return generic_system_data
 
 
 if __name__ == "__main__":
@@ -61,7 +66,7 @@ if __name__ == "__main__":
     sheet_name = "generic_systems"
     log_level = logging.DEBUG
     prep_logging(log_level)
-    for bp_label, bp_data in read_generic_system(input_file_path_string, sheet_name):
+    for bp_label, bp_data in read_generic_system(input_file_path_string, sheet_name).items():
         logging.debug(f"{bp_label=}")
         for gs_label, gs_list in bp_data.items():
             logging.debug(f"{gs_label=}")
