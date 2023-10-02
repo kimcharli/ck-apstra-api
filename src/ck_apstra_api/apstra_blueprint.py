@@ -179,44 +179,25 @@ class CkApstraBlueprint:
             TODO: implement intf_name in case of multiple link generic system
         TODO: cache generic system interface id
         """
-        if intf_name:
-            interface_query = f"""
-                match(
-                    node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
-                        .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
-                        .out('link').node('link', name='{CkEnum.LINK}')
-                        .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}', if_name='{intf_name}')
-                        .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
-                    optional(
-                        node('redundancy_group')
-                            .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
-                            .out('composed_of').node('interface')
-                            .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
-                    ),
-                    optional(
-                        node('tag', name='tag').out().node(name='{CkEnum.LINK}')
-                        )
-                )
-            """
-        else:
-            interface_query = f"""
-                match(
-                    node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
-                        .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
-                        .out('link').node('link', name='{CkEnum.LINK}')
-                        .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}')
-                        .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
-                    optional(
-                        node('redundancy_group')
-                            .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
-                            .out('composed_of').node('interface')
-                            .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
-                    ),
-                    optional(
-                        node('tag', name='tag').out().node(name='{CkEnum.LINK}')
-                        )
-                )
-            """
+        intf_name_filter = f", if_name='{intf_name}'" if intf_name else ""
+        interface_query = f"""
+            match(
+                node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
+                    .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
+                    .out('link').node('link', name='{CkEnum.LINK}')
+                    .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
+                    .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
+                optional(
+                    node('redundancy_group')
+                        .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
+                        .out('composed_of').node('interface')
+                        .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
+                ),
+                optional(
+                    node('tag', name='tag').out().node(name='{CkEnum.LINK}')
+                    )
+            )
+        """
         # self.logger.debug(f"{interface_query=}")
         interface_nodes = self.query(interface_query, multiline=True)
         # self.logger.debug(f"{interface_nodes=}")
@@ -244,6 +225,16 @@ class CkApstraBlueprint:
         # untagged_ct = [x['id'] for x in ct_list if x and 'untagged' in x['ep_endpoint_policy']['attributes']][0] or None
         return (tagged_ct, untagged_ct)
 
+    def get_ct_ids(self, ct_labels: list) -> list:
+        '''
+        Get the CT IDs from the CT labels
+        '''
+        ct_list_query = f"""
+            node('ep_endpoint_policy', policy_type_name='batch', label=is_in({ct_labels}), name='ep')
+        """
+        ct_list = self.query(ct_list_query, multiline=True)
+        return [x['ep']['id'] for x in ct_list]
+    
     def add_generic_system(self, gs_spec: dict) -> list:
         """
         Add a generic system (and access switch pair) to the blueprint.

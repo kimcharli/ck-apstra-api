@@ -35,7 +35,7 @@ class GenericSystemModel(BaseModel):
     gs_ifname4: Optional[str]
     untagged_vlan: Optional[int] = None
     tagged_vlans: Optional[List[int]] = None
-    ct_names: Optional[str] = None
+    ct_names: Optional[List[str]] = None
     comment: Optional[str] = None
 
     # convert to string in case an int is given
@@ -55,7 +55,7 @@ class GenericSystemModel(BaseModel):
             return [v]
         return [ x.strip() for x in v.split(',')]
 
-    @field_validator('tags', mode='before')
+    @field_validator('tags', 'ct_names', mode='before')
     @classmethod
     def convert_to_list_of_str(cls, v):
         if v is None:
@@ -271,7 +271,24 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
                 'links': {}
             }
             cable_map = {
-                'links': []
+                'links': [
+                    # {
+                    #     'endpoints': [
+                    #         {
+                    #             'interface': {
+                    #                 'id': sw_if_node_id
+                    #             }
+                    #         },
+                    #         {
+                    #             'interface': {
+                    #                 'id': gs_if_node_id,
+                    #                 'if_name': gs_ifname,
+                    #             }
+                    #         }
+                    #     ],
+                    #     'id': link_node_id                            
+                    # }
+                ]
             }
             link_id_num = 0
             for link in gs_list:
@@ -296,6 +313,7 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
                         logging.warning(f"Skipping: Generic system {gs_label} has invalid interface name {sw_ifname}")
                         continue
                     switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
+                    # logging.warning(f"{sw_label=}, {sw_ifname=}, {len(switch_link_nodes)=}")
                     # logging.debug(f"{label_label=}, {link[label_label]=}")
                     # logging.debug(f"{len(switch_link_nodes)=}, {switch_link_nodes=}")
                     if switch_link_nodes is None or len(switch_link_nodes) == 0:
@@ -332,12 +350,14 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
                             ],
                             'id': link_node_id                            
                         })
+            # update LACP
             if len(lag_spec['links']) > 0:
                 logging.debug(f"{lag_spec=}")
                 lag_updated = bp.patch_leaf_server_link_labels(lag_spec)
                 if lag_updated:
                     logging.warning(f"Unexpected return: LACP updated for generic system {gs_label} in blueprint {bp_label}: {lag_updated}")
                 # logging.debug(f"lag_updated: {lag_updated}")
+            # upddate generic system interface names
             if len(cable_map['links']) > 0:
                 logging.debug(f"{cable_map=}")
                 cable_map_updated = bp.patch_cable_map(cable_map)
@@ -345,6 +365,44 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
                     logging.warning(f"Unexpected return: cable map updated for generic system {gs_label} in blueprint {bp_label}: {cable_map_updated}")
                 # logging.debug(f"cable_map_updated: {cable_map_updated}"
 
+            # update connectivity templates - this should be run after lag update
+            ct_assign_spec = {
+                'application_points': [
+                    # {
+                    #     'id': <interface_id>,
+                    #     'policies': [
+                    #         {
+                    #             'policy': <ct-id>,
+                    #             'used': True,
+                    #         }
+                    #     ]
+                    # }
+                ]
+
+            }
+            for link in gs_list:
+                if len(link['ct_names']) > 0:
+                    ct_ids = bp.get_ct_ids(link['ct_names'])
+                    intf_nodes = bp.get_switch_interface_nodes([link['label1']], link['ifname1'])
+                    if len(intf_nodes) == 0:
+                        logging.warning(f"{len(intf_nodes)=}, {intf_nodes=}")
+                        logging.warning(f"Skipping: Generic system {gs_label} has invalid interface {link['label1']}:{link['ifname1']}")
+                        continue
+                    ap_id = None                        
+                    if intf_nodes[0][CkEnum.EVPN_INTERFACE]:
+                        ap_id = intf_nodes[0][CkEnum.EVPN_INTERFACE]['id']
+                    else:
+                        ap_id = intf_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
+                    ct_assign_spec['application_points'].append({
+                        'id': ap_id,
+                        'policies': [{ 'policy': ct_id, 'used': True } for ct_id in ct_ids]
+                    })
+
+            if len(ct_assign_spec['application_points']) > 0:
+                # logging.debug(f"{ct_assign_spec=}")
+                ct_assign_updated = bp.patch_obj_policy_batch_apply(ct_assign_spec, params={'async': 'full'})
+                logging.debug(f"CT assign updated for generic system {gs_label} in blueprint {bp_label}: {ct_assign_updated}")
+                # logging.debug(f"ct_assign_updated: {ct_assign_updated}"
 
 
 
