@@ -179,24 +179,44 @@ class CkApstraBlueprint:
             TODO: implement intf_name in case of multiple link generic system
         TODO: cache generic system interface id
         """
-        interface_query = f"""
-            match(
-                node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
-                    .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
-                    .out('link').node('link', name='{CkEnum.LINK}')
-                    .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}')
-                    .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
-                optional(
-                    node('redundancy_group')
-                        .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
-                        .out('composed_of').node('interface')
-                        .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
-                ),
-                optional(
-                    node('tag', name='tag').out().node(name='{CkEnum.LINK}')
-                    )
-            )
-        """
+        if intf_name:
+            interface_query = f"""
+                match(
+                    node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
+                        .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
+                        .out('link').node('link', name='{CkEnum.LINK}')
+                        .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}', if_name='{intf_name}')
+                        .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
+                    optional(
+                        node('redundancy_group')
+                            .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
+                            .out('composed_of').node('interface')
+                            .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
+                    ),
+                    optional(
+                        node('tag', name='tag').out().node(name='{CkEnum.LINK}')
+                        )
+                )
+            """
+        else:
+            interface_query = f"""
+                match(
+                    node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
+                        .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
+                        .out('link').node('link', name='{CkEnum.LINK}')
+                        .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}')
+                        .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
+                    optional(
+                        node('redundancy_group')
+                            .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
+                            .out('composed_of').node('interface')
+                            .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
+                    ),
+                    optional(
+                        node('tag', name='tag').out().node(name='{CkEnum.LINK}')
+                        )
+                )
+            """
         # self.logger.debug(f"{interface_query=}")
         interface_nodes = self.query(interface_query, multiline=True)
         # self.logger.debug(f"{interface_nodes=}")
@@ -475,6 +495,17 @@ class CkApstraBlueprint:
         '''
         url = f"{self.url_prefix}/cabling-maps"
         return self.session.session.get(url).json()
+
+    def patch_cable_map(self, cable_map_spec):
+        '''
+        Set the cabling map
+        '''
+        url = f"{self.url_prefix}/cabling-map"
+        patched = self.session.session.patch(url, json=cable_map_spec, params={'comment': 'cabling-map-update'})
+        if patched.status_code == 204:
+            # No Content: a request has succeeded, but that the client doesn't need to navigate away from its current page.
+            return None
+        return patched
 
     def revert(self):
         '''

@@ -12,6 +12,7 @@ import click
 
 from ck_apstra_api.apstra_session import prep_logging
 from ck_apstra_api.cli import CkJobEnv
+from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
 
 class GenericSystemModel(BaseModel):
     blueprint: str
@@ -19,6 +20,7 @@ class GenericSystemModel(BaseModel):
     is_external: Optional[bool] = False
     speed: str               # 10G 
     lag_mode: Optional[str]  # mandatory in case of multiple interfaces
+    tags: Optional[List[str]] = None
     label1: str
     ifname1: str
     gs_ifname1: Optional[str]
@@ -51,6 +53,13 @@ class GenericSystemModel(BaseModel):
             return None
         if isinstance(v, int):
             return [v]
+        return [ x.strip() for x in v.split(',')]
+
+    @field_validator('tags', mode='before')
+    @classmethod
+    def convert_to_list_of_str(cls, v):
+        if v is None:
+            return []
         return [ x.strip() for x in v.split(',')]
 
 generic_system_data = {} # { blueprint: { generic_system: {....}}}
@@ -122,7 +131,222 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
     }
     """
 
-    pass
+    ## create the generic systems
+    bp_total = len(generic_systems)  # total number of blueprints
+    bp_count = 0
+    logging.info(f"Adding generic systems to {bp_total} blueprints")
+    for bp_label, bp_data in generic_systems.items():
+        bp_count += 1
+        logging.info(f"Adding generic systems to blueprint {bp_count}/{bp_total}: {bp_label}")
+        bp = CkApstraBlueprint(job_env.session, bp_label)
+        # logging.debug(f"{bp=}, {bp.id=}")
+        gs_total = len(bp_data)
+        gs_count = 0
+        logging.info(f"Adding {gs_total} generic systems to blueprint {bp_label}")
+        for gs_label, gs_list in bp_data.items():
+            gs_count += 1
+            gs_link_total = len(gs_list)
+            logging.info(f"Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
+            if bp.get_system_node_from_label(gs_label):
+                logging.info(f"Skipping: Generic system {gs_label} already exists in blueprint {bp_label}")
+                continue
+            # if gs_link_total > 1:
+            #     logging.warning(f"Adding generic system {gs_label} with {gs_link_total} links\n{gs_list}")
+            #     return
+            generic_system_spec = {
+                'links': [],
+                'new_systems': [],
+            }
+            # to form logical device
+            speed_count = {}
+
+            for link in gs_list:
+            #     logging.debug(f"{link=}")
+                link_speed = link['speed']
+                for link_number in range(4):
+                    link_id_num = link_number + 1
+                    label_label = f"label{link_id_num}"
+                    this_ifname = link[f"ifname{link_id_num}"]
+                    # skip if data is missing
+                    if not link[label_label]:
+                        continue
+                    if this_ifname[:2] not in ['et', 'xe', 'ge']:
+                        logging.warning(f"Skipping: Generic system {gs_label} has invalid interface name {this_ifname}")
+                        continue
+                    logging.debug(f"{label_label=}, {link[label_label]=}")
+                    switch_id = bp.get_system_node_from_label(link[label_label])['id']
+                    link_spec = {
+                        'switch': {
+                            'system_id': switch_id,
+                            'transformation_id': bp.get_transformation_id(link[f"label{link_id_num}"], this_ifname , link_speed),
+                            'if_name': link[f"ifname{link_id_num}"],
+                        },
+                        'system': {
+                            'system_id': None,
+                        },
+                        # 'lag_mode':link['lag_mode'],
+                        'lag_mode': None,
+                    }
+                    generic_system_spec['links'].append(link_spec)
+                    # speed_count[link_speed] = getattr(speed_count, link_speed, 0) + 1
+                    logging.debug(f"{link_speed=}, {speed_count=}")
+                    if link_speed not in speed_count:
+                        speed_count[link_speed] = 1
+                    else:
+                        speed_count[link_speed] += 1
+
+
+            new_system = {
+                'system_type': 'server',
+                'label': gs_label,
+                'port_channel_id_min': 0,
+                'port_channel_id_max': 0,
+                'logical_device': {
+                    'display_name': None,
+                    'id': None,
+                    'panels': [
+                        {
+                            'panel_layout': {
+                                'row_count': 1,
+                                'column_count': sum(speed_count.values()),
+                            },
+                            'port_indexing': {
+                                'order': 'T-B, L-R',
+                                'start_index': 1,
+                                'schema': 'absolute'
+                            },
+                            "port_groups": [
+                                # {
+                                #     "count": 4,
+                                #     "speed": {
+                                #         "unit": "G",
+                                #         "value": 10
+                                #     },
+                                #     "roles": [
+                                #         "leaf",
+                                #         "access"
+                                #     ]
+                                # }
+                            ]
+                        }
+                    ]
+                },
+            }
+            display_name = 'auto'
+            for speed, count in speed_count.items():
+                port_group = {
+                    'count': count,
+                    'speed': {
+                        'unit': speed[-1],
+                        'value': int(speed[:-1]),
+                    },
+                    'roles': ['leaf', 'access'],
+                }
+                new_system['logical_device']['panels'][0]['port_groups'].append(port_group)
+                display_name = f"{display_name}-{count}x{speed}"
+            new_system['logical_device']['display_name'] = display_name
+            new_system['logical_device']['id'] = display_name
+            generic_system_spec['new_systems'].append(new_system)
+            logging.debug(f"{generic_system_spec=}, {speed_count=}")
+
+            generic_system_created = bp.add_generic_system(generic_system_spec)
+            logging.info(f"Generic system {gs_label} created in blueprint {bp_label}")
+
+        ## form LACP in the BP
+        """
+        lag_spec example:
+            "links": {
+                "atl1tor-r5r14a<->_atl_rack_1_001_sys072(link-000000001)[1]": {
+                    "group_label": "link1",
+                    "lag_mode": "lacp_active"
+                },
+                "atl1tor-r5r14b<->_atl_rack_1_001_sys072(link-000000002)[1]": {
+                    "group_label": "link1",
+                    "lag_mode": "lacp_active"
+                }
+            }            
+        """
+        for gs_label, gs_list in bp_data.items():
+            lag_spec = {
+                'links': {}
+            }
+            cable_map = {
+                'links': []
+            }
+            link_id_num = 0
+            for link in gs_list:
+                if link['lag_mode'] is None:
+                    # logging.debug(f"Skipping: Generic system {gs_label} has no lag_mode")
+                    continue                
+                lag_mode = link['lag_mode']
+                if lag_mode not in [ 'lacp_active', 'lacp_passive']:
+                    logging.warning(f"Skipping: Generic system {gs_label} has invalid lag_mode {lag_mode}")
+                    continue
+                link_id_num += 1
+                group_label = f"link{link_id_num}"
+                for member_number in range(4):
+                    member_number += 1
+                    sw_label = link[f"label{member_number}"]
+                    sw_ifname = link[f"ifname{member_number}"]
+                    gs_ifname = link[f"gs_ifname{member_number}"]
+                    # skip if data is missing
+                    if not sw_label or not sw_ifname:
+                        continue
+                    if sw_ifname[:2] not in ['et', 'xe', 'ge']:
+                        logging.warning(f"Skipping: Generic system {gs_label} has invalid interface name {sw_ifname}")
+                        continue
+                    switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
+                    # logging.debug(f"{label_label=}, {link[label_label]=}")
+                    # logging.debug(f"{len(switch_link_nodes)=}, {switch_link_nodes=}")
+                    if switch_link_nodes is None or len(switch_link_nodes) == 0:
+                        logging.warning(f"Skipping: Generic system {gs_label} has invalid interface {sw_label}:{sw_ifname}")
+                        continue
+                    link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
+                    sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
+                    gs_if_node_id = switch_link_nodes[0][CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
+                    link_spec = {
+                        'group_label': group_label,
+                        'lag_mode': lag_mode,
+                    }
+                    lag_spec['links'][link_node_id] = link_spec
+                    # logging.warning(f"{gs_list=}, {link_spec=}, {sw_label=}, {sw_ifname=}")
+                    if len(link['tags']) > 0:
+                        bp.post_tagging(link_node_id, link['tags'])
+                    
+                    # cable_map
+                    if len(gs_ifname):
+                        cable_map['links'].append({
+                            'endpoints': [
+                                {
+                                    'interface': {
+                                        'id': sw_if_node_id
+                                    }
+                                },
+                                {
+                                    'interface': {
+                                        'id': gs_if_node_id,
+                                        'if_name': gs_ifname,
+                                    }
+                                }
+
+                            ],
+                            'id': link_node_id                            
+                        })
+            if len(lag_spec['links']) > 0:
+                logging.debug(f"{lag_spec=}")
+                lag_updated = bp.patch_leaf_server_link_labels(lag_spec)
+                if lag_updated:
+                    logging.warning(f"Unexpected return: LACP updated for generic system {gs_label} in blueprint {bp_label}: {lag_updated}")
+                # logging.debug(f"lag_updated: {lag_updated}")
+            if len(cable_map['links']) > 0:
+                logging.debug(f"{cable_map=}")
+                cable_map_updated = bp.patch_cable_map(cable_map)
+                if cable_map_updated:
+                    logging.warning(f"Unexpected return: cable map updated for generic system {gs_label} in blueprint {bp_label}: {cable_map_updated}")
+                # logging.debug(f"cable_map_updated: {cable_map_updated}"
+
+
+
 
 @click.command(name='add-generic-systems')
 def click_add_generic_systems():
@@ -133,14 +357,4 @@ def click_add_generic_systems():
 
 if __name__ == "__main__":
     click_add_generic_systems()
-    # input_file_path_string = "./tests/fixtures/ApstraProvisiongTemplate.xlsx"
-    # sheet_name = "generic_systems"
-    # log_level = logging.DEBUG
-    # prep_logging(log_level)
-    # for bp_label, bp_data in read_generic_systems(input_file_path_string, sheet_name).items():
-    #     logging.debug(f"{bp_label=}")
-    #     for gs_label, gs_list in bp_data.items():
-    #         logging.debug(f"{gs_label=}")
-    #         for link in gs_list:
-    #             logging.debug(f"{link=}")
 
