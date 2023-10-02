@@ -1,7 +1,7 @@
 # ck-apstra-api
 
 
-## .env file example
+## var/.env file example
 
 ```
 apstra_server_host=34.214.126.200
@@ -15,8 +15,17 @@ main_blueprint=terra
 cabling_maps_yaml_file=tests/fixtures/sample-cabling-maps.yaml
 ```
 
+Link the env file
+```
+ls -s var/.env .env
+```
+
 ## run the commands
 
 ```
-ck-api read-generic-system
+ck-api read-generic-systems
+```
+
+```
+ck-api add-generic-systems
 ```
