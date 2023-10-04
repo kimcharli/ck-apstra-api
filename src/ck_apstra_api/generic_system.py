@@ -98,6 +98,146 @@ def click_read_generic_systems():
             for link in gs_links_list:
                 logging.debug(f"{link=}")
 
+def form_lacp(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
+    bp = job_env.main_bp
+    bp_label = bp.label
+    lag_spec = {
+        'links': {
+            # <link_node_id>: {
+            #     'group_label': group_label,
+            #     'lag_mode': lag_mode,
+            # }
+        }
+    }
+    link_id_num = 0
+    for link in generic_system_links_list:
+        lag_mode = link['lag_mode']
+        if lag_mode is None:
+            # logging.debug(f"Skipping: Generic system {generic_system_label} has no lag_mode")
+            continue                
+        if lag_mode not in [ 'lacp_active', 'lacp_passive']:
+            logging.warning(f"Skipping: Generic system {generic_system_label} has invalid lag_mode {lag_mode}")
+            continue
+        link_id_num += 1
+        group_label = f"link{link_id_num}"
+        # iterate over the 4 member interfaces
+        for member_number in range(4):
+            member_number += 1
+            sw_label = link[f"label{member_number}"]
+            sw_ifname = link[f"ifname{member_number}"]
+            gs_ifname = link[f"gs_ifname{member_number}"]
+            # skip if now switch is defined
+            if not sw_label or not sw_ifname:
+                continue
+            if sw_ifname[:2] not in ['et', 'xe', 'ge']:
+                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
+                continue
+            switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
+            if switch_link_nodes is None or len(switch_link_nodes) == 0:
+                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
+                continue
+            link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
+            sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
+            gs_if_node_id = switch_link_nodes[0][CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
+            link_spec = {
+                'group_label': group_label,
+                'lag_mode': lag_mode,
+            }
+            lag_spec['links'][link_node_id] = link_spec
+            # logging.warning(f"{gs_links_list=}, {link_spec=}, {sw_label=}, {sw_ifname=}")
+            if len(link['tags']) > 0:
+                bp.post_tagging(link_node_id, link['tags'])
+            
+    # update LACP
+    if len(lag_spec['links']) > 0:
+        logging.debug(f"{lag_spec=}")
+        lag_updated = bp.patch_leaf_server_link_labels(lag_spec)
+        if lag_updated:
+            logging.warning(f"Unexpected return: LACP updated for generic system {generic_system_label} in blueprint {bp_label}: {lag_updated}")
+        # logging.debug(f"lag_updated: {lag_updated}")
+    
+
+def rename_generic_system_intf(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
+    bp = job_env.main_bp
+    bp_label = bp.label
+    patch_cable_map_spec = {
+        'links': [
+            # {
+            #     'endpoints': [
+            #         {
+            #             'interface': {
+            #                 'id': <switch_intf_node_id>
+            #             }
+            #         },
+            #         {
+            #             'interface': {
+            #                 'id': <generic_system_intf_node_id>,
+            #                 'if_name': <generci_system_ifname>,
+            #             }
+            #         }
+            #     ],
+            #     'id': <link_node_id>
+            # }
+        ]
+    }
+    link_id_num = 0
+    for link in generic_system_links_list:
+        link_id_num += 1
+        group_label = f"link{link_id_num}"
+        for member_number in range(4):
+            member_number += 1
+            sw_label = link[f"label{member_number}"]
+            sw_ifname = link[f"ifname{member_number}"]
+            gs_ifname = link[f"gs_ifname{member_number}"]
+            # skip if data is missing
+            if not sw_label or not sw_ifname:
+                continue
+            if sw_ifname[:2] not in ['et', 'xe', 'ge']:
+                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
+                continue
+            switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
+            # logging.warning(f"{sw_label=}, {sw_ifname=}, {len(switch_link_nodes)=}")
+            # logging.debug(f"{label_label=}, {link[label_label]=}")
+            # logging.debug(f"{len(switch_link_nodes)=}, {switch_link_nodes=}")
+            if switch_link_nodes is None or len(switch_link_nodes) == 0:
+                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
+                continue
+            link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
+            sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
+            gs_if_node_id = switch_link_nodes[0][CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
+            # TODO: move to tags1
+            if len(link['tags']) > 0:
+                bp.post_tagging(link_node_id, link['tags'])
+            
+            # patch_cable_map_spec
+            if gs_ifname is not None and len(gs_ifname):
+                patch_cable_map_spec['links'].append({
+                    'endpoints': [
+                        {
+                            'interface': {
+                                'id': sw_if_node_id
+                            }
+                        },
+                        {
+                            'interface': {
+                                'id': gs_if_node_id,
+                                'if_name': gs_ifname,
+                            }
+                        }
+
+                    ],
+                    'id': link_node_id                            
+                })
+
+    # upddate generic system interface names
+    if len(patch_cable_map_spec['links']) > 0:
+        logging.debug(f"{patch_cable_map_spec=}")
+        patch_cable_map_spec_updated = bp.patch_cable_map(patch_cable_map_spec)
+        if patch_cable_map_spec_updated:
+            logging.warning(f"Unexpected return: cable map updated for generic system {generic_system_label} in blueprint {bp_label}: {patch_cable_map_spec_updated}")
+        # logging.debug(f"patch_cable_map_spec_updated: {patch_cable_map_spec_updated}"
+
+
 def assign_connectivity_templates(job_env: CkJobEnv, gs_label: str, gs_links_list: list):
     # update connectivity templates - this should be run after lag update
     bp = job_env.main_bp
@@ -302,108 +442,8 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
 
         ## form LACP in the BP iterating over the generic systems
         for gs_label, gs_links_list in bp_data.items():
-            lag_spec = {
-                'links': {
-                    # <link_node_id>: {
-                    #     'group_label': group_label,
-                    #     'lag_mode': lag_mode,
-                    # }
-                }
-            }
-            patch_cable_map_spec = {
-                'links': [
-                    # {
-                    #     'endpoints': [
-                    #         {
-                    #             'interface': {
-                    #                 'id': <switch_intf_node_id>
-                    #             }
-                    #         },
-                    #         {
-                    #             'interface': {
-                    #                 'id': <generic_system_intf_node_id>,
-                    #                 'if_name': <generci_system_ifname>,
-                    #             }
-                    #         }
-                    #     ],
-                    #     'id': <link_node_id>
-                    # }
-                ]
-            }
-            link_id_num = 0
-            for link in gs_links_list:
-                if link['lag_mode'] is None:
-                    # logging.debug(f"Skipping: Generic system {gs_label} has no lag_mode")
-                    continue                
-                lag_mode = link['lag_mode']
-                if lag_mode not in [ 'lacp_active', 'lacp_passive']:
-                    logging.warning(f"Skipping: Generic system {gs_label} has invalid lag_mode {lag_mode}")
-                    continue
-                link_id_num += 1
-                group_label = f"link{link_id_num}"
-                for member_number in range(4):
-                    member_number += 1
-                    sw_label = link[f"label{member_number}"]
-                    sw_ifname = link[f"ifname{member_number}"]
-                    gs_ifname = link[f"gs_ifname{member_number}"]
-                    # skip if data is missing
-                    if not sw_label or not sw_ifname:
-                        continue
-                    if sw_ifname[:2] not in ['et', 'xe', 'ge']:
-                        logging.warning(f"Skipping: Generic system {gs_label} has invalid interface name {sw_ifname}")
-                        continue
-                    switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
-                    # logging.warning(f"{sw_label=}, {sw_ifname=}, {len(switch_link_nodes)=}")
-                    # logging.debug(f"{label_label=}, {link[label_label]=}")
-                    # logging.debug(f"{len(switch_link_nodes)=}, {switch_link_nodes=}")
-                    if switch_link_nodes is None or len(switch_link_nodes) == 0:
-                        logging.warning(f"Skipping: Generic system {gs_label} has invalid interface {sw_label}:{sw_ifname}")
-                        continue
-                    link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
-                    sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
-                    gs_if_node_id = switch_link_nodes[0][CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
-                    link_spec = {
-                        'group_label': group_label,
-                        'lag_mode': lag_mode,
-                    }
-                    lag_spec['links'][link_node_id] = link_spec
-                    # logging.warning(f"{gs_links_list=}, {link_spec=}, {sw_label=}, {sw_ifname=}")
-                    if len(link['tags']) > 0:
-                        bp.post_tagging(link_node_id, link['tags'])
-                    
-                    # patch_cable_map_spec
-                    if gs_ifname is not None and len(gs_ifname):
-                        patch_cable_map_spec['links'].append({
-                            'endpoints': [
-                                {
-                                    'interface': {
-                                        'id': sw_if_node_id
-                                    }
-                                },
-                                {
-                                    'interface': {
-                                        'id': gs_if_node_id,
-                                        'if_name': gs_ifname,
-                                    }
-                                }
-
-                            ],
-                            'id': link_node_id                            
-                        })
-            # update LACP
-            if len(lag_spec['links']) > 0:
-                logging.debug(f"{lag_spec=}")
-                lag_updated = bp.patch_leaf_server_link_labels(lag_spec)
-                if lag_updated:
-                    logging.warning(f"Unexpected return: LACP updated for generic system {gs_label} in blueprint {bp_label}: {lag_updated}")
-                # logging.debug(f"lag_updated: {lag_updated}")
-            # upddate generic system interface names
-            if len(patch_cable_map_spec['links']) > 0:
-                logging.debug(f"{patch_cable_map_spec=}")
-                patch_cable_map_spec_updated = bp.patch_cable_map(patch_cable_map_spec)
-                if patch_cable_map_spec_updated:
-                    logging.warning(f"Unexpected return: cable map updated for generic system {gs_label} in blueprint {bp_label}: {patch_cable_map_spec_updated}")
-                # logging.debug(f"patch_cable_map_spec_updated: {patch_cable_map_spec_updated}"
+            form_lacp(job_env, gs_label, gs_links_list)
+            rename_generic_system_intf(job_env, gs_label, gs_links_list)
 
             # # update connectivity templates - this should be run after lag update
             # assign_connectivity_templates(job_env, gs_label, gs_links_list)
