@@ -235,25 +235,26 @@ class CkApstraBlueprint:
         ct_list = self.query(ct_list_query, multiline=True)
         return [x['ep']['id'] for x in ct_list]
     
-    def add_generic_system(self, gs_spec: dict) -> list:
+    def add_generic_system(self, generic_system_spec: dict) -> list:
         """
         Add a generic system (and access switch pair) to the blueprint.
 
         Args:
-            gs_spec: The specification of the generic system.
+            generic_system_spec: The specification of the generic system.
 
         Returns:
             The ID of the switch-system-link ids.
         """
-        existing_system_query = f"node('system', label='{gs_spec['new_systems'][0]['label']}', name='system')"
+        new_generic_system_label = generic_system_spec['new_systems'][0]['label']
+        existing_system_query = f"node('system', label='{new_generic_system_label}', name='system')"
         existing_system = self.query(existing_system_query)
         if len(existing_system) > 0:
             # skipping if the system already exists
             return []
         url = f"{self.url_prefix}/switch-system-links"
-        created_generic_system = self.session.session.post(url, json=gs_spec)
+        created_generic_system = self.session.session.post(url, json=generic_system_spec)
         if created_generic_system.status_code >= 400:
-            self.logger.error(f"System not created: {created_generic_system=}, {created_generic_system.status_code=}, {created_generic_system.text=}")
+            self.logger.error(f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}")
             return []
         if created_generic_system is None or len(created_generic_system.json()) == 0 or 'ids' not in created_generic_system.json():
             return []
