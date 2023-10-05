@@ -57,6 +57,13 @@ class GenericSystemModel(BaseModel):
             return [v]
         return [ x.strip() for x in v.split(',')]
 
+    @field_validator('is_external', mode='before')
+    @classmethod
+    def convert_to_bool(cls, v):
+        if isinstance(v, str) and v == 'yes':
+            return True
+        return False
+
     @field_validator('tags', 'ct_names', mode='before')
     @classmethod
     def convert_to_list_of_str(cls, v):
@@ -238,7 +245,7 @@ def rename_generic_system_intf(job_env: CkJobEnv, generic_system_label: str, gen
         # logging.debug(f"patch_cable_map_spec_updated: {patch_cable_map_spec_updated}"
 
 
-def assign_connectivity_templates(job_env: CkJobEnv, gs_label: str, gs_links_list: list):
+def assign_connectivity_templates(job_env: CkJobEnv, generic_system_label: str, gs_links_list: list):
     # update connectivity templates - this should be run after lag update
     bp = job_env.main_bp
     bp_label = bp.label
@@ -265,7 +272,7 @@ def assign_connectivity_templates(job_env: CkJobEnv, gs_label: str, gs_links_lis
         intf_nodes = bp.get_switch_interface_nodes([link['label1']], link['ifname1'])
         if len(intf_nodes) == 0:
             logging.warning(f"{len(intf_nodes)=}, {intf_nodes=}")
-            logging.warning(f"Skipping: Generic system {gs_label} has invalid interface {link['label1']}:{link['ifname1']}")
+            logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {link['label1']}:{link['ifname1']}")
             continue
         ap_id = None                        
         if intf_nodes[0][CkEnum.EVPN_INTERFACE]:
@@ -280,7 +287,7 @@ def assign_connectivity_templates(job_env: CkJobEnv, gs_label: str, gs_links_lis
     if len(ct_assign_spec['application_points']) > 0:
         # logging.debug(f"{ct_assign_spec=}")
         ct_assign_updated = bp.patch_obj_policy_batch_apply(ct_assign_spec, params={'async': 'full'})
-        logging.debug(f"CT assign updated for generic system {gs_label} in blueprint {bp_label}: {ct_assign_updated}")
+        logging.debug(f"CT assign updated for generic system {generic_system_label} in blueprint {bp_label}: {ct_assign_updated}")
         # logging.debug(f"ct_assign_updated: {ct_assign_updated}"
 
 
@@ -347,10 +354,12 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
             }
             # to form logical device
             speed_count = {}
+            system_type = 'server'
 
             for link in gs_links_list:
             #     logging.debug(f"{link=}")
                 link_speed = link['speed']
+                system_type = 'external' if link['is_external'] else 'server'
                 for link_number in range(4):
                     link_id_num = link_number + 1
                     label_label = f"label{link_id_num}"
@@ -383,9 +392,8 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
                     else:
                         speed_count[link_speed] += 1
 
-
             new_system = {
-                'system_type': 'server',
+                'system_type': system_type,
                 'label': gs_label,
                 'port_channel_id_min': 0,
                 'port_channel_id_max': 0,
