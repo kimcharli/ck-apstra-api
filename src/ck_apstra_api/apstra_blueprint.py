@@ -233,6 +233,9 @@ class CkApstraBlueprint:
             node('ep_endpoint_policy', policy_type_name='batch', label=is_in({ct_labels}), name='ep')
         """
         ct_list = self.query(ct_list_query, multiline=True)
+        if len(ct_list) == 0:
+            self.logger.debug(f"No CTs found for{ct_labels=}")
+            return []
         return [x['ep']['id'] for x in ct_list]
     
     def add_generic_system(self, generic_system_spec: dict) -> list:
@@ -425,26 +428,28 @@ class CkApstraBlueprint:
                    for x in self.query(ct_list_spec, multiline=True)]
         return ct_list
 
-    def add_single_vlan_ct(self, vni: str, is_tagged: bool) -> str:
+    def add_single_vlan_ct(self, vni: int, vlan_id: int, is_tagged: bool) -> str:
         '''
         Create a single VLAN CT
         '''
+        logging.debug(f"{vni=}, {vlan_id=}, {is_tagged=}")
         tagged_type = 'tagged' if is_tagged else 'untagged'
-        if is_tagged:
-            ct_label = f"vn{int(vni)-100000}"
-        else:
-            ct_label = f"vn{int(vni)-100000}-untagged"
+        ct_label = f"vn{vlan_id}" if is_tagged else f"vn{vlan_id}-untagged"
         uuid_batch = str(uuid.uuid4())
         uuid_pipeline = str(uuid.uuid4())
         uuid_vlan = str(uuid.uuid4())
-        vn_id = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")[0]['vn']['id']
+        found_vn_node = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
+        if len(found_vn_node) == 0:
+            self.logger.warning(f"virtual network with {vni=} not found")
+            return None
+        vn_id = found_vn_node[0]['vn']['id']
         policy_spec = {
             "policies": [
                 {
                     "description": f"Single VLAN Connectivity Template for VNI {vni}",
                     "tags": [],
                     "user_data": f"{{\"isSausage\":true,\"positions\":{{\"{uuid_vlan}\":[290,80,1]}}}}",
-                    "label": f"vn{int(vni)-100000}",
+                    "label": ct_label,
                     "visible": True,
                     "policy_type_name": "batch",
                     "attributes": {

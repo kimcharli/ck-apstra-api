@@ -39,8 +39,8 @@ def cli():
     # prep_logging(log_level)
     pass
 
-from ck_apstra_api.generic_system import click_read_generic_systems, click_add_generic_systems
+from ck_apstra_api.generic_system import click_read_generic_systems, click_add_generic_systems, click_assign_connecitivity_templates
 cli.add_command(click_read_generic_systems)
 cli.add_command(click_add_generic_systems)
-
+cli.add_command(click_assign_connecitivity_templates)
 

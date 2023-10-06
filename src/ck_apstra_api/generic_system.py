@@ -265,16 +265,29 @@ def assign_connectivity_templates(job_env: CkJobEnv, generic_system_label: str, 
     }
     for link in gs_links_list:
         # ct_names takes precedence
-        if len(link['ct_names']) > 0:
-            ct_ids = bp.get_ct_ids(link['ct_names'])
+        ct_names = link['ct_names']
+        if ct_names and len(ct_names) > 0:
+            ct_ids = bp.get_ct_ids(ct_names)
+            if len(ct_ids) != len(ct_names):
+                logging.error(f"Skipping: Generic system {generic_system_label} has wrong data {ct_names=} {ct_ids=}")
+                continue
         elif link['untagged_vlan'] is not None:
-            pass
+            # conentional name: vn123-untagged
+            untagged_vlan_id = link['untagged_vlan']
+            untagged_vlan_name = f"vn{untagged_vlan_id}-untagged"
+            ct_ids = bp.get_ct_ids([untagged_vlan_name])
+            if len(ct_ids) != 1:
+                added = bp.add_single_vlan_ct(200000 + untagged_vlan_id, untagged_vlan_id, is_tagged=False)
+                logging.debug(f"Added CT {untagged_vlan_name}: {added}")
+            ct_ids = bp.get_ct_ids([untagged_vlan_name])
+            logging.debug(f"{untagged_vlan_name=}, {ct_ids=}")            
+        logging.debug(f"{link=}")
         intf_nodes = bp.get_switch_interface_nodes([link['label1']], link['ifname1'])
         if len(intf_nodes) == 0:
             logging.warning(f"{len(intf_nodes)=}, {intf_nodes=}")
             logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {link['label1']}:{link['ifname1']}")
             continue
-        ap_id = None                        
+        ap_id = None
         if intf_nodes[0][CkEnum.EVPN_INTERFACE]:
             ap_id = intf_nodes[0][CkEnum.EVPN_INTERFACE]['id']
         else:
@@ -463,6 +476,25 @@ def click_add_generic_systems():
     generic_systems = read_generic_systems(job_env.excel_input_file, 'generic_systems')
     add_generic_systems(job_env, generic_systems)
 
+
+@click.command(name='assign-connectivity-templates')
+def click_assign_connecitivity_templates():
+    job_env = CkJobEnv()
+    generic_systems = read_generic_systems(job_env.excel_input_file, 'generic_systems')
+    bp_total = len(generic_systems)  # total number of blueprints
+    bp_count = 0
+    logging.info(f"Adding connecitivity templates to {bp_total} blueprints")
+    for bp_label, bp_data in generic_systems.items():
+        bp_count += 1
+        logging.info(f"Adding connecitivity templates to blueprint {bp_count}/{bp_total}: {bp_label}")
+        bp = CkApstraBlueprint(job_env.session, bp_label)
+        # logging.debug(f"{bp=}, {bp.id=}")
+        gs_total = len(bp_data)
+        gs_count = 0
+        logging.info(f"Adding {gs_total} generic systems to blueprint {bp_label}")
+        for gs_label, gs_links_list in bp_data.items():
+            form_lacp(job_env, gs_label, gs_links_list)
+            assign_connectivity_templates(job_env, gs_label, gs_links_list)
 
 if __name__ == "__main__":
     click_add_generic_systems()
