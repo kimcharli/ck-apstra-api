@@ -173,12 +173,17 @@ class CkApstraBlueprint:
     def get_switch_interface_nodes(self, system_labels, intf_name=None) -> str:
         """
         Return interface nodes of the switches
+            system_labels: list of system labels or a str for the single system label
             return CkEnum.MEMBER_INTERFACE and CkEnum.MEMBER_SWITCH
                 optionally CkEnum.EVPN_INTERFACE if it is a LAG
             It can be used for VLAN CT association
             TODO: implement intf_name in case of multiple link generic system
         TODO: cache generic system interface id
         """
+        the_system_labels = system_labels if isinstance(system_labels, list) else [system_labels] if isinstance(system_labels, str) else []
+        if len(the_system_labels) == 0:
+            self.logger.warning(f"{system_labels=} is not a list or string")
+            return []
         intf_name_filter = f", if_name='{intf_name}'" if intf_name else ""
         interface_query = f"""
             match(
@@ -186,7 +191,7 @@ class CkApstraBlueprint:
                     .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
                     .out('link').node('link', name='{CkEnum.LINK}')
                     .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
-                    .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
+                    .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
                 optional(
                     node('redundancy_group')
                         .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
@@ -234,7 +239,7 @@ class CkApstraBlueprint:
         """
         ct_list = self.query(ct_list_query, multiline=True)
         if len(ct_list) == 0:
-            self.logger.debug(f"No CTs found for{ct_labels=}")
+            self.logger.debug(f"No CTs found for {ct_labels=}")
             return []
         return [x['ep']['id'] for x in ct_list]
     
@@ -348,11 +353,11 @@ class CkApstraBlueprint:
         patched = self.session.patch_throttled(f"{self.url_prefix}/virtual-networks/{patch_spec['id']}", spec=patch_spec, params=params)
         return patched
 
-    def post_tagging(self, nodes, tags_to_add = None, tags_to_remove = None, params=None, print_prefix=None):
+    def post_tagging(self, nodes: list, tags_to_add = None, tags_to_remove = None, params=None):
         '''
         Update the tagging
         Args:
-            nodes: The list of nodes to be tagged. Can be links
+            nodes: The list of nodes to be tagged. Can be links. A node (string) can be used.
             tags_to_add: The list of tags to be added
             tags_to_remove: The list of tags to be removed
 
@@ -370,20 +375,23 @@ class CkApstraBlueprint:
             'remove': [],
             'assigned_to_all': [],
         }
-        tag_nodes = self.query(f"node(id=is_in({nodes})).in_().node('tag', label=is_in({tags_to_add}), name='tag')")
+        # take string or list 
+        the_nodes_list = nodes if isinstance(nodes, list) else [nodes] if isinstance(nodes, str) else []
+        if len(the_nodes_list) == 0:
+            self.logger.warning(f"{nodes=} is not a list or string")
+            return
+        # no need to check the present of tags in tags_to_add 
+        tag_nodes = self.query(f"node(id=is_in({the_nodes_list})).in_().node('tag', label=is_in({tags_to_add}), name='tag')")
         are_tags_the_same = len(tag_nodes) == (len(tags_to_add) * len(nodes))
+        self.logger.debug(f"{nodes=} {the_nodes_list=} {tags_to_add=}, {tags_to_remove=}, {are_tags_the_same=} {tag_nodes}")
 
         # self.logger.debug(f"{nodes=} {tags_to_add=}, {tags_to_remove=} {are_tags_the_same=}")
         # The tags are the same as the existing tags
         if are_tags_the_same or (not tags_to_add and not tags_to_remove):
-            if print_prefix:
-                self.logger.info(f"{print_prefix}: No tags to add or remove")
             return
-        tagging_spec['nodes'] = nodes
+        tagging_spec['nodes'] = the_nodes_list
         tagging_spec['add'] = tags_to_add
         tagging_spec['remove'] = tags_to_remove
-        if print_prefix:
-            self.logger.info(f"{print_prefix}: {nodes=}, {tags_to_add=}, {tags_to_remove=}, {tagging_spec=}")
         return self.session.session.post(f"{self.url_prefix}/tagging", json=tagging_spec, params={'aync': 'full'})
 
     def batch(self, batch_spec: dict, params=None) -> None:
@@ -428,12 +436,25 @@ class CkApstraBlueprint:
                    for x in self.query(ct_list_spec, multiline=True)]
         return ct_list
 
+    def get_single_vlan_ct_or_create(self, vlan_id: int, is_tagged: bool) -> str:
+        """
+        Get the single VLAN CT ID or create one if it does not exist
+        """
+        vlan_name = f"vn{vlan_id}"
+        if is_tagged is False:
+            vlan_name = f"{vlan_name}-untagged"
+        ct_ids = self.get_ct_ids([vlan_name])
+        if len(ct_ids) == 1:
+            return ct_ids[0]
+        new_ct_id = self.add_single_vlan_ct(200000 + vlan_id, vlan_id, is_tagged)
+        return new_ct_id
+
     def add_single_vlan_ct(self, vni: int, vlan_id: int, is_tagged: bool) -> str:
         '''
         Create a single VLAN CT
         '''
         logging.debug(f"{vni=}, {vlan_id=}, {is_tagged=}")
-        tagged_type = 'tagged' if is_tagged else 'untagged'
+        tagged_type = 'vlan_tagged' if is_tagged else 'untagged'
         ct_label = f"vn{vlan_id}" if is_tagged else f"vn{vlan_id}-untagged"
         uuid_batch = str(uuid.uuid4())
         uuid_pipeline = str(uuid.uuid4())
@@ -486,6 +507,65 @@ class CkApstraBlueprint:
         # it will be 204 with b''
         return uuid_batch
 
+    def add_multiple_vlan_ct(self, ct_label: str, untagged_vlan_id: int = None, tagged_vlan_ids: list[int] = []) -> str:
+        '''
+        Create a multi VLAN CT
+        TODO: under construction
+        '''
+        logging.warning(f"{ct_label=}, {untagged_vlan_id=}, {tagged_vlan_ids=}")
+        untagged_vn_id = self.get_virtual_network(200000 + untagged_vlan_id) if untagged_vlan_id else None
+        tagged_vn_ids = [self.get_virtual_network(200000 + x) for x in tagged_vlan_ids]
+        uuid_batch = str(uuid.uuid4())
+        uuid_pipeline = str(uuid.uuid4())
+        uuid_vlan = str(uuid.uuid4())
+        # found_vn_node = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
+        if untagged_vn_id is None and len(tagged_vn_ids) == 0:
+            self.logger.warning(f"virtual network with {untagged_vlan_id=} and/or {tagged_vlan_ids=} not found")
+            return None
+        policy_spec = {
+            "policies": [
+                {
+                    "description": f"Multiple VLAN Connectivity Template",
+                    "tags": [],
+                    "user_data": f"{{\"isSausage\":true,\"positions\":{{\"{uuid_vlan}\":[290,80,1]}}}}",
+                    "label": ct_label,
+                    "visible": True,
+                    "policy_type_name": "batch",
+                    "attributes": {
+                        "subpolicies": [uuid_pipeline]
+                    },
+                    "id": uuid_batch
+                },
+                {
+                    "description": "Add a list of VLANs to interfaces, as tagged or untagged.",
+                    "label": "Virtual Network (Multiple)",
+                    "visible": False,
+                    "attributes": {
+                        "untagged_vn_node_id": untagged_vn_id,
+                        "tagged_vn_node_ids": tagged_vn_ids,
+                    },
+                    "policy_type_name": "AttachMultipleVLAN",
+                    "id": uuid_vlan
+                },
+                {
+                    "description": "Add a list of VLANs to interfaces, as tagged or untagged.",
+                    "label": "Virtual Network (Multiple) (pipeline)",
+                    "visible": False,
+                    "attributes": {
+                        "second_subpolicy": None,
+                        "first_subpolicy": uuid_vlan
+                    },
+                    "policy_type_name": "pipeline",
+                    "id": uuid_pipeline
+                }
+            ]
+        }
+        url = f"{self.url_prefix}/obj-policy-import"
+        result = self.session.session.put(url, json=policy_spec)
+
+        # it will be 204 with b''
+        return uuid_batch
+
     def get_cabling_maps(self):
         '''
         Get the cabling maps
@@ -502,6 +582,28 @@ class CkApstraBlueprint:
         if patched.status_code == 204:
             # No Content: a request has succeeded, but that the client doesn't need to navigate away from its current page.
             return None
+        return patched
+
+    def patch_security_zones_csv_bulk(self, csv_bulk: str, params: dict = {'async': 'full'}):
+        '''
+        Patch the security zones in bulk
+        '''
+        url = f"{self.url_prefix}/security-zones-csv-bulk"
+        csv_spec = {
+            'csv_bulk': csv_bulk,
+        }        
+        patched = self.session.session.patch(url, json=csv_spec, params=params)
+        return patched
+
+    def patch_virtual_networks_csv_bulk(self, csv_bulk: str, params: dict = {'async': 'full'}):
+        '''
+        Patch the virtual networks in bulk
+        '''
+        url = f"{self.url_prefix}/virtual-networks-csv-bulk"
+        csv_spec = {
+            'csv_bulk': csv_bulk,
+        }        
+        patched = self.session.session.patch(url, json=csv_spec, params=params)
         return patched
 
     def revert(self):

@@ -3,10 +3,11 @@ import logging
 import pandas as pd
 from math import isnan
 from pathlib import Path
-from pydantic import BaseModel, validator, StrictStr, field_validator
+from pydantic import BaseModel, validator, StrictStr, field_validator, Field
 from typing import List, Optional, Any, TypeVar, Annotated
 import numpy as np
 import os
+import uuid
 
 import click
 
@@ -15,24 +16,37 @@ from ck_apstra_api.cli import CkJobEnv
 from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
 
 class GenericSystemModel(BaseModel):
+    """
+    The variables from the excel sheet generic_systems
+    """
     blueprint: str
     system_label: str
     is_external: Optional[bool] = False
     speed: str               # 10G 
     lag_mode: Optional[str]  # mandatory in case of multiple interfaces
-    tags: Optional[List[str]] = None
+    tags: List[str] = Field(default = [])  # deprecated
+    gs_tags: List[str] = Field(default = [])
+
     label1: str
     ifname1: str
     gs_ifname1: Optional[str]
+    tags1: List[str] = Field(default = [])
+
     label2: Optional[str]
     ifname2: Optional[str]
     gs_ifname2: Optional[str]
+    tags2: List[str] = Field(default = [])
+
     label3: Optional[str]
     ifname3: Optional[str]
     gs_ifname3: Optional[str]
+    tags3: List[str] = Field(default = [])
+
     label4: Optional[str]
     ifname4: Optional[str]
     gs_ifname4: Optional[str]
+    tags4: List[str] = Field(default = [])
+
     untagged_vlan: Optional[int] = None
     tagged_vlans: Optional[List[int]] = None
     ct_names: Optional[List[str]] = None
@@ -64,7 +78,7 @@ class GenericSystemModel(BaseModel):
             return True
         return False
 
-    @field_validator('tags', 'ct_names', mode='before')
+    @field_validator('tags', 'gs_tags', 'tags1', 'tags2', 'tags3', 'tags4', 'ct_names', mode='before')
     @classmethod
     def convert_to_list_of_str(cls, v):
         if v is None:
@@ -152,8 +166,6 @@ def form_lacp(job_env: CkJobEnv, generic_system_label: str, generic_system_links
             }
             lag_spec['links'][link_node_id] = link_spec
             # logging.warning(f"{gs_links_list=}, {link_spec=}, {sw_label=}, {sw_ifname=}")
-            if len(link['tags']) > 0:
-                bp.post_tagging(link_node_id, link['tags'])
             
     # update LACP
     if len(lag_spec['links']) > 0:
@@ -163,6 +175,47 @@ def form_lacp(job_env: CkJobEnv, generic_system_label: str, generic_system_links
             logging.warning(f"Unexpected return: LACP updated for generic system {generic_system_label} in blueprint {bp_label}: {lag_updated}")
         # logging.debug(f"lag_updated: {lag_updated}")
     
+
+def add_tags(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
+    bp = job_env.main_bp
+    bp_label = bp.label
+    link_id_num = 0
+    generic_system_node = bp.get_system_node_from_label(generic_system_label)
+    if generic_system_node is None:
+        logging.warning(f"Skipping: Generic system {generic_system_label} does not exist in blueprint {bp_label}")
+        return
+    generic_system_id = generic_system_node['id']
+    for link in generic_system_links_list:
+        link_id_num += 1
+        group_label = f"link{link_id_num}"
+        gs_tags = link['gs_tags']
+        if len(gs_tags) > 0:
+            bp.post_tagging(generic_system_id, tags_to_add=gs_tags)            
+        # iterate over the 4 member interfaces        
+        for member_number in range(4):
+            member_number += 1
+            sw_label = link[f"label{member_number}"]
+            sw_ifname = link[f"ifname{member_number}"]
+            gs_ifname = link[f"gs_ifname{member_number}"]
+            member_tags = link[f"tags{member_number}"]  # list of string(tag)
+            # the switch label and the interface should be defined. If not, skip
+            if not sw_label or not sw_ifname:
+                continue
+            # the switch interface name should be legit
+            if sw_ifname[:2] not in ['et', 'xe', 'ge']:
+                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
+                continue
+            switch_link_nodes = bp.get_switch_interface_nodes(sw_label, sw_ifname)
+            if switch_link_nodes is None or len(switch_link_nodes) == 0:
+                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
+                continue
+            link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
+            # logging.debug(f"{member_tags=}")
+            if len(member_tags) > 0:
+                logging.debug(f"{member_tags=}")
+                bp.post_tagging(link_node_id, tags_to_add=member_tags)
+                
+
 
 def rename_generic_system_intf(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
     bp = job_env.main_bp
@@ -212,9 +265,6 @@ def rename_generic_system_intf(job_env: CkJobEnv, generic_system_label: str, gen
             link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
             sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
             gs_if_node_id = switch_link_nodes[0][CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
-            # TODO: move to tags1
-            if len(link['tags']) > 0:
-                bp.post_tagging(link_node_id, link['tags'])
             
             # patch_cable_map_spec
             if gs_ifname is not None and len(gs_ifname):
@@ -266,22 +316,40 @@ def assign_connectivity_templates(job_env: CkJobEnv, generic_system_label: str, 
     for link in gs_links_list:
         # ct_names takes precedence
         ct_names = link['ct_names']
-        if ct_names and len(ct_names) > 0:
+        untagged_vlan = link['untagged_vlan']
+        tagged_vlans = link['tagged_vlans']
+        ct_ids = []
+        if (ct_names and len(ct_names) == 0) and untagged_vlan is None and len(tagged_vlans) == 0:
+            logging.debug(f"Skipping: Generic system {generic_system_label} has no CTs {link=}")
+            continue
+        if ct_names:
             ct_ids = bp.get_ct_ids(ct_names)
             if len(ct_ids) != len(ct_names):
                 logging.error(f"Skipping: Generic system {generic_system_label} has wrong data {ct_names=} {ct_ids=}")
                 continue
-        elif link['untagged_vlan'] is not None:
-            # conentional name: vn123-untagged
-            untagged_vlan_id = link['untagged_vlan']
-            untagged_vlan_name = f"vn{untagged_vlan_id}-untagged"
-            ct_ids = bp.get_ct_ids([untagged_vlan_name])
-            if len(ct_ids) != 1:
-                added = bp.add_single_vlan_ct(200000 + untagged_vlan_id, untagged_vlan_id, is_tagged=False)
-                logging.debug(f"Added CT {untagged_vlan_name}: {added}")
-            ct_ids = bp.get_ct_ids([untagged_vlan_name])
-            logging.debug(f"{untagged_vlan_name=}, {ct_ids=}")            
-        logging.debug(f"{link=}")
+        else:
+            # can have untagged too
+            # TODO: check if the CTs exist and create if not
+            # TODO: naming rule
+            if link['tagged_vlans']:
+                for tagged_vlan_id in link['tagged_vlans']:
+                    ct_ids.append(bp.get_single_vlan_ct_or_create(tagged_vlan_id, is_tagged=True))
+                # logging.debug(f"{untagged_vlan=}, {ct_ids=}")
+            if untagged_vlan:
+                # conentional name: vn123-untagged
+                # untagged_vlan_name = f"vn{untagged_vlan_id}-untagged"
+                # ct_ids = bp.get_ct_ids([untagged_vlan_name])
+                # if len(ct_ids) != 1:
+                #     added = bp.add_single_vlan_ct(200000 + untagged_vlan_id, untagged_vlan_id, is_tagged=False)
+                #     logging.debug(f"Added CT {untagged_vlan_name}: {added}")
+                # ct_ids = bp.get_ct_ids([untagged_vlan_name])
+                # logging.debug(f"{untagged_vlan_name=}, {ct_ids=}")
+                ct_ids.append(bp.get_single_vlan_ct_or_create(untagged_vlan, is_tagged=False))
+                logging.debug(f"{untagged_vlan=}, {ct_ids=}")
+        if 'ct_ids' not in locals():
+            logging.debug(f"Skipping: Generic system {generic_system_label} has no CTs")
+            continue
+        logging.debug(f"{link=} {ct_ids=}")
         intf_nodes = bp.get_switch_interface_nodes([link['label1']], link['ifname1'])
         if len(intf_nodes) == 0:
             logging.warning(f"{len(intf_nodes)=}, {intf_nodes=}")
@@ -300,7 +368,7 @@ def assign_connectivity_templates(job_env: CkJobEnv, generic_system_label: str, 
     if len(ct_assign_spec['application_points']) > 0:
         # logging.debug(f"{ct_assign_spec=}")
         ct_assign_updated = bp.patch_obj_policy_batch_apply(ct_assign_spec, params={'async': 'full'})
-        logging.debug(f"CT assign updated for generic system {generic_system_label} in blueprint {bp_label}: {ct_assign_updated}")
+        logging.debug(f"CT assign updated for generic system {generic_system_label} in blueprint {bp_label}: {ct_assign_updated} {ct_assign_spec=}")
         # logging.debug(f"ct_assign_updated: {ct_assign_updated}"
 
 
@@ -319,18 +387,23 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
                     "is_external": false,
                     "speed": "10G",
                     "lag_mode": null,
+ 
                     "label1": "eth1",
                     "ifname1": "eth1",
                     "gs_ifname1": null,
+
                     "label2": null,
                     "ifname2": null,
                     "gs_ifname2": null,
+
                     "label3": null,
                     "ifname3": null,
                     "gs_ifname3": null,
+
                     "label4": null,
                     "ifname4": null,
                     "gs_ifname4": null,
+
                     "ct_names": null,
                     "comment": null
                 }
@@ -464,6 +537,7 @@ def add_generic_systems(job_env: CkJobEnv, generic_systems: dict):
         ## form LACP in the BP iterating over the generic systems
         for gs_label, gs_links_list in bp_data.items():
             form_lacp(job_env, gs_label, gs_links_list)
+            add_tags(job_env, gs_label, gs_links_list)
             rename_generic_system_intf(job_env, gs_label, gs_links_list)
 
             # # update connectivity templates - this should be run after lag update
