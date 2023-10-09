@@ -122,6 +122,7 @@ class CkApstraSession:
             The items
         """
         url = f"{self.url_prefix}/{url}"
+        # self.logger.debug(f"{url=}")
         return self.session.get(url).json()
 
     def patch_item(self, url: str, spec: dict) -> dict:

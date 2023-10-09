@@ -605,6 +605,14 @@ class CkApstraBlueprint:
         }        
         patched = self.session.session.patch(url, json=csv_spec, params=params)
         return patched
+    
+    def patch_resource_groups(self, resource_group_spec: dict, params: dict = {'async': 'full'}):
+        '''
+        Patch the resource groups
+        '''
+        url = f"{self.url_prefix}/resource_groups"
+        patched = self.session.session.patch(url, json=resource_group_spec, params=params)
+        return patched
 
     def revert(self):
         '''
@@ -616,6 +624,14 @@ class CkApstraBlueprint:
                                                   params={"aync": "full"})
         self.logger.info(f"Revert result: {revert_result.json()}")
 
+
+    def get_ip_pools(self):
+        '''
+        Get the IP pools of the controller
+        '''
+        ip_pools = self.session.get_items('resources/ip-pools')
+        # self.logger.debug(f"{ip_pools=}")
+        return ip_pools['items']
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
