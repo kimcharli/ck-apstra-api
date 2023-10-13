@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ck-apstra-api"
-version = "0.2.1"
+version = "0.2.2"
 description = "An implementation to use Apstra API"
 authors = [ "Charlie Kim <ckim@juniper.net>" ]
 license = "MIT"

@@ -181,6 +181,20 @@ class CkApstraSession:
         url = f"{self.url_prefix}/blueprints"
         return self.session.options(url).json()['items']
 
+    def post(self, url: str, data: dict, params: dict = None) -> dict:
+        """
+        Post data to the url.
+
+        Args:
+            The url under /api/
+            The post data
+
+        Returns:
+            The return
+        """
+        url = f"{self.url_prefix}/{url}"
+        # self.logger.debug(f"post({url}, {data})")
+        return self.session.post(url, json=data, params=params)
 
 if __name__ == "__main__":
     from dotenv import load_dotenv

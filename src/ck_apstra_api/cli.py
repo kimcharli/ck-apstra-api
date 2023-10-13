@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import logging
 import time
+import json
 
 from ck_apstra_api.apstra_session import prep_logging
 from ck_apstra_api.apstra_session import CkApstraSession
@@ -16,8 +17,10 @@ class CkJobEnv:
     # session: CkApstraSession
     # main_bp: CkApstraBlueprint
     # excel_input_file: str
+    # main_blueprint_name: str
+    # bp_json_file: str
 
-    def __init__(self):
+    def __init__(self, command: str = None):
         load_dotenv()
         self.log_level = os.getenv('logging_level')
         prep_logging(self.log_level)
@@ -31,9 +34,64 @@ class CkJobEnv:
             apstra_server_username,
             apstra_server_password,
             )
-        main_blueprint_name = os.getenv('main_blueprint')
-        self.main_bp = CkApstraBlueprint(self.session, main_blueprint_name)
+        self.main_blueprint_name = os.getenv('main_blueprint')
+        # in case of skipping the bp loading
+        if command and command == 'add-bp-from-json':
+            self.bp_json_file = os.getenv('bp_json_file')
+            return
+        self.main_bp = CkApstraBlueprint(self.session, self.main_blueprint_name)
         self.excel_input_file = os.getenv('excel_input_file')
+
+
+
+def add_bp_from_json(job_env: CkJobEnv):
+    """
+    Add a blueprint from a json file
+    The json file - job_env.bp_json_file
+    The blueprint label - job_env.main_blueprint_name
+
+    """
+    bp_json = ''
+    with open(job_env.bp_json_file, 'r') as f:
+        bp_json = f.read()
+    bp_dict = json.loads(bp_json)
+    node_list = []
+    for node_id, node_dict in bp_dict['nodes'].items():
+        if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
+            node_dict['system_id'] = None
+            # node_dict['deploy_mode'] = 'undeploy'
+        if node_dict['type'] == 'metadata':
+            node_dict['label'] = job_env.main_blueprint_name      
+        for k, v in node_dict.items():
+            if k == 'tags':
+                if v is None or v == "['null']":
+                    node_dict[k] = []
+            elif k == 'property_set' and v is None:
+                node_dict.update({
+                    k: {}
+                })
+        node_list.append(node_dict)        
+
+    bp_dict['label'] = job_env.main_blueprint_name
+
+    relationship_list = [
+        rel_dict for rel_id, rel_dict in bp_dict['relationships'].items()
+    ]
+
+    bp_spec = { 
+        'design': bp_dict['design'], 
+        'label': bp_dict['label'], 
+        'init_type': 'explicit', 
+        'nodes': node_list,
+        'relationships': relationship_list
+    }
+    bp_created = job_env.session.post('blueprints', data=bp_spec)
+    logging.info(f"push_bp_from_json() BP bp_created = {bp_created}")
+
+@click.command(name='add-bp-from-json')
+def click_add_bp_from_json():
+    job_env = CkJobEnv(command='add-bp-from-json')
+    add_bp_from_json(job_env)
 
 
 def import_routing_zones(job_env: CkJobEnv, input_file_path_string: str = None, sheet_name: str = 'routing_zones'):
@@ -112,3 +170,4 @@ cli.add_command(click_add_generic_systems)
 cli.add_command(click_assign_connecitivity_templates)
 cli.add_command(click_import_routing_zones)
 cli.add_command(click_import_virtual_networks)
+cli.add_command(click_add_bp_from_json)
