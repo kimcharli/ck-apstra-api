@@ -171,3 +171,6 @@ cli.add_command(click_assign_connecitivity_templates)
 cli.add_command(click_import_routing_zones)
 cli.add_command(click_import_virtual_networks)
 cli.add_command(click_add_bp_from_json)
+
+from ck_apstra_api.ip_endpoint import click_add_ip_endpoints
+cli.add_command(click_add_ip_endpoints)

@@ -394,6 +394,12 @@ class CkApstraBlueprint:
         tagging_spec['remove'] = tags_to_remove
         return self.session.session.post(f"{self.url_prefix}/tagging", json=tagging_spec, params={'aync': 'full'})
 
+    def post_item(self, item_url: str, post_spec: dict, params={'type': 'staging'}):
+        '''
+        Post an item
+        '''
+        return self.session.session.post(f"{self.url_prefix}/{item_url}", json=post_spec, params=params)
+
     def batch(self, batch_spec: dict, params=None) -> None:
         '''
         Run API commands in batch
