@@ -400,6 +400,12 @@ class CkApstraBlueprint:
         '''
         return self.session.session.post(f"{self.url_prefix}/{item_url}", json=post_spec, params=params)
 
+    def put_item(self, item_url: str, put_spec: dict, params={'type': 'staging'}):
+        '''
+        Put an item
+        '''
+        return self.session.session.put(f"{self.url_prefix}/{item_url}", json=put_spec, params=params)
+
     def batch(self, batch_spec: dict, params=None) -> None:
         '''
         Run API commands in batch
