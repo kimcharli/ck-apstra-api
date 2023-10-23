@@ -83,7 +83,7 @@ class CkApstraBlueprint:
             strip: Strip the query string. Required in case of multi-line query.
 
         Returns:
-            The results of the query.
+            The content of the items, the results of the query.
         """
         query_candidate = query_string.strip()        
         if multiline:
