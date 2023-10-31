@@ -59,11 +59,13 @@ class CkApstraBlueprint:
         Returns:
             The ID of the blueprint.
         """
+        # get summary lists of all the blueprints
         blueprints = self.session.get_items('blueprints')['items']
-        for blueprint in blueprints:
-            if blueprint['label'] == self.label:
-                self.id = blueprint['id']
-                break
+        self.id = [x['id'] for x in blueprints if x['label'] == self.label][0]
+        # for blueprint in blueprints:
+        #     if blueprint['label'] == self.label:
+        #         self.id = blueprint['id']
+        #         break
         if self.id is None:
             raise ValueError(f"Blueprint '{self.label}' not found.")
         return self.id
@@ -73,6 +75,22 @@ class CkApstraBlueprint:
     #     Print the ID of the blueprint.
     #     """
     #     return self.id
+
+    def dump(self) -> dict:
+        """
+        Dump the blueprint.
+          {
+            'relationships': {},
+            'nodes': {},
+            'last_modified_at': '2023-10-30T22:25:08.490380Z',            
+            'label': 'test',
+            'version': 6095,
+            'design': 'two_stage_l3clos',
+            'id': "43964eca-9b21-4144-8c44-9f173c224623",
+            'source_versions': { "config_blueprint": 6051 }
+          }
+        """
+        return self.session.get_items(f"blueprints/{self.id}")
 
     def query(self, query_string: str, print_prefix: str = None, multiline: bool = False) -> list:
         """

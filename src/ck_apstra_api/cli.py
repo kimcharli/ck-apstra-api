@@ -6,6 +6,7 @@ import pandas as pd
 import logging
 import time
 import json
+from datetime import datetime
 
 from ck_apstra_api.apstra_session import prep_logging
 from ck_apstra_api.apstra_session import CkApstraSession
@@ -42,6 +43,11 @@ class CkJobEnv:
         self.main_bp = CkApstraBlueprint(self.session, self.main_blueprint_name)
         self.excel_input_file = os.getenv('excel_input_file')
 
+    def get_bp_json_file(self):
+        if hasattr(self, 'bp_json_file') and self.bp_json_file != '':
+            return self.bp_json_file
+        datetime_str = time.strftime("%Y-%m-%d-%H:%M")
+        return f"{self.main_blueprint_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M:%S')}.json"
 
 
 def add_bp_from_json(job_env: CkJobEnv):
@@ -92,6 +98,31 @@ def add_bp_from_json(job_env: CkJobEnv):
 def click_add_bp_from_json():
     job_env = CkJobEnv(command='add-bp-from-json')
     add_bp_from_json(job_env)
+
+
+def get_bp_into_json(job_env: CkJobEnv, bp_name, json_path):
+    """
+    Create a blueprint into a json file
+    The blueprint label - job_env.main_blueprint_name
+    The json file - job_env.bp_json_file
+    """
+    the_bp_name = bp_name if bp_name != '' else job_env.main_blueprint_name
+    the_json_path = json_path if json_path != '' else job_env.get_bp_json_file()
+    logging.info(f"{the_bp_name=} {the_json_path=}")
+
+    the_blueprint_data = job_env.main_bp.dump()
+    logging.info(f"{the_blueprint_data.keys()=}")
+    with open(the_json_path, 'w') as f:
+        f.write(json.dumps(the_blueprint_data, indent=2))
+
+    return
+
+@click.command(name='get-bp-into-json')
+@click.option('--bp_name', default='')
+@click.option('--json_path', default='')
+def click_get_bp_into_json(bp_name, json_path):
+    job_env = CkJobEnv(command='get-bp-into-json')
+    get_bp_into_json(job_env, bp_name, json_path)
 
 
 def import_routing_zones(job_env: CkJobEnv, input_file_path_string: str = None, sheet_name: str = 'routing_zones'):
@@ -156,9 +187,10 @@ def click_import_virtual_networks():
     import_virtual_networks(job_env)
 
 
-
 @click.group()
-def cli():
+@click.option('--logging-level', default='')
+def cli(logging_level: str = ''):
+    # job_env = CkJobEnv(logging_level)
     # load_dotenv()
     # log_level = os.getenv('logging_level', 'DEBUG')
     # prep_logging(log_level)
@@ -171,6 +203,7 @@ cli.add_command(click_assign_connecitivity_templates)
 cli.add_command(click_import_routing_zones)
 cli.add_command(click_import_virtual_networks)
 cli.add_command(click_add_bp_from_json)
+cli.add_command(click_get_bp_into_json)
 
 from ck_apstra_api.ip_endpoint import click_add_ip_endpoints
 cli.add_command(click_add_ip_endpoints)
