@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# https://github.com/kimcharli/pull-device-config
+
 import os
 import json
 import urllib3
