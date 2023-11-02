@@ -89,6 +89,12 @@ class CkAosBlueprint:
         resp = self.server.http_get_json(f"/api/systems/{system}/pristine-config")
         return resp['pristine_data']
 
+def write_to_file(file_name, content):
+    MIN_SIZE = 2  # might have one \n
+    if len(content) > MIN_SIZE:
+        with open(file_name, 'w') as f:
+            f.write(content)
+
 @click.command(name='copy-device-configurations-from-apstra')
 @click.option('--server', help='Apstra server IP address')
 @click.option('--blueprint', help='Apstra blueprint label')
@@ -126,23 +132,22 @@ def main(server, blueprint, username, password, output_dir):
                 f.write(pristine_config)
 
         rendered_confg = bp.get_node_rendering(system_id)
-        with open(f"{blueprint_dir}/{system_label}-rendered.txt", 'w') as f:
-            f.write(rendered_confg)
+        write_to_file(f"{blueprint_dir}/{system_label}-rendered.txt", rendered_confg)
+
         print("-- Reading rendered configuration")
         config_string = rendered_confg.split(begin_configlet)
-        with open(f"{blueprint_dir}/{system_label}.txt", 'w') as f:
-            f.write(config_string[0])
+        write_to_file(f"{blueprint_dir}/{system_label}.txt", config_string[0])
         if len(config_string) < 2:
             # no configlet. skip
             continue
+
         configlet_string = config_string[1].split(begin_set)
-        with open(f"{blueprint_dir}/{system_label}-configlet.txt", 'w') as f:
-            f.write(configlet_string[0])
+        write_to_file(f"{blueprint_dir}/{system_label}-configlet.txt", configlet_string[0])
         if len(configlet_string) < 2:
             # no configlet in set type. skip
             continue
-        with open(f"{blueprint_dir}/{system_label}-configlet-set.txt", 'w') as f:
-            f.write(configlet_string[1])
+
+        write_to_file(f"{blueprint_dir}/{system_label}-configlet-set.txt", configlet_string[1])
 
 
 @click.group()
