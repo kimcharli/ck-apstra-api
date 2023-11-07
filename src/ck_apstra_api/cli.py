@@ -50,7 +50,7 @@ class CkJobEnv:
         return f"{self.main_blueprint_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M:%S')}.json"
 
 
-def add_bp_from_json(job_env: CkJobEnv):
+def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None):
     """
     Add a blueprint from a json file
     The json file - job_env.bp_json_file
@@ -58,7 +58,9 @@ def add_bp_from_json(job_env: CkJobEnv):
 
     """
     bp_json = ''
-    with open(job_env.bp_json_file, 'r') as f:
+    bp_json_file = bp_json_file or job_env.bp_json_file or input('Blueprint json file: ')
+    logging.info(f"{bp_json_file=}")
+    with open(bp_json_file, 'r') as f:
         bp_json = f.read()
     bp_dict = json.loads(bp_json)
     node_list = []
@@ -95,9 +97,10 @@ def add_bp_from_json(job_env: CkJobEnv):
     logging.info(f"push_bp_from_json() BP bp_created = {bp_created}")
 
 @click.command(name='add-bp-from-json')
-def click_add_bp_from_json():
+@click.option('--bp-json-file', default='')
+def click_add_bp_from_json(bp_json_file):
     job_env = CkJobEnv(command='add-bp-from-json')
-    add_bp_from_json(job_env)
+    add_bp_from_json(job_env, bp_json_file=bp_json_file)
 
 
 def get_bp_into_json(job_env: CkJobEnv, bp_name, json_path):
