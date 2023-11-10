@@ -663,6 +663,13 @@ class CkApstraBlueprint:
         # self.logger.debug(f"{ip_pools=}")
         return ip_pools['items']
 
+    def get_lldp_data(self):
+        '''
+        Get the LLDP data
+        '''
+        lldp_data = self.session.get_items(f"blueprints/{self.id}/cabling-map/lldp")
+        return lldp_data
+
 if __name__ == "__main__":
     from dotenv import load_dotenv
     import os

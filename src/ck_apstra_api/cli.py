@@ -7,6 +7,7 @@ import logging
 import time
 import json
 from datetime import datetime
+from pprint import pprint
 
 from ck_apstra_api.apstra_session import prep_logging
 from ck_apstra_api.apstra_session import CkApstraSession
@@ -190,6 +191,19 @@ def click_import_virtual_networks():
     import_virtual_networks(job_env)
 
 
+def get_lldp_data(job_env: CkJobEnv):
+    bp = job_env.main_bp
+    lldp_data = bp.get_lldp_data()
+    for link in lldp_data['links']:
+        logging.info(f"{link['id']=} {link['endpoints'][0]['system']['label']}:{link['endpoints'][0]['interface']['if_name']} {link['endpoints'][1]['system']['label']}:{link['endpoints'][1]['interface']['if_name']}")
+    return lldp_data
+
+@click.command(name='get-lldp-data', help='Get LLDP data between managed switches')
+def click_get_lldp_data():
+    job_env = CkJobEnv()
+    get_lldp_data(job_env)
+
+
 @click.group()
 @click.option('--logging-level', default='')
 def cli(logging_level: str = ''):
@@ -207,6 +221,7 @@ cli.add_command(click_import_routing_zones)
 cli.add_command(click_import_virtual_networks)
 cli.add_command(click_add_bp_from_json)
 cli.add_command(click_get_bp_into_json)
+cli.add_command(click_get_lldp_data)
 
 from ck_apstra_api.ip_endpoint import click_add_ip_endpoints
 cli.add_command(click_add_ip_endpoints)
