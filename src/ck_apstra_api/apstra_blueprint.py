@@ -120,6 +120,15 @@ class CkApstraBlueprint:
             self.logger.warning(f"items does not exist: {query_string=}, {response.text=}")
         return response.json()['items']
     
+    # TODO: integrate with other functions
+    def get_managed_system_nodes(self):
+        SYSTEM_NODE_NAME='system'
+        system_query = f"node('system', system_type='switch', management_level='full_control', name='{SYSTEM_NODE_NAME}')"
+        resp = self.query(system_query)
+        self.managed_system_nodes = [x[SYSTEM_NODE_NAME] for x in resp]
+        return self.managed_system_nodes
+
+    
     # return the first entry for the system
     def get_system_with_im(self, system_label):
         system_im = self.query(f"node('system', label='{system_label}', name='system').out().node('interface_map', name='im')")[0]
@@ -669,6 +678,14 @@ class CkApstraBlueprint:
         '''
         lldp_data = self.session.get_items(f"blueprints/{self.id}/cabling-map/lldp")
         return lldp_data
+
+    def get_item(self, item: str):
+        '''
+        Get the items of the blueprint
+        '''
+        items = self.session.get_items(f"blueprints/{self.id}/{item}")
+        return items
+
 
 if __name__ == "__main__":
     from dotenv import load_dotenv

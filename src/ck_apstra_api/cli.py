@@ -20,6 +20,7 @@ class CkJobEnv:
     # main_bp: CkApstraBlueprint
     # excel_input_file: str
     # main_blueprint_name: str
+    # config_dir: str
     # bp_json_file: str
 
     def __init__(self, command: str = None):
@@ -43,6 +44,7 @@ class CkJobEnv:
             return
         self.main_bp = CkApstraBlueprint(self.session, self.main_blueprint_name)
         self.excel_input_file = os.getenv('excel_input_file')
+        self.config_dir = os.getenv('config_dir')
 
     def get_bp_json_file(self):
         if hasattr(self, 'bp_json_file') and self.bp_json_file != '':
@@ -196,6 +198,10 @@ def get_lldp_data(job_env: CkJobEnv):
     lldp_data = bp.get_lldp_data()
     for link in lldp_data['links']:
         logging.info(f"{link['id']=} {link['endpoints'][0]['system']['label']}:{link['endpoints'][0]['interface']['if_name']} {link['endpoints'][1]['system']['label']}:{link['endpoints'][1]['interface']['if_name']}")
+    
+    server_hostnames = bp.get_items('server-hostnames-lldp')
+    pprint(server_hostnames)
+    
     return lldp_data
 
 @click.command(name='get-lldp-data', help='Get LLDP data between managed switches')
@@ -225,3 +231,6 @@ cli.add_command(click_get_lldp_data)
 
 from ck_apstra_api.ip_endpoint import click_add_ip_endpoints
 cli.add_command(click_add_ip_endpoints)
+
+from ck_apstra_api.pull_device_configuration import click_pull_configurations
+cli.add_command(click_pull_configurations)
