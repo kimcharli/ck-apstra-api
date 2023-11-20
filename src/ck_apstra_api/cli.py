@@ -53,7 +53,7 @@ class CkJobEnv:
         return f"{self.main_blueprint_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M:%S')}.json"
 
 
-def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None):
+def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None, new_bp_name: str = None):
     """
     Add a blueprint from a json file
     The json file - job_env.bp_json_file
@@ -83,7 +83,7 @@ def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None):
                 })
         node_list.append(node_dict)        
 
-    bp_dict['label'] = job_env.main_blueprint_name
+    bp_dict['label'] = new_bp_name or job_env.main_blueprint_name
 
     relationship_list = [
         rel_dict for rel_id, rel_dict in bp_dict['relationships'].items()
@@ -101,9 +101,10 @@ def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None):
 
 @click.command(name='add-bp-from-json')
 @click.option('--bp-json-file', default='')
-def click_add_bp_from_json(bp_json_file):
+@click.option('--new-bp-name', default='')
+def click_add_bp_from_json(bp_json_file, new_bp_name):
     job_env = CkJobEnv(command='add-bp-from-json')
-    add_bp_from_json(job_env, bp_json_file=bp_json_file)
+    add_bp_from_json(job_env, bp_json_file=bp_json_file, new_bp_name=new_bp_name)
 
 
 def get_bp_into_json(job_env: CkJobEnv, bp_name, json_path):
@@ -124,8 +125,8 @@ def get_bp_into_json(job_env: CkJobEnv, bp_name, json_path):
     return
 
 @click.command(name='get-bp-into-json')
-@click.option('--bp_name', default='')
-@click.option('--json_path', default='')
+@click.option('--bp-name', default='')
+@click.option('--json-path', default='')
 def click_get_bp_into_json(bp_name, json_path):
     job_env = CkJobEnv(command='get-bp-into-json')
     get_bp_into_json(job_env, bp_name, json_path)
