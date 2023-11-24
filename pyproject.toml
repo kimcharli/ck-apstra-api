@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ck-apstra-api"
-version = "0.2.4"
+version = "0.2.5"
 description = "An implementation to use Apstra API"
 authors = [ "Charlie Kim <ckim@juniper.net>" ]
 license = "MIT"
@@ -14,6 +14,10 @@ pydantic = "^2.4.2"
 openpyxl = "^3.1.2"
 python-dotenv = "^1.0.0"
 click = "^8.1.7"
+
+[[tool.poetry.source]]
+name = "pypi"
+priority = "primary"
 
 [tool.poetry.scripts]
 ck-api = "ck_apstra_api.cli:cli"

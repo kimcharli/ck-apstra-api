@@ -4,7 +4,7 @@
 ## var/.env file example
 
 ```
-apstra_server_host=34.214.126.200
+apstra_server_host=local-apstra.pslab.link
 apstra_server_port=443
 apstra_server_username=admin
 apstra_server_password=zaq1@WSXcde3$RFV
