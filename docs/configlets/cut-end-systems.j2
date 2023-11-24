@@ -1,0 +1,11 @@
+{# assign this configlet to leaf #}
+groups cut-end-systems {
+    interfaces {
+{% for _, intf_data in interface.items() %}
+{% if 'spine_leaf' != intf_data.role  %}
+        {{ intf_data.intfName }} disable;
+{% endif %}
+{% endfor %}
+    }
+}
+set apply-groups cut-end-systems;
