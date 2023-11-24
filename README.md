@@ -22,10 +22,25 @@ ls -s var/.env .env
 
 ## run the commands
 
+Help message
 ```
-ck-api read-generic-systems
-```
+(ck-apstra-api-py3.11) ckim@ckim-mbp:ck-apstra-api % ck-api --help                                                                         
+Usage: ck-api [OPTIONS] COMMAND [ARGS]...
 
-```
-ck-api add-generic-systems
+Options:
+  --logging-level TEXT
+  --help                Show this message and exit.
+
+Commands:
+  add-bp-from-json
+  add-generic-systems
+  add-ip-endpoints
+  assign-connectivity-templates
+  get-bp-into-json
+  get-lldp-data                  Get LLDP data between managed switches
+  import-routing-zones
+  import-virtual-networks
+  pull-device-configurations     pull produced configurations from Apstra
+  read-generic-systems
+(ck-apstra-api-py3.11) ckim@ckim-mbp:ck-apstra-api % 
 ```
