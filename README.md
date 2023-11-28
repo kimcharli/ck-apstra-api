@@ -1,6 +1,15 @@
 # ck-apstra-api
 
 
+## prepare venv
+
+```
+python3.11 -m venv venv
+source venv/bin/activate
+pip install ck-apstra-api
+```
+
+
 ## var/.env file example
 
 ```
@@ -24,7 +33,7 @@ ls -s var/.env .env
 
 Help message
 ```
-(ck-apstra-api-py3.11) ckim@ckim-mbp:ck-apstra-api % ck-api --help                                                                         
+(venv) ckim@ckim-mbp:ck-apstra-api % ck-api --help                                                                         
 Usage: ck-api [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -42,5 +51,5 @@ Commands:
   import-virtual-networks
   pull-device-configurations     pull produced configurations from Apstra
   read-generic-systems
-(ck-apstra-api-py3.11) ckim@ckim-mbp:ck-apstra-api % 
+(venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
