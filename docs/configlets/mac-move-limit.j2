@@ -1,0 +1,15 @@
+{# role in ["leaf"] #}
+vlans {
+{% for _, vn in vlan.items() %}
+{% if vn.impl_type == 'vxlan' %}
+    vn{{ vn.id }} {
+        switch-options {
+            mac-move-limit {
+                1;
+                packet-action log;
+            }            
+        }
+    }
+{% endif %}
+{% endfor %}
+}

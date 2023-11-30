@@ -39,13 +39,13 @@ class CkApstraBlueprint:
         self.session = session
         self.label = label
         self.id = id
+        self.logger = logging.getLogger(f"CkApstraBlueprint({label})")
         if id:
             this_blueprint = self.session.get_items(f"blueprints/{id}")
             self.label = this_blueprint['label']
         else:
             self.get_id()
         self.url_prefix = f"{self.session.url_prefix}/blueprints/{self.id}"
-        self.logger = logging.getLogger(f"CkApstraBlueprint({label})")
 
         self.system_label_2_id_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
         self.system_id_2_label_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
@@ -61,6 +61,8 @@ class CkApstraBlueprint:
         """
         # get summary lists of all the blueprints
         blueprints = self.session.get_items('blueprints')['items']
+        labels = [x['label'] for x in blueprints ]
+        # self.logger.debug(f"{self.label=} {labels=} {blueprints=}")
         self.id = [x['id'] for x in blueprints if x['label'] == self.label][0]
         # for blueprint in blueprints:
         #     if blueprint['label'] == self.label:

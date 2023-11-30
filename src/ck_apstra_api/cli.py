@@ -23,7 +23,7 @@ class CkJobEnv:
     # config_dir: str
     # bp_json_file: str
 
-    def __init__(self, command: str = None):
+    def __init__(self, command: str = None, bp_name: str = None):
         load_dotenv()
         self.log_level = os.getenv('logging_level')
         prep_logging(self.log_level)
@@ -37,7 +37,8 @@ class CkJobEnv:
             apstra_server_username,
             apstra_server_password,
             )
-        self.main_blueprint_name = os.getenv('main_blueprint')
+        self.main_blueprint_name = bp_name or os.getenv('main_blueprint')
+        # self.main_blueprint_name = os.getenv('main_blueprint')
         # in case of skipping the bp loading
         if command and command == 'add-bp-from-json':
             self.bp_json_file = os.getenv('bp_json_file')
@@ -128,7 +129,7 @@ def get_bp_into_json(job_env: CkJobEnv, bp_name, json_path):
 @click.option('--bp-name', default='')
 @click.option('--json-path', default='')
 def click_get_bp_into_json(bp_name, json_path):
-    job_env = CkJobEnv(command='get-bp-into-json')
+    job_env = CkJobEnv(command='get-bp-into-json',bp_name=bp_name)
     get_bp_into_json(job_env, bp_name, json_path)
 
 
