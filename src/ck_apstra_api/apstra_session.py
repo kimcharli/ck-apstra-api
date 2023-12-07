@@ -47,6 +47,9 @@ class CkApstraSession:
                  port: int, 
                  username: str, 
                  password: str) -> None:
+        """
+        Create a new Apstra session. When it fails, self.last_error captures the error message.
+        """
         self.host = host
         self.port = port
         self.username = username
@@ -60,6 +63,7 @@ class CkApstraSession:
         self.session.verify = False
         self.session.headers.update({'Content-Type': "application/json"})
         self.url_prefix = f"https://{self.host}:{self.port}/api"
+        self.last_error = None
 
         self.login()
 
@@ -75,9 +79,20 @@ class CkApstraSession:
             "password": self.password
         }
         response = self.session.post(url, json=payload)
-        # print(f"{response.content=}")
-        self.token = response.json()["token"]
-        self.session.headers.update({'AuthToken': self.token})
+        # the status code is 201 if the login is successful
+        if response.status_code == 201:
+            self.token = response.json()["token"]
+            self.session.headers.update({'AuthToken': self.token})
+            self.last_error = None
+            return
+        if response.status_code == 401:
+            self.last_error = response.json()['errors']
+            self.logger.error(f"login failed: {response.content}")
+            return
+        else:
+            self.last_error = response.content
+            self.logger.error(f"login failed: {self.last_error}")
+            return
 
     def get_device_profile(self, device_profile_name: str = None) -> dict:
         """
