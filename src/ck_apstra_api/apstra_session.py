@@ -95,10 +95,20 @@ class CkApstraSession:
             return
 
     def logout(self) -> None:
+        self.token = None
         url = f"{self.url_prefix}/aaa/logout"
         response = self.post(url, None)
         # the status code is 404 (not found) if the logout is successful
         return response
+    
+    def is_online(self) -> bool:
+        """
+        Check if the Apstra controller is online.
+
+        Returns:
+            True if the Apstra controller is online, False otherwise.
+        """
+        return self.token is not None
 
     def get_device_profile(self, device_profile_name: str = None) -> dict:
         """
@@ -233,5 +243,9 @@ if __name__ == "__main__":
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     apstra.print_token()
 
+    logging.info(f"Done {apstra.is_online()=}")
+
     logouted = apstra.logout()
     logging.info(f"Done {logouted=}")
+
+    logging.info(f"Done {apstra.is_online()=}")
