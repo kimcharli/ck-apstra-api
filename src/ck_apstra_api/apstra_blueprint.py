@@ -59,6 +59,8 @@ class CkApstraBlueprint:
         Returns:
             The ID of the blueprint.
         """
+        if self.id:
+            return self.id
         # get summary lists of all the blueprints
         blueprints = self.session.get_items('blueprints')['items']
         labels = [x['label'] for x in blueprints ]
