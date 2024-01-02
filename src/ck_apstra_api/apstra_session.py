@@ -65,9 +65,23 @@ class CkApstraSession:
         self.url_prefix = f"https://{self.host}:{self.port}/api"
         self.last_error = None
 
+        self.get_version()
         self.login()
 
         self.device_profile_cache = {}  # { device_profile_id: data }
+
+    def get_version(self) -> str:
+        """
+        Get the version of the Apstra controller.
+
+        Returns:
+            The version of the Apstra controller.
+        """
+        url = f"{self.url_prefix}/versions/server"
+        response = self.session.get(url)
+        version = response.json()["version"]
+        self.version = version
+        return self.version
 
     def login(self) -> None:
         """
@@ -243,6 +257,7 @@ if __name__ == "__main__":
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     apstra.print_token()
 
+    logging.info(f"version {apstra.version}")
     logging.info(f"Done {apstra.is_online()=}")
 
     logouted = apstra.logout()
