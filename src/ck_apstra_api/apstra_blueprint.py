@@ -11,16 +11,16 @@ from ck_apstra_api.apstra_session import prep_logging
 
 
 class CkEnum:
-    MEMBER_SWITCH = 'member-switch'
-    MEMBER_INTERFACE = 'member-interface'
-    EVPN_INTERFACE = 'evpn-interface'
+    MEMBER_SWITCH = 'member_switch'
+    MEMBER_INTERFACE = 'member_interface'
+    EVPN_INTERFACE = 'evpn_interface'
     LINK = 'link'
     TAG = 'tag'
-    GENERIC_SYSTEM = 'generic-system'
-    GENERIC_SYSTEM_INTERFACE = 'gs-intf'
-    TAGGED_VLANS = 'tagged-vlans'
-    UNTAGGED_VLAN = 'untagged-vlan'
-    REDUNDANCY_GROUP = 'redundancy-group'
+    GENERIC_SYSTEM = 'generic_system'
+    GENERIC_SYSTEM_INTERFACE = 'gs_intf'
+    TAGGED_VLANS = 'tagged_vlans'
+    UNTAGGED_VLAN = 'untagged_vlan'
+    REDUNDANCY_GROUP = 'redundancy_group'
 
 
 class CkApstraBlueprint:
@@ -224,7 +224,7 @@ class CkApstraBlueprint:
                     .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
                     .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
                 optional(
-                    node('redundancy_group')
+                    node('{CkEnum.REDUNDANCY_GROUP}')
                         .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
                         .out('composed_of').node('interface')
                         .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
