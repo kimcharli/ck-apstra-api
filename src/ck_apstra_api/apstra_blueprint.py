@@ -221,7 +221,7 @@ class CkApstraBlueprint:
                         .in_('composed_of').node('interface', name='{CkEnum.AE_INTERFACE}')
                 ),
                 optional(
-                    node('tag', name='tag').out().node(name='{CkEnum.LINK}')
+                    node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
                     )
             )
         """
