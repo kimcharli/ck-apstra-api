@@ -2,15 +2,13 @@
 
 import logging
 import uuid
+from enum import StrEnum
 
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_session import prep_logging
 
-# def pretty_yaml(data: dict, label: str) -> None:
-#     print(f"==== {label}\n{yaml.dump(data)}\n====")
 
-
-class CkEnum:
+class CkEnum(StrEnum):
     MEMBER_SWITCH = 'member_switch'
     MEMBER_INTERFACE = 'member_interface'
     EVPN_INTERFACE = 'evpn_interface'
@@ -21,6 +19,7 @@ class CkEnum:
     TAGGED_VLANS = 'tagged_vlans'
     UNTAGGED_VLAN = 'untagged_vlan'
     REDUNDANCY_GROUP = 'redundancy_group'
+    AE_INTERFACE = 'ae'
 
 
 class CkApstraBlueprint:
@@ -63,22 +62,10 @@ class CkApstraBlueprint:
             return self.id
         # get summary lists of all the blueprints
         blueprints = self.session.get_items('blueprints')['items']
-        labels = [x['label'] for x in blueprints ]
-        # self.logger.debug(f"{self.label=} {labels=} {blueprints=}")
         self.id = [x['id'] for x in blueprints if x['label'] == self.label][0]
-        # for blueprint in blueprints:
-        #     if blueprint['label'] == self.label:
-        #         self.id = blueprint['id']
-        #         break
         if self.id is None:
             raise ValueError(f"Blueprint '{self.label}' not found.")
         return self.id
-
-    # def get_id(self) -> None:
-    #     """
-    #     Print the ID of the blueprint.
-    #     """
-    #     return self.id
 
     def dump(self) -> dict:
         """
@@ -137,7 +124,7 @@ class CkApstraBlueprint:
     def get_system_with_im(self, system_label):
         system_im = self.query(f"node('system', label='{system_label}', name='system').out().node('interface_map', name='im')")[0]
         if system_label not in self.system_label_2_id_cache:
-            self.system_label_2_id_cache[system_label] = system_im['system']['id']
+            self.system_label_2_id_cache[system_label] = { 'id': system_im['system']['id'] }
             self.system_id_2_label_cache[system_im['system']['id']] = system_label
             if  'interface_map_id' not in self.system_label_2_id_cache[system_label]:
                 self.system_label_2_id_cache[system_label]['interface_map_id'] = system_im['im']['id']
@@ -201,19 +188,19 @@ class CkApstraBlueprint:
         """
         return self.query(interface_query, multiline=True)
 
-    def get_switch_interface_nodes(self, system_labels, intf_name=None) -> str:
+    def get_switch_interface_nodes(self, switch_labels, intf_name=None) -> str:
         """
         Return interface nodes of the switches
-            system_labels: list of system labels or a str for the single system label
+            switch_labels: list of system labels or a str for the single system label
             return CkEnum.MEMBER_INTERFACE and CkEnum.MEMBER_SWITCH
                 optionally CkEnum.EVPN_INTERFACE if it is a LAG
             It can be used for VLAN CT association
             TODO: implement intf_name in case of multiple link generic system
         TODO: cache generic system interface id
         """
-        the_system_labels = system_labels if isinstance(system_labels, list) else [system_labels] if isinstance(system_labels, str) else []
-        if len(the_system_labels) == 0:
-            self.logger.warning(f"{system_labels=} is not a list or string")
+        the_switch_labels = switch_labels if isinstance(switch_labels, list) else [switch_labels] if isinstance(switch_labels, str) else []
+        if len(the_switch_labels) == 0:
+            self.logger.warning(f"{switch_labels=} is not a list or string")
             return []
         intf_name_filter = f", if_name='{intf_name}'" if intf_name else ""
         interface_query = f"""
@@ -222,12 +209,16 @@ class CkApstraBlueprint:
                     .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
                     .out('link').node('link', name='{CkEnum.LINK}')
                     .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
-                    .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_system_labels}), name='{CkEnum.MEMBER_SWITCH}'),
+                    .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_switch_labels}), name='{CkEnum.MEMBER_SWITCH}'),
                 optional(
                     node('{CkEnum.REDUNDANCY_GROUP}')
                         .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
                         .out('composed_of').node('interface')
                         .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
+                ),
+                optional(
+                    node('{CkEnum.MEMBER_INTERFACE}')
+                        .in_('composed_of').node('interface', name='{CkEnum.AE_INTERFACE}')
                 ),
                 optional(
                     node('tag', name='tag').out().node(name='{CkEnum.LINK}')
@@ -705,5 +696,8 @@ if __name__ == "__main__":
     apstra_server_password = os.getenv('apstra_server_password')
 
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
-    bp = CkApstraBlueprint(apstra, os.getenv('main_blueprint'))
+    # bp = CkApstraBlueprint(apstra, os.getenv('main_blueprint'))
+    bp = CkApstraBlueprint(apstra, 'AZ-1_1-R5R15')
+    links = bp.get_switch_interface_nodes(['atl1tor-r5r15a', 'atl1tor-r5r15b'])
+    print(f"{links=}")
     print(bp.get_id())
