@@ -211,13 +211,13 @@ class CkApstraBlueprint:
                     .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
                     .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_switch_labels}), name='{CkEnum.MEMBER_SWITCH}'),
                 optional(
-                    node('{CkEnum.REDUNDANCY_GROUP}')
+                    node(name='{CkEnum.REDUNDANCY_GROUP}')
                         .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
                         .out('composed_of').node('interface')
                         .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
                 ),
                 optional(
-                    node('{CkEnum.MEMBER_INTERFACE}')
+                    node(name='{CkEnum.MEMBER_INTERFACE}')
                         .in_('composed_of').node('interface', name='{CkEnum.AE_INTERFACE}')
                 ),
                 optional(
