@@ -104,6 +104,7 @@ class CkApstraBlueprint:
             "query": query_candidate
         }
         response = self.session.session.post(url, json=payload)
+        # self.logger.warning(f"query() {query_string=} {multiline=} {response=} {response.content=}")
         if print_prefix or response.status_code != 200:
             self.logger.warning(f"status_code {response.status_code} != 200: {payload=}, response.text={response.text}")
         # the content should have 'items'. otherwise, the query would be invalid
@@ -162,7 +163,7 @@ class CkApstraBlueprint:
             return None
         return self.system_id_2_label_cache[system_id]
 
-    def get_server_interface_nodes(self, system_label, intf_name=None) -> str:
+    def get_server_interface_nodes(self, generic_system_label, intf_name=None) -> str:
         """
         Return interface nodes of a system label
             return CkEnum.MEMBER_INTERFACE and CkEnum.MEMBER_SWITCH
@@ -172,20 +173,27 @@ class CkApstraBlueprint:
         TODO: cache generic system interface id
         called by move_access_switch
         """
-        interface_query = f"""
-            match(
-                node('system', system_type='server', label='{system_label}')
-                    .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
-                    .out('link').node('link', name='{CkEnum.LINK}')
-                    .in_('link').node('interface', name='{CkEnum.MEMBER_INTERFACE}')
-                    .in_('hosted_interfaces').node('system', system_type='switch', name='{CkEnum.MEMBER_SWITCH}'),
-                optional(
-                    node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
-                        .out('composed_of').node('interface')
-                        .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
-                )
+        interface_query = f"""match(
+            node('system', system_type='server', label='{generic_system_label}', name='{CkEnum.GENERIC_SYSTEM}')
+                .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
+                .out('link').node('link', name='{CkEnum.LINK}')
+                .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}')
+                .in_('hosted_interfaces').node('system', system_type='switch', name='{CkEnum.MEMBER_SWITCH}'),
+            optional(
+                node(name='{CkEnum.REDUNDANCY_GROUP}')
+                    .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
+                    .out('composed_of').node('interface')
+                    .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
+            ),
+            optional(
+                node(name='{CkEnum.MEMBER_INTERFACE}')
+                    .in_('composed_of').node('interface', name='{CkEnum.AE_INTERFACE}')
+            ),
+            optional(
+                node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
             )
-        """
+        )"""
+        # self.logger.warning(f"get_server_interface_nodes() {system_label=} {interface_query=}")
         return self.query(interface_query, multiline=True)
 
     def get_switch_interface_nodes(self, switch_labels, intf_name=None) -> str:
@@ -203,33 +211,30 @@ class CkApstraBlueprint:
             self.logger.warning(f"{switch_labels=} is not a list or string")
             return []
         intf_name_filter = f", if_name='{intf_name}'" if intf_name else ""
-        interface_query = f"""
-            match(
-                node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
-                    .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
-                    .out('link').node('link', name='{CkEnum.LINK}')
-                    .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
-                    .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_switch_labels}), name='{CkEnum.MEMBER_SWITCH}'),
-                optional(
-                    node(name='{CkEnum.REDUNDANCY_GROUP}')
-                        .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
-                        .out('composed_of').node('interface')
-                        .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
-                ),
-                optional(
-                    node(name='{CkEnum.MEMBER_INTERFACE}')
-                        .in_('composed_of').node('interface', name='{CkEnum.AE_INTERFACE}')
-                ),
-                optional(
-                    node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
-                    )
+        interface_query = f"""match(
+            node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
+                .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
+                .out('link').node('link', name='{CkEnum.LINK}')
+                .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
+                .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_switch_labels}), name='{CkEnum.MEMBER_SWITCH}'),
+            optional(
+                node(name='{CkEnum.REDUNDANCY_GROUP}')
+                    .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
+                    .out('composed_of').node('interface')
+                    .out('composed_of').node(name='{CkEnum.MEMBER_INTERFACE}')
+            ),
+            optional(
+                node(name='{CkEnum.MEMBER_INTERFACE}')
+                    .in_('composed_of').node('interface', name='{CkEnum.AE_INTERFACE}')
+            ),
+            optional(
+                node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
             )
-        """
+        )"""
         # self.logger.debug(f"{interface_query=}")
         interface_nodes = self.query(interface_query, multiline=True)
         # self.logger.debug(f"{interface_nodes=}")
         return interface_nodes
-
 
     def get_single_vlan_ct_id(self, vn_id: int):
         '''
@@ -697,7 +702,10 @@ if __name__ == "__main__":
 
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     # bp = CkApstraBlueprint(apstra, os.getenv('main_blueprint'))
-    bp = CkApstraBlueprint(apstra, 'AZ-1_1-R5R15')
-    links = bp.get_switch_interface_nodes(['atl1tor-r5r15a', 'atl1tor-r5r15b'])
+    # bp = CkApstraBlueprint(apstra, 'AZ-1_1-R5R15')
+    bp = CkApstraBlueprint(apstra, 'ATLANTA-Master')
+    # links = bp.get_switch_interface_nodes(['atl1tor-r5r15a', 'atl1tor-r5r15b'])
+    links = bp.get_server_interface_nodes('r5r15-sys018')
+    # links = bp.get_server_interface_nodes('atl1tor-r1r16')
     print(f"{links=}")
     print(bp.get_id())
