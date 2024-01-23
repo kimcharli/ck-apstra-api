@@ -397,7 +397,7 @@ class CkApstraBlueprint:
         '''
         tagging_spec = {
             'add': [],
-            'tags': [],
+            # 'tags': [],
             'nodes': [],
             'remove': [],
             'assigned_to_all': [],
@@ -414,8 +414,8 @@ class CkApstraBlueprint:
 
         # self.logger.debug(f"{nodes=} {tags_to_add=}, {tags_to_remove=} {are_tags_the_same=}")
         # The tags are the same as the existing tags
-        if are_tags_the_same or (not tags_to_add and not tags_to_remove):
-            return
+        # if are_tags_the_same or (not tags_to_add and not tags_to_remove):
+        #     return
         tagging_spec['nodes'] = the_nodes_list
         tagging_spec['add'] = tags_to_add
         tagging_spec['remove'] = tags_to_remove
