@@ -94,9 +94,9 @@ class CkApstraBlueprint:
         Returns:
             The content of the items, the results of the query.
         """
-        query_candidate = query_string.strip()        
-        if multiline:
-            query_candidate = query_candidate.replace("\n", '')
+        query_candidate = query_string.strip().replace("\n", '')        
+        # if multiline:
+        #     query_candidate = query_candidate.replace("\n", '')
         if print_prefix:
             self.logger.info(f"{print_prefix}: {query_string}")
         url = f"{self.url_prefix}/qe"
@@ -705,7 +705,15 @@ if __name__ == "__main__":
     # bp = CkApstraBlueprint(apstra, 'AZ-1_1-R5R15')
     bp = CkApstraBlueprint(apstra, 'ATLANTA-Master')
     # links = bp.get_switch_interface_nodes(['atl1tor-r5r15a', 'atl1tor-r5r15b'])
-    links = bp.get_server_interface_nodes('r5r15-sys018')
-    # links = bp.get_server_interface_nodes('atl1tor-r1r16')
-    print(f"{links=}")
+    # links = bp.get_server_interface_nodes('r5r15-sys018')
+    # # links = bp.get_server_interface_nodes('atl1tor-r1r16')
+    # print(f"{links=}")
+    query_str1 = f"""match(
+        node('virtual_network', vn_id='101353', name='vn').in_('member_vns').node('security_zone', name='rz'),
+        node(name='vn').out('instantiated_by').node('vn_instance', name='vn_instance')
+            .in_('hosted_vn_instances').node(name='switch')
+            .in_('composed_of_systems').node('redundancy_group', name='redundancy_group'),
+    )"""
+    result = bp.query(query_str1)
+    print(f"{query_str1=} {len(result)=} {result=}")
     print(bp.get_id())
