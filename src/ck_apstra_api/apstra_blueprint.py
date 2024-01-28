@@ -433,12 +433,13 @@ class CkApstraBlueprint:
         '''
         return self.session.session.put(f"{self.url_prefix}/{item_url}", json=put_spec, params=params)
 
-    def batch(self, batch_spec: dict, params=None) -> None:
+    def batch(self, batch_spec: dict, params=None) -> dict:
         '''
         Run API commands in batch
         '''
         url = f"{self.url_prefix}/batch"
-        self.session.session.post(url, json=batch_spec, params=params)
+        result = self.session.session.post(url, json=batch_spec, params=params)
+        return result
 
     # def get_cts_on_generic_system_with_only_ae(self, generic_system_label) -> list:
     #     '''
