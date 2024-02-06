@@ -196,18 +196,23 @@ class CkApstraBlueprint:
         # self.logger.warning(f"get_server_interface_nodes() {system_label=} {interface_query=}")
         return self.query(interface_query, multiline=True)
 
-    def get_switch_interface_nodes(self, switch_labels, intf_name=None) -> str:
+    def get_switch_interface_nodes(self, switch_labels=None, intf_name=None) -> str:
         """
         Return interface nodes of the switches
-            switch_labels: list of system labels or a str for the single system label
+            switch_labels: list of system labels, a str for the single system label, or None for all switches
             return CkEnum.MEMBER_INTERFACE and CkEnum.MEMBER_SWITCH
                 optionally CkEnum.EVPN_INTERFACE if it is a LAG
             It can be used for VLAN CT association
             TODO: implement intf_name in case of multiple link generic system
         TODO: cache generic system interface id
         """
-        the_switch_labels = switch_labels if isinstance(switch_labels, list) else [switch_labels] if isinstance(switch_labels, str) else []
-        if len(the_switch_labels) == 0:
+        if switch_labels is None:
+            label_selection = ''
+        elif isinstance(switch_labels, list):
+            label_selection = f" label=is_in({switch_labels}),"
+        elif isinstance(switch_labels, str):
+            label_selection = f" label='{switch_labels}',"
+        else:
             self.logger.warning(f"{switch_labels=} is not a list or string")
             return []
         intf_name_filter = f", if_name='{intf_name}'" if intf_name else ""
@@ -216,7 +221,7 @@ class CkApstraBlueprint:
                 .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
                 .out('link').node('link', name='{CkEnum.LINK}')
                 .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
-                .in_('hosted_interfaces').node('system', system_type='switch', label=is_in({the_switch_labels}), name='{CkEnum.MEMBER_SWITCH}'),
+                .in_('hosted_interfaces').node('system', system_type='switch',{label_selection} name='{CkEnum.MEMBER_SWITCH}'),
             optional(
                 node(name='{CkEnum.REDUNDANCY_GROUP}')
                     .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
@@ -231,9 +236,7 @@ class CkApstraBlueprint:
                 node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
             )
         )"""
-        # self.logger.debug(f"{interface_query=}")
-        interface_nodes = self.query(interface_query, multiline=True)
-        # self.logger.debug(f"{interface_nodes=}")
+        interface_nodes = self.query(interface_query)
         return interface_nodes
 
     def get_single_vlan_ct_id(self, vn_id: int):
@@ -703,18 +706,20 @@ if __name__ == "__main__":
 
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     # bp = CkApstraBlueprint(apstra, os.getenv('main_blueprint'))
-    # bp = CkApstraBlueprint(apstra, 'AZ-1_1-R5R15')
-    bp = CkApstraBlueprint(apstra, 'ATLANTA-Master')
+    bp = CkApstraBlueprint(apstra, 'AZ-1_1-R5R15')
+    # bp = CkApstraBlueprint(apstra, 'ATLANTA-Master')
     # links = bp.get_switch_interface_nodes(['atl1tor-r5r15a', 'atl1tor-r5r15b'])
+    links = bp.get_switch_interface_nodes('atl1tor-r5r15a')
+    # links = bp.get_switch_interface_nodes()
     # links = bp.get_server_interface_nodes('r5r15-sys018')
     # # links = bp.get_server_interface_nodes('atl1tor-r1r16')
-    # print(f"{links=}")
-    query_str1 = f"""match(
-        node('virtual_network', vn_id='101353', name='vn').in_('member_vns').node('security_zone', name='rz'),
-        node(name='vn').out('instantiated_by').node('vn_instance', name='vn_instance')
-            .in_('hosted_vn_instances').node(name='switch')
-            .in_('composed_of_systems').node('redundancy_group', name='redundancy_group'),
-    )"""
-    result = bp.query(query_str1)
-    print(f"{query_str1=} {len(result)=} {result=}")
+    print(f"{links=} {len(links)=}")
+    # # query_str1 = f"""match(
+    # #     node('virtual_network', vn_id='101353', name='vn').in_('member_vns').node('security_zone', name='rz'),
+    # #     node(name='vn').out('instantiated_by').node('vn_instance', name='vn_instance')
+    # #         .in_('hosted_vn_instances').node(name='switch')
+    # #         .in_('composed_of_systems').node('redundancy_group', name='redundancy_group'),
+    # # )"""
+    # result = bp.query(query_str1)
+    # print(f"{query_str1=} {len(result)=} {result=}")
     print(bp.get_id())
