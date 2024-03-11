@@ -23,6 +23,7 @@ class CkEnum(StrEnum):
 
 
 class CkApstraBlueprint:
+    # __slots__ = ['session', 'label', 'design', 'id', 'logger', 'url_prefix', 'system_label_2_id_cache', 'system_id_2_label_cache']
 
     def __init__(self,
                  session: CkApstraSession,
@@ -42,6 +43,7 @@ class CkApstraBlueprint:
         if id:
             this_blueprint = self.session.get_items(f"blueprints/{id}")
             self.label = this_blueprint['label']
+            self.design = this_blueprint['design']
         else:
             self.get_id()
         self.url_prefix = f"{self.session.url_prefix}/blueprints/{self.id}"
@@ -61,8 +63,15 @@ class CkApstraBlueprint:
         if self.id:
             return self.id
         # get summary lists of all the blueprints
-        blueprints = self.session.get_items('blueprints')['items']
-        self.id = [x['id'] for x in blueprints if x['label'] == self.label][0]
+        for blueprints in self.session.get_items('blueprints')['items']:
+            if blueprints['label'] == self.label:
+                self.id = blueprints['id']
+                self.design = blueprints['design']
+                return self.id
+        #     bp = [x for x in blueprints if x['label'] == self.label][0]
+        # self.id = bp['id']
+        # self.design = bp['design']
+        # self.id = [x['id'] for x in blueprints if x['label'] == self.label][0]
         if self.id is None:
             raise ValueError(f"Blueprint '{self.label}' not found.")
         return self.id
@@ -699,14 +708,19 @@ if __name__ == "__main__":
     log_level = os.getenv('logging_level', 'DEBUG')
     prep_logging(log_level)
 
-    apstra_server_host = os.getenv('apstra_server_host')
-    apstra_server_port = os.getenv('apstra_server_port')
-    apstra_server_username = os.getenv('apstra_server_username')
-    apstra_server_password = os.getenv('apstra_server_password')
+    # apstra_server_host = os.getenv('apstra_server_host')
+    # apstra_server_port = os.getenv('apstra_server_port')
+    # apstra_server_username = os.getenv('apstra_server_username')
+    # apstra_server_password = os.getenv('apstra_server_password')
+    apstra_server_host = '10.85.192.50'
+    apstra_server_port = '443'
+    apstra_server_username = 'admin'
+    apstra_server_password = 'zaq1@WSXcde3$RFV'
 
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     # bp = CkApstraBlueprint(apstra, os.getenv('main_blueprint'))
-    bp = CkApstraBlueprint(apstra, 'AZ-1_1-R5R15')
+    bp = CkApstraBlueprint(apstra, 'infor-pristine')
+    # breakpoint()
     # bp = CkApstraBlueprint(apstra, 'ATLANTA-Master')
     # links = bp.get_switch_interface_nodes(['atl1tor-r5r15a', 'atl1tor-r5r15b'])
     links = bp.get_switch_interface_nodes('atl1tor-r5r15a')
