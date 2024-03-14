@@ -3,7 +3,7 @@
 protocols {
     loop-detect {
         enhanced {
-{% for _, intf in interface.items() %}
+{% for intf in interface.values() %}
 {% if intf.role == 'l2edge' and intf.allowed_vlans|length %}
             interface {{ intf.intfName }}.0 {
                 vlan-id {{ intf.allowed_vlans[-1] }};
