@@ -1,0 +1,30 @@
+{# mirror the interface with intf_tags 'mirror' #}
+{% set mirrored_interfaces = [] %}
+{% for intf in interface.values() %}
+{% if 'intf_tags' in intf and 'mirror' in intf['intf_tags'] %}
+{% set mirrored_interfaces = mirrored_interfaces.append(intf['intfName']) %}
+{% endif %}
+{% endfor %}
+{% if mirrored_interfaces|length %}
+forwarding-options {
+    analyzer {
+        mirro1 {
+            input {
+                ingress {
+{% for intf in mirrored_interfaces %}
+                    interface {{ intf }}.0;
+{% endfor %}
+                }
+                egress {
+{% for intf in mirrored_interfaces %}
+                    interface {{ intf }}.0;
+{% endfor %}
+                }
+            }
+            output {
+                ip-address 192.168.0.2;
+            }
+        }
+    }    
+}
+{% endif %}

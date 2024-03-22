@@ -1,67 +1,25 @@
-interfaces {
-    irb {
-        unit 200 {
-            family inet {
-                mtu 1500;
-            }
-        }
-    }
-}
-policy-options {
-    prefix-list ospf-export {
-        10.0.101.0/24;
-    }
-    policy-statement ospf-export {
-        term from-ospf {
-            from community FROM_OSPF;
-            then reject;
-        }
-        term irbs {
-            from {
-                prefix-list ospf-export;
-            }
-            then accept;
-        }
-    }
-    replace: policy-statement BGP-AOS-Policy-vrf {
-        term BGP-AOS-Policy-vrf-10 {
-            from policy AllPodNetworks-vrf;
-            then accept;
-        }
-        term OSPF-to-T5 {
-            from protocol ospf;
-            then {
-                community add FROM_OSPF;
-                accept;
-            }
-        }
-        term BGP-AOS-Policy-vrf-100 {
-            then reject;
-        }
-    }
-    community FROM_OSPF members 7:30003;
-}
-routing-instances {
+set interfaces irb.20 family inet mtu 1500
+set interfaces irb.910 family inet mtu 1500
+set interfaces irb.912 family inet mtu 1500
+set policy-options policy-statement Import_From_OSPF term Import_From_OSPF from protocol ospf
+set policy-options policy-statement Import_From_OSPF term Import_From_OSPF then community add FROM_OSPF
+set policy-options policy-statement Import_From_OSPF term Import_From_OSPF then accept
+set policy-options policy-statement Export_To_OSPF term Export_To_OSPF from community FROM_OSPF
+set policy-options policy-statement Export_To_OSPF term Export_To_OSPF then reject
+set policy-options policy-statement Export_To_OSPF term irbs from protocol direct
+set policy-options policy-statement Export_To_OSPF term irbs from protocol static
+set policy-options policy-statement Export_To_OSPF term irbs then accept
+set policy-options community FROM_OSPF members 7:30003
 {% for vrf in security_zones.values() %}
-{% if vrf['sz_type'] == 'evpn' %}
-    vrf {
-        routing-options {
-            router-id {{ vrf['loopback_ip'] }};
-        }
-        protocols {
-            ospf {
-                export ospf-export;
-                area 0.0.0.0 {
-                    interface {{ vrf['loopback_intf'] }} {
-                        passive;
-                    }
-                    interface irb.200 {
-                        mtu 1500;
-                    }
-                }
-            }
-        }
-    }
+{% if vrf['vrf_name'] == 'corp_trust' %}
+set routing-instances corp_trust routing-options router-id {{ vrf['loopback_ip'] }}
+set routing-instances corp_trust protocols ospf area 0.0.0.1 interface {{ vrf['loopback_intf'] }} passive
+set routing-instances corp_trust protocols ospf area 0.0.0.1 interface irb.20 mtu 1500
+set routing-instances corp_trust protocols ospf area 0.0.0.1 interface irb.910 mtu 1500
+set routing-instances corp_trust protocols ospf area 0.0.0.1 interface irb.912 mtu 1500
+set routing-instances corp_trust protocols ospf export Export_To_OSPF
+delete routing-instances corp_trust protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
+set routing-instances corp_trust protocols evpn ip-prefix-routes export Import_From_OSPF 
+set routing-instances corp_trust protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
 {% endif %}
 {% endfor %}
-}
