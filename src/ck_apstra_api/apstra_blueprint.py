@@ -419,6 +419,9 @@ class CkApstraBlueprint:
         if len(the_nodes_list) == 0:
             self.logger.warning(f"{nodes=} is not a list or string")
             return
+        # in case of single tags_to_add
+        if isinstance(tags_to_add, str):
+            tags_to_add = [tags_to_add]
         # no need to check the present of tags in tags_to_add 
         tag_nodes = self.query(f"node(id=is_in({the_nodes_list})).in_().node('tag', label=is_in({tags_to_add}), name='tag')")
         are_tags_the_same = len(tag_nodes) == (len(tags_to_add) * len(nodes))
