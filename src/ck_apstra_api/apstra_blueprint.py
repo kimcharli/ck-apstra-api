@@ -3,6 +3,7 @@
 import logging
 import uuid
 from enum import StrEnum
+from functools import cache
 
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_session import prep_logging
@@ -23,7 +24,7 @@ class CkEnum(StrEnum):
 
 
 class CkApstraBlueprint:
-    # __slots__ = ['session', 'label', 'design', 'id', 'logger', 'url_prefix', 'system_label_2_id_cache', 'system_id_2_label_cache']
+    # __slots__ = ['session', 'label', 'design', 'id', 'logger', 'url_prefix']
 
     def __init__(self,
                  session: CkApstraSession,
@@ -48,8 +49,8 @@ class CkApstraBlueprint:
             self.get_id()
         self.url_prefix = f"{self.session.url_prefix}/blueprints/{self.id}"
 
-        self.system_label_2_id_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
-        self.system_id_2_label_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
+        # self.system_label_2_id_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
+        # self.system_id_2_label_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
         self.logger.debug(f"{self.id=}")
 
 
@@ -131,38 +132,45 @@ class CkApstraBlueprint:
 
     
     # return the first entry for the system
+    @cache
     def get_system_with_im(self, system_label):
         system_im = self.query(f"node('system', label='{system_label}', name='system').out().node('interface_map', name='im')")[0]
-        if system_label not in self.system_label_2_id_cache:
-            self.system_label_2_id_cache[system_label] = { 'id': system_im['system']['id'] }
-            self.system_id_2_label_cache[system_im['system']['id']] = system_label
-            if  'interface_map_id' not in self.system_label_2_id_cache[system_label]:
-                self.system_label_2_id_cache[system_label]['interface_map_id'] = system_im['im']['id']
-                self.system_label_2_id_cache[system_label]['device_profile_id'] = system_im['im']['device_profile_id']
+        # if system_label not in self.system_label_2_id_cache:
+        #     # self.system_label_2_id_cache[system_label] = { 'id': system_im['system']['id'] }
+        #     # self.system_id_2_label_cache[system_im['system']['id']] = system_label
+        #     if  'interface_map_id' not in self.system_label_2_id_cache[system_label]:
+        #         self.system_label_2_id_cache[system_label]['interface_map_id'] = system_im['im']['id']
+        #         self.system_label_2_id_cache[system_label]['device_profile_id'] = system_im['im']['device_profile_id']
         return system_im
 
+    @cache
     def get_system_node_from_label(self, system_label) -> dict:
         """
         Return the system dict from the system label
         called from move_access_switch
         """
-        # cache the id of the system_label if not already cached
-        if system_label not in self.system_label_2_id_cache:
-            system_query_result = self.query(f"node('system', label='{system_label}', name='system')")
-            # skip if the system does not exist
-            if len(system_query_result) == 0:
-                return None            
-            id = system_query_result[0]['system']['id']
-            # sn = system_query_result[0]['system']['system_id']
-            # deploy_mode = system_query_result[0]['system']['deploy_mode']
-            # self.system_label_2_id_cache[system_label] = { 
-            #     'id': id,
-            #     'sn': sn,
-            #     'deploy_mode': deploy_mode
-            #     }
-            self.system_label_2_id_cache[system_label] = system_query_result[0]['system']
-            self.system_id_2_label_cache[id] = system_label
-        return self.system_label_2_id_cache[system_label]
+        system_query_result = self.query(f"node('system', label='{system_label}', name='system')")
+        if len(system_query_result) == 0:
+            return None            
+        return system_query_result[0]['system']
+
+        # # cache the id of the system_label if not already cached
+        # if system_label not in self.system_label_2_id_cache:
+        #     system_query_result = self.query(f"node('system', label='{system_label}', name='system')")
+        #     # skip if the system does not exist
+        #     if len(system_query_result) == 0:
+        #         return None            
+        #     id = system_query_result[0]['system']['id']
+        #     # sn = system_query_result[0]['system']['system_id']
+        #     # deploy_mode = system_query_result[0]['system']['deploy_mode']
+        #     # self.system_label_2_id_cache[system_label] = { 
+        #     #     'id': id,
+        #     #     'sn': sn,
+        #     #     'deploy_mode': deploy_mode
+        #     #     }
+        #     self.system_label_2_id_cache[system_label] = system_query_result[0]['system']
+        #     self.system_id_2_label_cache[id] = system_label
+        # return self.system_label_2_id_cache[system_label]
 
     def get_system_label(self, system_id):
         '''
