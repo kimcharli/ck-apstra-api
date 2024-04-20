@@ -641,7 +641,11 @@ def add_generic_system(apstra_session, generic_systems: dict):
                         logging.warning(f"Skipping: Generic system {gs_label} has invalid interface name {this_ifname}")
                         continue
                     logging.debug(f"{label_label=}, {link[label_label]=}")
-                    switch_id = bp.get_system_node_from_label(link[label_label])['id']
+                    switch_node = bp.get_system_node_from_label(link[label_label])
+                    if switch_node is None:
+                        logging.warning(f"Skipping: Generic system {gs_label} has invalid switch {link[label_label]}")
+                        continue
+                    switch_id = switch_node['id']
                     link_spec = {
                         'switch': {
                             'system_id': switch_id,
