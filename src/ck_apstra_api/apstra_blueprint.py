@@ -273,6 +273,8 @@ class CkApstraBlueprint:
         '''
         Get the CT IDs from the CT labels
         '''
+        if isinstance(ct_labels, str):
+            ct_labels = [ct_labels]
         ct_list_query = f"""
             node('ep_endpoint_policy', policy_type_name='batch', label=is_in({ct_labels}), name='ep')
         """
