@@ -249,10 +249,14 @@ if __name__ == "__main__":
     log_level = os.getenv('logging_level', 'DEBUG')
     prep_logging(log_level)
 
-    apstra_server_host = os.getenv('apstra_server_host')
-    apstra_server_port = os.getenv('apstra_server_port')
-    apstra_server_username = os.getenv('apstra_server_username')
-    apstra_server_password = os.getenv('apstra_server_password')
+    # apstra_server_host = os.getenv('apstra_server_host')
+    # apstra_server_port = os.getenv('apstra_server_port')
+    # apstra_server_username = os.getenv('apstra_server_username')
+    # apstra_server_password = os.getenv('apstra_server_password')
+    apstra_server_host = '10.85.192.50'
+    apstra_server_port = '443'
+    apstra_server_username = 'admin'
+    apstra_server_password = 'zaq1@WSXcde3$RFV'
 
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     apstra.print_token()

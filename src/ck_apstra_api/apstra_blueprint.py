@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+from typing import Optional, Tuple
 import uuid
 from enum import StrEnum
 from functools import cache
@@ -143,34 +144,19 @@ class CkApstraBlueprint:
         #         self.system_label_2_id_cache[system_label]['device_profile_id'] = system_im['im']['device_profile_id']
         return system_im
 
-    @cache
-    def get_system_node_from_label(self, system_label) -> dict:
+    # can be checked before the system creation - should not be cached in such case
+    # @cache
+    def get_system_node_from_label(self, system_label) -> Tuple[Optional[dict], Optional[str]]:
         """
         Return the system dict from the system label
         called from move_access_switch
         """
-        system_query_result = self.query(f"node('system', label='{system_label}', name='system')")
+        query = f"node('system', label='{system_label}', name='system')"
+        system_query_result = self.query(query)
         if len(system_query_result) == 0:
-            return None            
-        return system_query_result[0]['system']
+            return None, f"{system_label} not found for {query} from {self.label}:{self.id}"
+        return system_query_result[0]['system'], None
 
-        # # cache the id of the system_label if not already cached
-        # if system_label not in self.system_label_2_id_cache:
-        #     system_query_result = self.query(f"node('system', label='{system_label}', name='system')")
-        #     # skip if the system does not exist
-        #     if len(system_query_result) == 0:
-        #         return None            
-        #     id = system_query_result[0]['system']['id']
-        #     # sn = system_query_result[0]['system']['system_id']
-        #     # deploy_mode = system_query_result[0]['system']['deploy_mode']
-        #     # self.system_label_2_id_cache[system_label] = { 
-        #     #     'id': id,
-        #     #     'sn': sn,
-        #     #     'deploy_mode': deploy_mode
-        #     #     }
-        #     self.system_label_2_id_cache[system_label] = system_query_result[0]['system']
-        #     self.system_id_2_label_cache[id] = system_label
-        # return self.system_label_2_id_cache[system_label]
 
     def get_system_label(self, system_id):
         '''
