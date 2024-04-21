@@ -1,0 +1,27 @@
+{# no-arp-suppression is deprecated. This is just an example. #}
+{# aos_version was not detected #}
+{% if aos_version == '4.2.1' %}
+routing-instances {
+    evpn-1 {
+        vlans {
+{% for vlan_data in vlan.values() %}
+{% if vlan_data['impl_type'] == 'vxlan' %}
+            vn{{ vlan_data['id'] }} {
+                no-arp-suppression;
+            }
+{% endif %}
+{% endfor %}
+        }
+    }
+}
+{% else %}
+vlans {
+{% for vlan_data in vlan.values() %}
+{% if vlan_data['impl_type'] == 'vxlan' %}
+    vn{{ vlan_data['id'] }} {
+        no-arp-suppression;
+    }
+{% endif %}
+{% endfor %}
+}
+{% endif %}

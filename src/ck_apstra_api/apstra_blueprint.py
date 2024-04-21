@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 import uuid
 from enum import StrEnum
 from functools import cache
@@ -94,7 +94,8 @@ class CkApstraBlueprint:
         """
         return self.session.get_items(f"blueprints/{self.id}")
 
-    def query(self, query_string: str, print_prefix: str = None, multiline: bool = False) -> list:
+    # def query(self, query_string: str, print_prefix: str = None, multiline: bool = False) -> list:
+    def query(self, query_string: str) -> Tuple[Optional[List], Optional[str]]:
         """
         Query the Apstra API.
 
@@ -103,46 +104,42 @@ class CkApstraBlueprint:
             strip: Strip the query string. Required in case of multi-line query.
 
         Returns:
-            The content of the items, the results of the query.
+            The Tuple of the results of the query and the error message
+
         """
         query_candidate = query_string.strip().replace("\n", '')        
-        # if multiline:
-        #     query_candidate = query_candidate.replace("\n", '')
-        if print_prefix:
-            self.logger.info(f"{print_prefix}: {query_string}")
         url = f"{self.url_prefix}/qe"
         payload = {
             "query": query_candidate
         }
         response = self.session.session.post(url, json=payload)
-        # self.logger.warning(f"query() {query_string=} {multiline=} {response=} {response.content=}")
-        if print_prefix or response.status_code != 200:
-            self.logger.warning(f"status_code {response.status_code} != 200: {payload=}, response.text={response.text}")
+        if response.status_code != 200:
+            return None, f"status_code is not 200 {response.status_code=} != 200: {payload=}, {response.text=}"
         # the content should have 'items'. otherwise, the query would be invalid
         elif 'items' not in response.json():
-            self.logger.warning(f"items does not exist: {query_string=}, {response.text=}")
-        return response.json()['items']
+            return None, f"items does not exist: {query_string=}, {response.text=}"
+        return response.json()['items'], None
     
     # TODO: integrate with other functions
     def get_managed_system_nodes(self):
         SYSTEM_NODE_NAME='system'
         system_query = f"node('system', system_type='switch', management_level='full_control', name='{SYSTEM_NODE_NAME}')"
-        resp = self.query(system_query)
+        resp, error = self.query(system_query)
         self.managed_system_nodes = [x[SYSTEM_NODE_NAME] for x in resp]
         return self.managed_system_nodes
 
     
     # return the first entry for the system
-    @cache
-    def get_system_with_im(self, system_label):
-        system_im = self.query(f"node('system', label='{system_label}', name='system').out().node('interface_map', name='im')")[0]
+    # @cache
+    def get_system_with_im(self, system_label) -> Tuple[Optional[dict], Optional[str]]:
+        system_im, error = self.query(f"node('system', label='{system_label}', name='system').out().node('interface_map', name='im')")
         # if system_label not in self.system_label_2_id_cache:
         #     # self.system_label_2_id_cache[system_label] = { 'id': system_im['system']['id'] }
         #     # self.system_id_2_label_cache[system_im['system']['id']] = system_label
         #     if  'interface_map_id' not in self.system_label_2_id_cache[system_label]:
         #         self.system_label_2_id_cache[system_label]['interface_map_id'] = system_im['im']['id']
         #         self.system_label_2_id_cache[system_label]['device_profile_id'] = system_im['im']['device_profile_id']
-        return system_im
+        return system_im[0], error
 
     # can be checked before the system creation - should not be cached in such case
     # @cache
@@ -152,9 +149,12 @@ class CkApstraBlueprint:
         called from move_access_switch
         """
         query = f"node('system', label='{system_label}', name='system')"
-        system_query_result = self.query(query)
+        system_query_result, error = self.query(query)
+        if error:
+            return None, f"{system_label} not found for {query}: from query: {error}"
+        # self.logger.warning(f"{system_label=} {system_query_result=}")
         if len(system_query_result) == 0:
-            return None, f"{system_label} not found for {query} from {self.label}:{self.id}"
+            return None, None
         return system_query_result[0]['system'], None
 
 
@@ -197,7 +197,7 @@ class CkApstraBlueprint:
             )
         )"""
         # self.logger.warning(f"get_server_interface_nodes() {system_label=} {interface_query=}")
-        return self.query(interface_query, multiline=True)
+        return self.query(interface_query)
 
     def get_switch_interface_nodes(self, switch_labels=None, intf_name=None) -> str:
         """
@@ -239,7 +239,7 @@ class CkApstraBlueprint:
                 node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
             )
         )"""
-        interface_nodes = self.query(interface_query)
+        interface_nodes, error = self.query(interface_query)
         return interface_nodes
 
     def get_single_vlan_ct_id(self, vn_id: int):
@@ -254,7 +254,7 @@ class CkApstraBlueprint:
                 .in_('ep_first_subpolicy').node()
                 .in_('ep_subpolicy').node('ep_endpoint_policy', name='ct')
         """
-        ct_list = self.query(ct_list_spec, multiline=True)
+        ct_list, error = self.query(ct_list_spec)
         tagged_nodes = [x for x in ct_list if 'vlan_tagged' in x['ep_endpoint_policy']['attributes']]
         tagged_ct = len(tagged_nodes) and tagged_nodes[0]['ct']['id'] or None
         # tagged_ct = [x['id'] for x in ct_list if x and 'vlan_tagged' in x['ep_endpoint_policy']['attributes']][0] or None
@@ -272,7 +272,7 @@ class CkApstraBlueprint:
         ct_list_query = f"""
             node('ep_endpoint_policy', policy_type_name='batch', label=is_in({ct_labels}), name='ep')
         """
-        ct_list = self.query(ct_list_query, multiline=True)
+        ct_list, error = self.query(ct_list_query)
         if len(ct_list) == 0:
             self.logger.debug(f"No CTs found for {ct_labels=}")
             return []
@@ -290,7 +290,7 @@ class CkApstraBlueprint:
         """
         new_generic_system_label = generic_system_spec['new_systems'][0]['label']
         existing_system_query = f"node('system', label='{new_generic_system_label}', name='system')"
-        existing_system = self.query(existing_system_query)
+        existing_system, error = self.query(existing_system_query)
         if len(existing_system) > 0:
             # skipping if the system already exists
             return []
@@ -312,7 +312,7 @@ class CkApstraBlueprint:
             intf_name: The name of the interface
             speed: The speed of the interface in the format of '10G'
         '''
-        system_im = self.get_system_with_im(system_label)
+        system_im, error = self.get_system_with_im(system_label)
         device_profile = self.session.get_device_profile(system_im['im']['device_profile_id'])
 
         for port in device_profile['ports']:
@@ -367,7 +367,7 @@ class CkApstraBlueprint:
         '''
         Get virtual network data from vni or None
         '''
-        vn_id_got = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
+        vn_id_got, error = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
         if len(vn_id_got) == 0:
             self.logger.warning(f"{vni=} not found")
             return None
@@ -419,7 +419,7 @@ class CkApstraBlueprint:
         if isinstance(tags_to_add, str):
             tags_to_add = [tags_to_add]
         # no need to check the present of tags in tags_to_add 
-        tag_nodes = self.query(f"node(id=is_in({the_nodes_list})).in_().node('tag', label=is_in({tags_to_add}), name='tag')")
+        tag_nodes, error = self.query(f"node(id=is_in({the_nodes_list})).in_().node('tag', label=is_in({tags_to_add}), name='tag')")
         are_tags_the_same = len(tag_nodes) == (len(tags_to_add) * len(nodes))
         self.logger.debug(f"{nodes=} {the_nodes_list=} {tags_to_add=}, {tags_to_remove=}, {are_tags_the_same=} {tag_nodes}")
 
@@ -484,7 +484,7 @@ class CkApstraBlueprint:
             ).distinct(['batch'])
         """
         ct_list = [x['batch']['id']
-                   for x in self.query(ct_list_spec, multiline=True)]
+                   for x, error in self.query(ct_list_spec)]
         return ct_list
 
     def get_single_vlan_ct_or_create(self, vlan_id: int, is_tagged: bool) -> str:
@@ -510,7 +510,7 @@ class CkApstraBlueprint:
         uuid_batch = str(uuid.uuid4())
         uuid_pipeline = str(uuid.uuid4())
         uuid_vlan = str(uuid.uuid4())
-        found_vn_node = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
+        found_vn_node, error = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
         if len(found_vn_node) == 0:
             self.logger.warning(f"virtual network with {vni=} not found")
             return None
