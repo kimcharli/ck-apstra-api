@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from functools import cache
+from typing import Optional, Tuple
 import requests
 import urllib3
 import logging
@@ -124,7 +126,9 @@ class CkApstraSession:
         """
         return self.token is not None
 
-    def get_device_profile(self, device_profile_name: str = None) -> dict:
+
+    @cache
+    def get_device_profile(self, device_profile_name: str = None) -> Tuple[Optional[dict], Optional[str]]:
         """
         Get the device profile with the specified name.
 
@@ -135,13 +139,11 @@ class CkApstraSession:
             The device profile, or None if the device profile does not exist.
         """
         if device_profile_name is None:
-            self.logger.warning("name is None")
-            return None
-        if device_profile_name not in self.device_profile_cache:
-            # url = f"{self.url_prefix}/device-profiles"
-            device_profiles = self.get_items('device-profiles')['items']
-            self.device_profile_cache[device_profile_name] = [x for x in device_profiles if x['id'] == device_profile_name][0]
-        return self.device_profile_cache[device_profile_name]
+            return None, f"Error: {device_profile_name=}"
+        device_profiles = self.get_items('device-profiles')['items']
+        the_device_profile = [x for x in device_profiles if x['id'] == device_profile_name][0]
+        return the_device_profile, None
+
 
     def get_logical_device(self, id: int) -> dict:
         """

@@ -2,7 +2,6 @@
 import logging
 from math import isnan
 from pathlib import Path
-from pydantic import BaseModel, validator, StrictStr, field_validator, Field
 from typing import List, Optional, Any, Tuple, TypeVar, Annotated
 import os
 import uuid
@@ -10,111 +9,7 @@ import uuid
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
 
-class GenericSystemModel(BaseModel):
-    """
-    The variables from the excel sheet generic_systems
-    """
-    blueprint: str
-    system_label: str
-    is_external: Optional[bool] = False
-    speed: str               # 10G 
-    lag_mode: Optional[str]  # mandatory in case of multiple interfaces
-    tags: List[str] = Field(default = [])  # deprecated
-    gs_tags: List[str] = Field(default = [])
 
-    label1: str
-    ifname1: str
-    gs_ifname1: Optional[str]
-    tags1: List[str] = Field(default = [])
-
-    label2: Optional[str]
-    ifname2: Optional[str]
-    gs_ifname2: Optional[str]
-    tags2: List[str] = Field(default = [])
-
-    label3: Optional[str]
-    ifname3: Optional[str]
-    gs_ifname3: Optional[str]
-    tags3: List[str] = Field(default = [])
-
-    label4: Optional[str]
-    ifname4: Optional[str]
-    gs_ifname4: Optional[str]
-    tags4: List[str] = Field(default = [])
-
-    untagged_vlan: Optional[int] = None
-    tagged_vlans: Optional[List[int]] = None
-    ct_names: Optional[List[str]] = None
-    comment: Optional[str] = None
-
-    # convert to string in case an int is given
-    @field_validator('gs_ifname1', 'gs_ifname2', 'gs_ifname3', 'gs_ifname4', mode='before')
-    @classmethod
-    def conver_to_string(cls, v):
-        if v is None:
-            return None
-        if isinstance(v, str):
-            return v
-        return str(v)
-
-    @field_validator('tagged_vlans', mode='before')
-    @classmethod
-    def convert_to_list_of_int(cls, v):
-        if v is None:
-            return None
-        if isinstance(v, int):
-            return [v]
-        return [ x.strip() for x in v.split(',')]
-
-    @field_validator('is_external', mode='before')
-    @classmethod
-    def convert_to_bool(cls, v):
-        if isinstance(v, str) and v == 'yes':
-            return True
-        return False
-
-    @field_validator('tags', 'gs_tags', 'tags1', 'tags2', 'tags3', 'tags4', 'ct_names', mode='before')
-    @classmethod
-    def convert_to_list_of_str(cls, v):
-        if v is None:
-            return []
-        return [ x.strip() for x in v.split(',')]
-
-generic_system_data = {} # { blueprint: { generic_system: {....}}}
-
-
-def process_row(row):
-    blueprint_label = row['blueprint']
-    blueprint_data = generic_system_data.setdefault(blueprint_label, {})
-    system_label = row['system_label']
-    system_data = blueprint_data.setdefault(system_label,[])
-    # logging.debug(f"{generic_system_data}")
-    pydantic_data = GenericSystemModel(**row)
-    system_data.append(pydantic_data.model_dump())
-    # logging.debug(f"{pydantic_data=}")
-
-
-def read_generic_systems(input_file_path_string: str = None, sheet_name: str = 'generic_systems'):
-    excel_file_sting = input_file_path_string or os.getenv('excel_input_file')
-    input_file_path = Path(excel_file_sting) 
-    df = pd.read_excel(input_file_path, sheet_name=sheet_name, header=[1])
-    df = df.replace({np.nan: None})
-
-    df.apply(process_row, axis=1)
-    return generic_system_data
-
-# @click.command(name='read-generic-systems')
-# def click_read_generic_systems():
-#     job_env = CkJobEnv()
-#     generic_systems = read_generic_systems(job_env.excel_input_file, 'generic_systems')
-#     for bp_label, bp_data in generic_systems.items():
-#         logging.debug(f"{bp_label=}")
-#         for gs_label, gs_links_list in bp_data.items():
-#             logging.debug(f"{gs_label=}")
-#             for link in gs_links_list:
-#                 logging.debug(f"{link=}")
-
-# def form_lacp(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
 def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: list):
     # bp = job_env.main_bp
     bp = apstra_bp
@@ -134,11 +29,11 @@ def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: l
             # logging.debug(f"Skipping: Generic system {generic_system_label} has no lag_mode")
             continue                
         if lag_mode not in [ 'lacp_active', 'lacp_passive']:
-            logging.warning(f"Skipping: Generic system {generic_system_label} has invalid lag_mode {lag_mode}")
+            logging.warning(f"form_lacp Skipping: Generic system {generic_system_label} has invalid lag_mode {lag_mode}")
             continue
         link_id_num += 1
         group_label = f"link{link_id_num}"
-        # iterate over the 4 member interfaces
+        # iterate over the 4 member interfaces and links list
         for member_number in range(4):
             member_number += 1
             sw_label = link[f"label{member_number}"] if f"label{member_number}" in link else link[f"switch{member_number}"]
@@ -148,11 +43,12 @@ def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: l
             if not sw_label or not sw_ifname:
                 continue
             if sw_ifname[:2] not in ['et', 'xe', 'ge']:
-                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
+                # TODO: should fail on input validation
+                logging.warning(f"form_lacp Skipping: Switch for {generic_system_label}, {sw_ifname[:2]} has invalid interface name {sw_ifname}:{sw_ifname}")
                 continue
             switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
             if switch_link_nodes is None or len(switch_link_nodes) == 0:
-                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
+                logging.warning(f"form_lacp Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
                 continue
             link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
             sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
@@ -181,6 +77,8 @@ def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: li
     generic_system_node, error = bp.get_system_node_from_label(generic_system_label)
     if error:
         logging.warning(f"add_tags skipping: {error}")
+        return None, f"add_tags {generic_system_label} not found in blueprint {bp.label}"
+    if not generic_system_node:
         return None, f"add_tags {generic_system_label} not found in blueprint {bp.label}"
     generic_system_id = generic_system_node['id']
     for link in generic_system_links_list:
@@ -214,7 +112,7 @@ def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: li
                 logging.debug(f"{member_tags=}")
                 bp.post_tagging(link_node_id, tags_to_add=member_tags)
                 
-
+    return None, None
 
 # def rename_generic_system_intf(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
 #     bp = job_env.main_bp
@@ -403,7 +301,8 @@ def add_single_generic_system(bp, gs_label, gs_links_list) -> Tuple[Optional[str
 
     for link in gs_links_list:
     #     logging.debug(f"{link=}")
-        link_speed = link['speed']
+        # make sure upper case
+        link_speed = link['speed'].upper()
         system_type = 'external' if link['is_external'] else 'server'
         for link_id_num in range(1, 5):
             # link_id_num = link_number + 1
@@ -422,11 +321,19 @@ def add_single_generic_system(bp, gs_label, gs_links_list) -> Tuple[Optional[str
                 error_message = f"Error: generic system {gs_label} has absent switch {switch_label}\n\tFrom get_system_node_from_label {error}"
                 # logging.warning(f"add_single_generic_system {error_message}")
                 return None, error_message
+            if not switch_node:
+                return None, f"Error: {switch_label} not found in blueprint {bp.label}"
             switch_id = switch_node['id']
+            transformation_id, error = bp.get_transformation_id(switch_label, this_ifname , link_speed)
+            if error:
+                error_message = f"Error: generic system {gs_label} has absent transformation {switch_label}:{this_ifname}\n\tFrom get_transformation_id {error}"
+                logging.warning(f"add_single_generic_system {error_message}")
+                return None, error_message
             link_spec = {
                 'switch': {
                     'system_id': switch_id,
-                    'transformation_id': bp.get_transformation_id(link[f"switch{link_id_num}"], this_ifname , link_speed),
+                    # 'transformation_id': bp.get_transformation_id(link[f"switch{link_id_num}"], this_ifname , link_speed),
+                    'transformation_id': transformation_id,
                     'if_name': link[f"switch_intf{link_id_num}"],
                 },
                 'system': {
@@ -496,8 +403,11 @@ def add_single_generic_system(bp, gs_label, gs_links_list) -> Tuple[Optional[str
     generic_system_spec['new_systems'].append(new_system)
     logging.debug(f"add_single_generic_system {generic_system_spec=}, {speed_count=}")
 
-    generic_system_created = bp.add_generic_system(generic_system_spec)
-    logging.info(f"add_single_generic_system {gs_label} created in blueprint {bp.label}")
+    generic_system_created, error = bp.add_generic_system(generic_system_spec)
+    if error:
+        error_message = f"Error: generic system {gs_label} not created\n\tFrom add_generic_system {error}"
+        # logging.warning(error_message)
+        return None, error_message
 
     return None, None
                                                                              
@@ -566,7 +476,11 @@ def add_generic_system(apstra_session, generic_systems: dict) -> Tuple[Optional[
         ## form LACP in the BP iterating over the generic systems
         for gs_label, gs_links_list in bp_data.items():
             form_lacp(bp, gs_label, gs_links_list)
-            add_tags(bp, gs_label, gs_links_list)
+            _, error = add_tags(bp, gs_label, gs_links_list)
+            if error:
+                logging.warning(f"add_generic_system Error for {gs_label=}:\n\tFrom add_tags: {error}")
+                # return None, f"add_generic_system {error}"
+                continue
             rename_generic_system_intf(bp, gs_label, gs_links_list)
 
             # # update connectivity templates - this should be run after lag update

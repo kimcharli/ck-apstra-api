@@ -278,7 +278,7 @@ class CkApstraBlueprint:
             return []
         return [x['ep']['id'] for x in ct_list]
     
-    def add_generic_system(self, generic_system_spec: dict) -> list:
+    def add_generic_system(self, generic_system_spec: dict) -> Tuple[Optional[List], Optional[str]]:
         """
         Add a generic system (and access switch pair) to the blueprint.
 
@@ -293,17 +293,19 @@ class CkApstraBlueprint:
         existing_system, error = self.query(existing_system_query)
         if len(existing_system) > 0:
             # skipping if the system already exists
-            return []
+            # return []
+            return [], None
         url = f"{self.url_prefix}/switch-system-links"
         created_generic_system = self.session.session.post(url, json=generic_system_spec)
         if created_generic_system.status_code >= 400:
-            self.logger.error(f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}")
-            return []
+            # self.logger.error(f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}")
+            return [], f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}"
+        # which case?
         if created_generic_system is None or len(created_generic_system.json()) == 0 or 'ids' not in created_generic_system.json():
-            return []
-        return created_generic_system.json()['ids']
+            return [], None
+        return created_generic_system.json()['ids'], None
 
-    def get_transformation_id(self, system_label, intf_name, speed) -> int:
+    def get_transformation_id(self, system_label, intf_name, speed) -> Tuple[Optional[int], Optional[str]]:
         '''
         Get the transformation ID for the interface
 
@@ -312,10 +314,19 @@ class CkApstraBlueprint:
             intf_name: The name of the interface
             speed: The speed of the interface in the format of '10G'
         '''
+        # the unit is in uppercase
+        speed = speed.upper()
         system_im, error = self.get_system_with_im(system_label)
-        device_profile = self.session.get_device_profile(system_im['im']['device_profile_id'])
-
+        if error:
+            return None, f"{system_label=} {intf_name=} {speed=}\n\tError get_system_with_im {error=}"
+        device_profile, error = self.session.get_device_profile(system_im['im']['device_profile_id'])
+        if error:
+            return None, f"{system_label=} {intf_name=} {speed=}\n\tError get_device_profile {error=}"
+        if 'ports' not in device_profile:
+            return None, f"{system_label=} {intf_name=} {speed=}\n\tError: no ports in device profile {device_profile=}"
         for port in device_profile['ports']:
+            if 'transformations' not in port:
+                return None, f"{system_label=} {intf_name=} {speed=}\n\tError: no transformations in port {port=}"         
             for transformation in port['transformations']:
                 # self.logger.debug(f"{transformation=}")
                 for intf in transformation['interfaces']:
@@ -323,7 +334,8 @@ class CkApstraBlueprint:
                     #     self.logger.debug(f"{intf=}")
                     if intf['name'] == intf_name and intf['speed']['unit'] == speed[-1:] and intf['speed']['value'] == int(speed[:-1]): 
                         # self.logger.warning(f"{intf_name=}, {intf=}")
-                        return transformation['transformation_id']
+                        return transformation['transformation_id'], None
+        return None, f"transformation not found for {system_label=} {intf_name=} {speed=}"
 
     def patch_leaf_server_link(self, link_spec: dict) -> None:
         """
