@@ -4,9 +4,9 @@
 ## prepare venv
 
 ```
-python3.11 -m venv venv
-source venv/bin/activate
-pip install ck-apstra-api
+uv venv
+source .venv/bin/activate
+uv pip install ck-apstra-api
 ```
 
 

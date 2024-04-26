@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 from functools import cache
-from typing import Optional, Tuple
+from typing import Optional
 import requests
 import urllib3
 import logging
 import time
 from datetime import datetime
-
+from result import Result, Ok, Err
 
 class CustomFormatter(logging.Formatter):
     grey = "\x1b[38;20m"
@@ -128,7 +128,7 @@ class CkApstraSession:
 
 
     @cache
-    def get_device_profile(self, device_profile_name: str = None) -> Tuple[Optional[dict], Optional[str]]:
+    def get_device_profile(self, device_profile_name: str = None) -> Result[dict, str]:
         """
         Get the device profile with the specified name.
 
@@ -139,10 +139,12 @@ class CkApstraSession:
             The device profile, or None if the device profile does not exist.
         """
         if device_profile_name is None:
-            return None, f"Error: {device_profile_name=}"
+            return Err(f"Error: {device_profile_name=}")
+            # return None, f"Error: {device_profile_name=}"
         device_profiles = self.get_items('device-profiles')['items']
         the_device_profile = [x for x in device_profiles if x['id'] == device_profile_name][0]
-        return the_device_profile, None
+        return Ok(the_device_profile)
+        # return the_device_profile, None
 
 
     def get_logical_device(self, id: int) -> dict:

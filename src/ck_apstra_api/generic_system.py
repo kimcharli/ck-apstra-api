@@ -2,9 +2,11 @@
 import logging
 from math import isnan
 from pathlib import Path
-from typing import List, Optional, Any, Tuple, TypeVar, Annotated
+from typing import List, Optional, Any, TypeVar, Annotated
 import os
 import uuid
+
+from result import Result, Ok, Err
 
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
@@ -46,7 +48,10 @@ def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: l
                 # TODO: should fail on input validation
                 logging.warning(f"form_lacp Skipping: Switch for {generic_system_label}, {sw_ifname[:2]} has invalid interface name {sw_ifname}:{sw_ifname}")
                 continue
-            switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
+            switch_link_nodes_result = bp.get_switch_interface_nodes([sw_label], sw_ifname)
+            if isinstance(switch_link_nodes_result, Err):
+                return Err(f"form_lacp Err: {sw_label}:{sw_ifname} not found in blueprint {bp.label}")
+            switch_link_nodes = switch_link_nodes_result.ok_value
             if switch_link_nodes is None or len(switch_link_nodes) == 0:
                 logging.warning(f"form_lacp Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
                 continue
@@ -71,15 +76,16 @@ def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: l
 
 # def add_tags(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
 #     bp = job_env.main_bp
-def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: list) -> Tuple[Optional[str], Optional[str]]:
+def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: list) -> Result[str, str]:
     bp = apstra_bp
     link_id_num = 0
-    generic_system_node, error = bp.get_system_node_from_label(generic_system_label)
-    if error:
-        logging.warning(f"add_tags skipping: {error}")
-        return None, f"add_tags {generic_system_label} not found in blueprint {bp.label}"
+    generic_system_node_result = bp.get_system_node_from_label(generic_system_label)
+    if isinstance(generic_system_node_result, Err):
+        logging.warning(f"add_tags skipping: {generic_system_node_result.err_value}")
+        return Err(f"add_tags {generic_system_label} not found in blueprint {bp.label}")
+    generic_system_node = generic_system_node_result.ok_value
     if not generic_system_node:
-        return None, f"add_tags {generic_system_label} not found in blueprint {bp.label}"
+        return Err(f"add_tags {generic_system_label} not found in blueprint {bp.label}")
     generic_system_id = generic_system_node['id']
     for link in generic_system_links_list:
         link_id_num += 1
@@ -102,7 +108,10 @@ def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: li
             if sw_ifname[:2] not in ['et', 'xe', 'ge']:
                 logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
                 continue
-            switch_link_nodes = bp.get_switch_interface_nodes(sw_label, sw_ifname)
+            switch_link_nodes_result = bp.get_switch_interface_nodes(sw_label, sw_ifname)
+            if isinstance(switch_link_nodes_result, Err):
+                return Err(f"add_tags Err: {sw_label}:{sw_ifname} not found in blueprint {bp.label}")
+            switch_link_nodes = switch_link_nodes_result.ok_value
             if switch_link_nodes is None or len(switch_link_nodes) == 0:
                 logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
                 continue
@@ -112,7 +121,7 @@ def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: li
                 logging.debug(f"{member_tags=}")
                 bp.post_tagging(link_node_id, tags_to_add=member_tags)
                 
-    return None, None
+    return Ok('done')
 
 # def rename_generic_system_intf(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
 #     bp = job_env.main_bp
@@ -154,10 +163,13 @@ def rename_generic_system_intf(apstra_bp, generic_system_label: str, generic_sys
             if sw_ifname[:2] not in ['et', 'xe', 'ge']:
                 logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
                 continue
-            switch_link_nodes = bp.get_switch_interface_nodes([sw_label], sw_ifname)
+            switch_link_nodes_result = bp.get_switch_interface_nodes([sw_label], sw_ifname)
             # logging.warning(f"{sw_label=}, {sw_ifname=}, {len(switch_link_nodes)=}")
             # logging.debug(f"{label_label=}, {link[label_label]=}")
             # logging.debug(f"{len(switch_link_nodes)=}, {switch_link_nodes=}")
+            if isinstance(switch_link_nodes_result, Err):
+                return Err(f"rename_generic_system_intf Err: {sw_label}:{sw_ifname} not found in blueprint {bp.label}\n\t get_switch_interface_nodes {switch_link_nodes_result.err_value}") 
+            switch_link_nodes = switch_link_nodes_result.ok_value
             if switch_link_nodes is None or len(switch_link_nodes) == 0:
                 logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
                 continue
@@ -255,7 +267,10 @@ def assign_connectivity_templates(apstra_bp, generic_system_label: str, gs_links
             continue
         logging.debug(f"{link=} {ct_ids=}")
         # intf_nodes = bp.get_switch_interface_nodes([link['label1']], link['ifname1'])
-        intf_nodes = bp.get_switch_interface_nodes([link['switch1']], link['switch_intf1'])
+        intf_nodes_result = bp.get_switch_interface_nodes([link['switch1']], link['switch_intf1'])
+        if isinstance(intf_nodes_result, Err):
+            return Err(f"assign_connectivity_templates Err: {link['switch1']}:{link['switch_intf1']} not found in blueprint {bp.label}")
+        intf_nodes = intf_nodes_result.ok_value
         if len(intf_nodes) == 0:
             logging.warning(f"{len(intf_nodes)=}, {intf_nodes=}")
             # logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {link['label1']}:{link['ifname1']}")
@@ -279,15 +294,15 @@ def assign_connectivity_templates(apstra_bp, generic_system_label: str, gs_links
 
 
 
-def add_single_generic_system(bp, gs_label, gs_links_list) -> Tuple[Optional[str], Optional[str]]:
+def add_single_generic_system(bp, gs_label, gs_links_list) -> Result[str, str]:
     # gs_count += 1
     gs_link_total = len(gs_links_list)
     # logging.info(f"add_generic_system Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
-    existing_gs, _ = bp.get_system_node_from_label(gs_label)
-    if existing_gs:
-        logging.warning(f"add_single_generic_system Skipping: Generic system {gs_label} already exists in blueprint {bp.label}")
+    existing_gs_result = bp.get_system_node_from_label(gs_label)
+    if isinstance(existing_gs_result, Ok) and existing_gs_result.ok_value:
+        error_message = f"add_single_generic_system Skipping: Generic system {gs_label} already exists in blueprint {bp.label}"
         # TODO: verify the content
-        return None, None
+        return Err(error_message)
     # if gs_link_total > 1:
     #     logging.warning(f"Adding generic system {gs_label} with {gs_link_total} links\n{gs_links_list}")
     #     return
@@ -314,21 +329,23 @@ def add_single_generic_system(bp, gs_label, gs_links_list) -> Tuple[Optional[str
             if this_ifname[:2] not in ['et', 'xe', 'ge']:
                 error_message = f"Error: wrong interface for {gs_label} - {switch_label}:{this_ifname}"
                 # logging.warning(f"add_single_generic_system Error : {error_message}")
-                return None, error_message
+                return Err(error_message)
             logging.debug(f"{switch_label=}")
-            switch_node, error = bp.get_system_node_from_label(switch_label)
-            if error:
+            switch_node_result = bp.get_system_node_from_label(switch_label)
+            if isinstance(switch_node_result, Err):
                 error_message = f"Error: generic system {gs_label} has absent switch {switch_label}\n\tFrom get_system_node_from_label {error}"
                 # logging.warning(f"add_single_generic_system {error_message}")
-                return None, error_message
+                return Err(error_message)
+            switch_node = switch_node_result.ok_value
             if not switch_node:
                 return None, f"Error: {switch_label} not found in blueprint {bp.label}"
             switch_id = switch_node['id']
-            transformation_id, error = bp.get_transformation_id(switch_label, this_ifname , link_speed)
-            if error:
-                error_message = f"Error: generic system {gs_label} has absent transformation {switch_label}:{this_ifname}\n\tFrom get_transformation_id {error}"
+            transformation_id_result = bp.get_transformation_id(switch_label, this_ifname , link_speed)
+            if isinstance(transformation_id_result, Err):
+                error_message = f"Error: generic system {gs_label} has absent transformation {switch_label}:{this_ifname}\n\tFrom get_transformation_id {transformation_id_result.err_value}"
                 logging.warning(f"add_single_generic_system {error_message}")
-                return None, error_message
+                return Err(error_message)
+            transformation_id = transformation_id_result.ok_value
             link_spec = {
                 'switch': {
                     'system_id': switch_id,
@@ -403,16 +420,16 @@ def add_single_generic_system(bp, gs_label, gs_links_list) -> Tuple[Optional[str
     generic_system_spec['new_systems'].append(new_system)
     logging.debug(f"add_single_generic_system {generic_system_spec=}, {speed_count=}")
 
-    generic_system_created, error = bp.add_generic_system(generic_system_spec)
-    if error:
-        error_message = f"Error: generic system {gs_label} not created\n\tFrom add_generic_system {error}"
+    generic_system_created_result = bp.add_generic_system(generic_system_spec)
+    if isinstance(generic_system_created_result, Err):
+        error_message = f"Error: generic system {gs_label} not created\n\tFrom add_generic_system {generic_system_created_result.err_value}"
         # logging.warning(error_message)
-        return None, error_message
+        return Err(error_message)
 
-    return None, None
+    return Ok('done')
                                                                              
 
-def add_generic_system(apstra_session, generic_systems: dict) -> Tuple[Optional[str], Optional[str]]:
+def add_generic_system(apstra_session, generic_systems: dict) -> Result[str, str]:
     """
     Add a single generic system to the Apstra server from the given generic systems data.
     Revised from add_generic_systems.
@@ -451,34 +468,35 @@ def add_generic_system(apstra_session, generic_systems: dict) -> Tuple[Optional[
         }
     }
     """
+    func_name = "add_generic_system"
 
     ## create the generic systems
     bp_total = len(generic_systems)  # total number of blueprints
     bp_count = 0
-    logging.info(f"add_generic_system Adding generic systems to {bp_total} blueprints")
+    logging.info(f"{func_name} Adding generic systems to {bp_total} blueprints")
     for bp_label, bp_data in generic_systems.items():
         bp_count += 1
-        logging.info(f"add_generic_system Adding generic systems to blueprint {bp_count}/{bp_total}: {bp_label}")
+        logging.info(f"{func_name} Adding generic systems to blueprint {bp_count}/{bp_total}: {bp_label}")
         bp = CkApstraBlueprint(apstra_session, bp_label)
         # logging.debug(f"{bp=}, {bp.id=}")
         gs_total = len(bp_data)
         gs_count = 0
-        logging.info(f"add_generic_system Adding {gs_total} generic systems to blueprint {bp_label}")
+        logging.info(f"{func_name} Adding {gs_total} generic systems to blueprint {bp_label}")
         for gs_label, gs_links_list in bp_data.items():
             gs_count += 1
             gs_link_total = len(gs_links_list)
-            logging.info(f"add_generic_system Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
-            _, error = add_single_generic_system(bp, gs_label, gs_links_list)
-            if error:
-                logging.warning(f"add_generic_system Error for {gs_label=}:\n\tFrom add_single_generic_system: {error}")
-                # return None, f"add_generic_system {error}"
+            logging.info(f"{func_name} Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
+            add_single_gs_result = add_single_generic_system(bp, gs_label, gs_links_list)
+            if isinstance(add_single_gs_result, Err):
+                logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_single_generic_system: {add_single_gs_result.err_value}")
+                # return None, f"{func_name} {error}"
 
         ## form LACP in the BP iterating over the generic systems
         for gs_label, gs_links_list in bp_data.items():
             form_lacp(bp, gs_label, gs_links_list)
-            _, error = add_tags(bp, gs_label, gs_links_list)
-            if error:
-                logging.warning(f"add_generic_system Error for {gs_label=}:\n\tFrom add_tags: {error}")
+            add_tags_result = add_tags(bp, gs_label, gs_links_list)
+            if isinstance(add_tags_result, Err):
+                logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_tags: {add_tags_result.err_value}")
                 # return None, f"add_generic_system {error}"
                 continue
             rename_generic_system_intf(bp, gs_label, gs_links_list)
@@ -487,7 +505,7 @@ def add_generic_system(apstra_session, generic_systems: dict) -> Tuple[Optional[
             # assign_connectivity_templates(job_env, gs_label, gs_links_list)
             assign_connectivity_templates(bp, gs_label, gs_links_list)
 
-        return None, None    
+    return Ok(f"{func_name}: {bp_total} blueprints, {gs_total} generic systems added")
 
 
 
@@ -553,5 +571,10 @@ if __name__ == "__main__":
             ]
         }
     }
-    add_generic_system(apstra, generic_systems)
+    add_gs_result = add_generic_system(apstra, generic_systems)
+    logging.info(f"{add_gs_result=}")
+    if isinstance(add_gs_result, Ok):
+        logging.warning(add_gs_result.ok_value)
+    else:
+        logging.warning(add_gs_result.err_value)
 

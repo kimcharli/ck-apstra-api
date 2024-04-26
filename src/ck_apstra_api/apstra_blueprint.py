@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional
 import uuid
 from enum import StrEnum
 from functools import cache
+
+from result import Err, Result, Ok
 
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_session import prep_logging
@@ -95,7 +97,7 @@ class CkApstraBlueprint:
         return self.session.get_items(f"blueprints/{self.id}")
 
     # def query(self, query_string: str, print_prefix: str = None, multiline: bool = False) -> list:
-    def query(self, query_string: str) -> Tuple[Optional[List], Optional[str]]:
+    def query(self, query_string: str) -> Result[List, str]:
         """
         Query the Apstra API.
 
@@ -114,11 +116,11 @@ class CkApstraBlueprint:
         }
         response = self.session.session.post(url, json=payload)
         if response.status_code != 200:
-            return None, f"status_code is not 200 {response.status_code=} != 200: {payload=}, {response.text=}"
+            return Err(f"status_code is not 200 {response.status_code=} != 200: {payload=}, {response.text=}")
         # the content should have 'items'. otherwise, the query would be invalid
         elif 'items' not in response.json():
-            return None, f"items does not exist: {query_string=}, {response.text=}"
-        return response.json()['items'], None
+            return Err(f"items does not exist: {query_string=}, {response.text=}")
+        return Ok(response.json()['items'])
     
     # TODO: integrate with other functions
     def get_managed_system_nodes(self):
@@ -131,31 +133,34 @@ class CkApstraBlueprint:
     
     # return the first entry for the system
     # @cache
-    def get_system_with_im(self, system_label) -> Tuple[Optional[dict], Optional[str]]:
-        system_im, error = self.query(f"node('system', label='{system_label}', name='system').out().node('interface_map', name='im')")
+    def get_system_with_im(self, system_label) -> Result[dict,str]:
+        system_im_result = self.query(f"node('system', label='{system_label}', name='system').out().node('interface_map', name='im')")
         # if system_label not in self.system_label_2_id_cache:
         #     # self.system_label_2_id_cache[system_label] = { 'id': system_im['system']['id'] }
         #     # self.system_id_2_label_cache[system_im['system']['id']] = system_label
         #     if  'interface_map_id' not in self.system_label_2_id_cache[system_label]:
         #         self.system_label_2_id_cache[system_label]['interface_map_id'] = system_im['im']['id']
         #         self.system_label_2_id_cache[system_label]['device_profile_id'] = system_im['im']['device_profile_id']
-        return system_im[0], error
+        if isinstance(system_im_result, Err):
+            error_message = f"Error: {system_label=}\n\tquery() {system_im_result.err_value=}"
+            return Err(error_message)
+        return Ok(system_im_result.ok_value[0])
 
     # can be checked before the system creation - should not be cached in such case
     # @cache
-    def get_system_node_from_label(self, system_label) -> Tuple[Optional[dict], Optional[str]]:
+    def get_system_node_from_label(self, system_label) -> Result[dict, str]:
         """
         Return the system dict from the system label
         called from move_access_switch
         """
         query = f"node('system', label='{system_label}', name='system')"
-        system_query_result, error = self.query(query)
-        if error:
-            return None, f"{system_label} not found for {query}: from query: {error}"
+        system_query_result = self.query(query)
+        if isinstance(system_query_result, Err):
+            return Err(f"{system_label} not found for {query}: from query: {error}")
         # self.logger.warning(f"{system_label=} {system_query_result=}")
-        if len(system_query_result) == 0:
-            return None, None
-        return system_query_result[0]['system'], None
+        if len(system_query_result.ok_value) == 0:
+            return Ok({})
+        return Ok(system_query_result.ok_value[0]['system'])
 
 
     def get_system_label(self, system_id):
@@ -199,7 +204,7 @@ class CkApstraBlueprint:
         # self.logger.warning(f"get_server_interface_nodes() {system_label=} {interface_query=}")
         return self.query(interface_query)
 
-    def get_switch_interface_nodes(self, switch_labels=None, intf_name=None) -> str:
+    def get_switch_interface_nodes(self, switch_labels=None, intf_name=None) -> Result[List, str]:
         """
         Return interface nodes of the switches
             switch_labels: list of system labels, a str for the single system label, or None for all switches
@@ -239,8 +244,8 @@ class CkApstraBlueprint:
                 node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
             )
         )"""
-        interface_nodes, error = self.query(interface_query)
-        return interface_nodes
+        interface_nodes_result = self.query(interface_query)
+        return interface_nodes_result
 
     def get_single_vlan_ct_id(self, vn_id: int):
         '''
@@ -272,13 +277,16 @@ class CkApstraBlueprint:
         ct_list_query = f"""
             node('ep_endpoint_policy', policy_type_name='batch', label=is_in({ct_labels}), name='ep')
         """
-        ct_list, error = self.query(ct_list_query)
+        ct_list_result = self.query(ct_list_query)
+        if isinstance(ct_list_result, Err):
+            return Err(f"Error: {ct_list_result.err_value=}")
+        ct_list = ct_list_result.ok_value
         if len(ct_list) == 0:
             self.logger.debug(f"No CTs found for {ct_labels=}")
             return []
         return [x['ep']['id'] for x in ct_list]
     
-    def add_generic_system(self, generic_system_spec: dict) -> Tuple[Optional[List], Optional[str]]:
+    def add_generic_system(self, generic_system_spec: dict) -> Result[List, str]:
         """
         Add a generic system (and access switch pair) to the blueprint.
 
@@ -290,22 +298,22 @@ class CkApstraBlueprint:
         """
         new_generic_system_label = generic_system_spec['new_systems'][0]['label']
         existing_system_query = f"node('system', label='{new_generic_system_label}', name='system')"
-        existing_system, error = self.query(existing_system_query)
-        if len(existing_system) > 0:
+        existing_system_result = self.query(existing_system_query)
+        if len(existing_system_result.ok_value) > 0:
             # skipping if the system already exists
             # return []
-            return [], None
+            return Ok([])
         url = f"{self.url_prefix}/switch-system-links"
         created_generic_system = self.session.session.post(url, json=generic_system_spec)
         if created_generic_system.status_code >= 400:
             # self.logger.error(f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}")
-            return [], f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}"
+            return Err(f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}")
         # which case?
         if created_generic_system is None or len(created_generic_system.json()) == 0 or 'ids' not in created_generic_system.json():
-            return [], None
-        return created_generic_system.json()['ids'], None
+            return Err("Not created")
+        return Ok(created_generic_system.json()['ids'])
 
-    def get_transformation_id(self, system_label, intf_name, speed) -> Tuple[Optional[int], Optional[str]]:
+    def get_transformation_id(self, system_label, intf_name, speed) -> Result[int, str]:
         '''
         Get the transformation ID for the interface
 
@@ -316,17 +324,19 @@ class CkApstraBlueprint:
         '''
         # the unit is in uppercase
         speed = speed.upper()
-        system_im, error = self.get_system_with_im(system_label)
-        if error:
-            return None, f"{system_label=} {intf_name=} {speed=}\n\tError get_system_with_im {error=}"
-        device_profile, error = self.session.get_device_profile(system_im['im']['device_profile_id'])
-        if error:
-            return None, f"{system_label=} {intf_name=} {speed=}\n\tError get_device_profile {error=}"
+        system_im_result = self.get_system_with_im(system_label)
+        if isinstance(system_im_result, Err):
+            return Err(f"{system_label=} {intf_name=} {speed=}\n\tError get_system_with_im {error=}")
+        system_im = system_im_result.ok_value
+        device_profile_result = self.session.get_device_profile(system_im['im']['device_profile_id'])
+        if isinstance(device_profile_result, Err):
+            return Err(f"{system_label=} {intf_name=} {speed=}\n\tError get_device_profile {device_profile_result.err_value=}")
+        device_profile = device_profile_result.ok_value
         if 'ports' not in device_profile:
-            return None, f"{system_label=} {intf_name=} {speed=}\n\tError: no ports in device profile {device_profile=}"
+            return Err(f"{system_label=} {intf_name=} {speed=}\n\tError: no ports in device profile {device_profile=}")
         for port in device_profile['ports']:
             if 'transformations' not in port:
-                return None, f"{system_label=} {intf_name=} {speed=}\n\tError: no transformations in port {port=}"         
+                return Err(f"{system_label=} {intf_name=} {speed=}\n\tError: no transformations in port {port=}")    
             for transformation in port['transformations']:
                 # self.logger.debug(f"{transformation=}")
                 for intf in transformation['interfaces']:
@@ -334,8 +344,8 @@ class CkApstraBlueprint:
                     #     self.logger.debug(f"{intf=}")
                     if intf['name'] == intf_name and intf['speed']['unit'] == speed[-1:] and intf['speed']['value'] == int(speed[:-1]): 
                         # self.logger.warning(f"{intf_name=}, {intf=}")
-                        return transformation['transformation_id'], None
-        return None, f"transformation not found for {system_label=} {intf_name=} {speed=}"
+                        return Ok(transformation['transformation_id'])
+        return Err(f"transformation not found for {system_label=} {intf_name=} {speed=}")
 
     def patch_leaf_server_link(self, link_spec: dict) -> None:
         """
@@ -431,9 +441,9 @@ class CkApstraBlueprint:
         if isinstance(tags_to_add, str):
             tags_to_add = [tags_to_add]
         # no need to check the present of tags in tags_to_add 
-        tag_nodes, error = self.query(f"node(id=is_in({the_nodes_list})).in_().node('tag', label=is_in({tags_to_add}), name='tag')")
-        are_tags_the_same = len(tag_nodes) == (len(tags_to_add) * len(nodes))
-        self.logger.debug(f"{nodes=} {the_nodes_list=} {tags_to_add=}, {tags_to_remove=}, {are_tags_the_same=} {tag_nodes}")
+        tag_nodes_result = self.query(f"node(id=is_in({the_nodes_list})).in_().node('tag', label=is_in({tags_to_add}), name='tag')")
+        are_tags_the_same = len(tag_nodes_result.ok_value) == (len(tags_to_add) * len(nodes))
+        self.logger.debug(f"{nodes=} {the_nodes_list=} {tags_to_add=}, {tags_to_remove=}, {are_tags_the_same=} {tag_nodes_result.ok_value}")
 
         # self.logger.debug(f"{nodes=} {tags_to_add=}, {tags_to_remove=} {are_tags_the_same=}")
         # The tags are the same as the existing tags
