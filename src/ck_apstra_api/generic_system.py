@@ -2,14 +2,136 @@
 import logging
 from math import isnan
 from pathlib import Path
-from typing import List, Optional, Any, TypeVar, Annotated
+from dataclasses import dataclass, fields, field
+from typing import List, Optional, Any, TypeVar, Annotated, Dict
 import os
 import uuid
 
+import pandas as pd
+import numpy as np
 from result import Result, Ok, Err
 
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
+
+@dataclass
+class LinkMember:
+    """
+    Data class for a single link in a generic system. Can be part of LinkGroup
+    """
+    link_speed: Optional[str]
+    server_ifname: Optional[str]
+    switch_label: str
+    switch_ifname: str
+    link_tags: Optional[List[str]]
+    comment: Optional[str]
+
+    def __init__(self, data: Dict[str, Any]):
+        # logging.warning(f"LinkMember::init {data=}")
+        cls_fields = [field.name for field in fields(self)]
+        for key, value in data.items():
+            if key in cls_fields:
+                setattr(self, key, value)
+
+@dataclass
+class LinkGroup:
+    """
+    Data class for a group of links in a generic system. Can be a LAG.
+    """
+    link_group_id: Optional[str]  # the unique id for the link group within the generic system. If not provided, the link will be treated as a non-LAG single link
+    link_group_lag_mode: Optional[str]  # the LAG mode for the link group. 'lacp_active', 'lacp_passive', for None for static LAG or non-LAG single link
+    link_group_ct_names: Optional[List[str]]  # the list of connectivity templates for the link group, or non-LAG single link
+    link_group_tags: Optional[List[str]]  # the list of tags for the link group, or non-LAG single link
+    link_group_members: Optional[List[LinkMember]]  # the list of links in the link group. optional only during initial creation
+
+    def is_ae_id(self, link_group_id: str) -> bool:
+        return self.link_group_id is link_group_id
+
+    def __init__(self, data: Dict[str, Any]):
+        # logging.warning(f"LinkGroup::init {data=}")
+        cls_fields = [field.name for field in fields(self)]
+        for key, value in data.items():
+            if key in cls_fields:
+                setattr(self, key, value)
+        # breakpoint()
+        self.link_group_members = [ LinkMember(data) ]
+
+    def add_link(self, data: Dict[str, Any]):
+        # logging.warning(f"LinkGroup::update {self=}")
+        self.link_group_members.append(LinkMember(data))
+        # logging.warning(f"LinkGroup::update end {self=}")
+
+
+@dataclass
+class GenericSystem:
+    """
+    Data class for a generic system.
+    """
+    server_label: str
+    is_external: Optional[bool]
+    server_tags: Optional[List[str]]
+    link_groups: Optional[List[LinkGroup]]  # optional only during initial creation
+
+    def __init__(self, data: Dict[str, Any]):
+        logging.warning(f"GenericSystem::init {data=}")
+        cls_fields = [field.name for field in fields(self)]
+        # logging.warning(f"GenericSystem::init {cls_fields=} {'server_label' in cls_fields=} {'blueprint' in cls_fields=}")
+        for key, value in data.items():
+            # logging.warning(f"GenericSystem::init {key=}, {value=} {key in cls_fields=}")
+            # breakpoint()
+            if key in cls_fields:
+                # logging.warning(f"GenericSystem::init matched {key=}, {value=}")
+                setattr(self, key, value)
+        self.link_groups = []
+        self.add_link_group(data)
+        # breakpoint()
+        logging.warning(f"GenericSystem::init end {self=}")
+    
+    def add_link_group(self, data):
+        logging.warning(f"GenericSystem::update {self=}")
+        link_group_id = data['link_group_id']
+        if link_group_id:
+            # process LAG
+            for link_group in self.link_groups:
+                if link_group.is_ae_id(link_group_id):
+                    # existing AE. link_group exists. Add link to it
+                    link_group.add_link(data)
+                    return
+        # new AE or non AE. Create it
+        self.link_groups.append(LinkGroup(data))
+
+@dataclass
+class ServerBlueprint:
+    """
+    Data class for a server blueprint.
+    """
+    blueprint: str
+    servers: Dict[str, GenericSystem]  # optional only during initial creation
+    _bps = {}
+
+    def __new__(cls, data: Dict[str, Any]):        
+        blueprint = data['blueprint']
+        if blueprint in cls._bps:
+            return cls._bps[blueprint]
+        else:
+            bp = super().__new__(cls)
+            cls._bps[blueprint] = bp
+            return bp
+
+    def __init__(self, data: Dict[str, Any]):
+        if not hasattr(self, 'servers'):
+            cls_fields = (field.name for field in fields(self))
+            for key, value in data.items():
+                if key in cls_fields:
+                    setattr(self, key, value)
+            self.servers = {}
+        server_label = data['server_label']        
+        # breakpoint()
+        logging.warning(f"ServerBlueprint::init processing GS {server_label=}")
+        if server_label not in self.servers:
+            self.servers[server_label] = GenericSystem(data)
+        this_server = self.servers[server_label]
+        this_server.add_link_group(data)
 
 
 def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: list):
@@ -294,15 +416,39 @@ def assign_connectivity_templates(apstra_bp, generic_system_label: str, gs_links
 
 
 
-def add_single_generic_system(bp, gs_label, gs_links_list) -> Result[str, str]:
+def add_single_generic_system(bp, gs_label: str, gs_links_list) -> Result[str, str]:
+    """
+    Add a single generic system to the Apstra server from the given generic systems data.
+    """
+    func_name = "add_single_generic_system"
+    server_link_result = bp.get_server_interface_nodes(gs_label)
+    if isinstance(server_link_result, Err):
+        error_message = f"Error: generic system {gs_label} has absent server {gs_label}\n\tFrom get_server_interface_nodes {server_link_result.err_value}"
+        # logging.warning(f"add_single_generic_system {error_message}")
+        return Err(error_message)
+    server_links = server_link_result.ok_value
+    if len(server_links):
+        logging.warning(f"{func_name} Skipping: Generic system {gs_label} already exists in blueprint {bp.label}")
+        # TODO: which return value to use?
+        return Ok('done')
+
+    # generic system absent. Add it.
+    generic_system_spec = {
+        'links': [],
+        'new_systems': [],
+    }
+
+
+
+
     # gs_count += 1
     gs_link_total = len(gs_links_list)
     # logging.info(f"add_generic_system Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
-    existing_gs_result = bp.get_system_node_from_label(gs_label)
-    if isinstance(existing_gs_result, Ok) and existing_gs_result.ok_value:
-        error_message = f"add_single_generic_system Skipping: Generic system {gs_label} already exists in blueprint {bp.label}"
-        # TODO: verify the content
-        return Err(error_message)
+    # existing_gs_result = bp.get_system_node_from_label(gs_label)
+    # if isinstance(existing_gs_result, Ok) and existing_gs_result.ok_value:
+    #     error_message = f"add_single_generic_system Skipping: Generic system {gs_label} already exists in blueprint {bp.label}"
+    #     # TODO: verify the content
+    #     return Err(error_message)
     # if gs_link_total > 1:
     #     logging.warning(f"Adding generic system {gs_label} with {gs_link_total} links\n{gs_links_list}")
     #     return
@@ -518,63 +664,80 @@ if __name__ == "__main__":
 
     apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
     apstra.print_token()
-    
-    generic_systems = {
-        'terra': {
-            'single-home-1': [
-                {
-                    "blueprint": "terra",
-                    "system_label": "single-home-1",
-                    "is_external": False,
-                    "speed": "10G",
-                    "lag_mode": None,
-                    "ct_names": "vn20",
-                    "gs_tags": "single",
-                    "server_intf1": "eth0",
-                    "switch1": "server_1",
-                    "switch_intf1": "xe-0/0/11",
-                    "server_intf2": None,
-                    "switch2": None,
-                    "switch_intf2": None,
-                    "server_intf3": None,
-                    "switch3": None,
-                    "switch_intf3": None,
-                    "server_intf4": None,
-                    "switch4": None,
-                    "switch_intf4": None,
-                    "comment": None
-                }
-            ],
-            'dual-home-1': [
-                {
-                    "blueprint": "terra",
-                    "system_label": "dual-home-1",
-                    "is_external": False,
-                    "speed": "10G",
-                    "lag_mode": "lacp_active",
-                    "ct_names": "vn20,vn101",
-                    "gs_tags": "dual",
-                    "server_intf1": "eth0",
-                    "switch1": "server_1",
-                    "switch_intf1": "xe-0/0/12",
-                    "server_intf2": "eth1",
-                    "switch2": "server_2",
-                    "switch_intf2": "xe-0/0/12",
-                    "server_intf3": None,
-                    "switch3": None,
-                    "switch_intf3": None,
-                    "server_intf4": None,
-                    "switch4": None,
-                    "switch_intf4": None,
-                    "comment": None
-                }
-            ]
-        }
-    }
-    add_gs_result = add_generic_system(apstra, generic_systems)
-    logging.info(f"{add_gs_result=}")
-    if isinstance(add_gs_result, Ok):
-        logging.warning(add_gs_result.ok_value)
-    else:
-        logging.warning(add_gs_result.err_value)
+
+    the_columns = None
+    df = pd.read_csv('./tests/fixtures/sample_generic_system.csv').replace(np.nan, None)
+    columns =  [{"name": col, "label": col, "field": col} for col in df.columns]
+    logging.warning(f"{columns=}")
+    # pairs = zip(columns, the_columns)
+    # diffs = [(x, y) for x, y in pairs if x != y]
+    # if diffs:
+    #     logging.error(f"handle_upload WRONG {diffs=}")
+    the_rows=[{col: row[col] for col in df.columns} for _, row in df.iterrows()]
+    logging.warning(f"{the_rows=}")
+
+    bps = {}
+    for row in the_rows:
+        print(f"{row=}")
+        bp = ServerBlueprint(row)
+        logging.warning(f"{bp=}")
+
+    # # generic_systems = {
+    # #     'terra': {
+    # #         'single-home-1': [
+    # #             {
+    # #                 "blueprint": "terra",
+    # #                 "system_label": "single-home-1",
+    # #                 "is_external": False,
+    # #                 "speed": "10G",
+    # #                 "lag_mode": None,
+    # #                 "ct_names": "vn20",
+    # #                 "gs_tags": "single",
+    # #                 "server_intf1": "eth0",
+    # #                 "switch1": "server_1",
+    # #                 "switch_intf1": "xe-0/0/11",
+    # #                 "server_intf2": None,
+    # #                 "switch2": None,
+    # #                 "switch_intf2": None,
+    # #                 "server_intf3": None,
+    # #                 "switch3": None,
+    # #                 "switch_intf3": None,
+    # #                 "server_intf4": None,
+    # #                 "switch4": None,
+    # #                 "switch_intf4": None,
+    # #                 "comment": None
+    # #             }
+    # #         ],
+    # #         'dual-home-1': [
+    # #             {
+    # #                 "blueprint": "terra",
+    # #                 "system_label": "dual-home-1",
+    # #                 "is_external": False,
+    # #                 "speed": "10G",
+    # #                 "lag_mode": "lacp_active",
+    # #                 "ct_names": "vn20,vn101",
+    # #                 "gs_tags": "dual",
+    # #                 "server_intf1": "eth0",
+    # #                 "switch1": "server_1",
+    # #                 "switch_intf1": "xe-0/0/12",
+    # #                 "server_intf2": "eth1",
+    # #                 "switch2": "server_2",
+    # #                 "switch_intf2": "xe-0/0/12",
+    # #                 "server_intf3": None,
+    # #                 "switch3": None,
+    # #                 "switch_intf3": None,
+    # #                 "server_intf4": None,
+    # #                 "switch4": None,
+    # #                 "switch_intf4": None,
+    # #                 "comment": None
+    # #             }
+    # #         ]
+    # #     }
+    # # }
+    # add_gs_result = add_generic_system(apstra, generic_systems)
+    # logging.info(f"{add_gs_result=}")
+    # if isinstance(add_gs_result, Ok):
+    #     logging.warning(add_gs_result.ok_value)
+    # else:
+    #     logging.warning(add_gs_result.err_value)
 

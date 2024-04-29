@@ -1,0 +1,4 @@
+﻿blueprint,server_label,is_external,server_tags,link_group_id,link_group_lag_mode,link_group_ct_names,link_group_tags,link_speed,server_ifname,switch_label,switch_ifname,link_tags,comment
+terra,single-home-1,,single,,,vn20,single,10g,eth0,server_1,xe-0/0/11,,
+terra,dual-home-1,,dual,dual-1,lacp_active,"vn20,vn101",dual,10g,eth0,server_1,xe-0/0/12,forceup,
+terra,dual-home-1,,dual,dual-1,lacp_active,"vn20,vn101",dual,10g,eth1,server_2,xe-0/0/12,,

@@ -25,7 +25,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.poetry]
 name = "ck-apstra-api"
-version = "0.3.2"
+version = "0.3.3"
 description = "An implementation to use Apstra API"
 authors = [ "Charlie Kim <ckim@juniper.net>" ]
 license = "MIT"
@@ -58,7 +58,7 @@ addopts = [
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    envlist = py310, py311, pep8
+    envlist = py311, pep8
     skipsdist = True
     isolated_build = True
 
