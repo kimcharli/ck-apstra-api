@@ -14,8 +14,18 @@ from result import Result, Ok, Err
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
 
+
 @dataclass
-class LinkMember:
+class DataInit:
+    def __init__(self, data: Dict[str, Any]):
+        cls_fields = [field.name for field in fields(self)]
+        for key, value in data.items():
+            if key in cls_fields:
+                setattr(self, key, value)
+
+
+@dataclass
+class LinkMember(DataInit):
     """
     Data class for a single link in a generic system. Can be part of LinkGroup
     """
@@ -27,14 +37,11 @@ class LinkMember:
     comment: Optional[str]
 
     def __init__(self, data: Dict[str, Any]):
-        # logging.warning(f"LinkMember::init {data=}")
-        cls_fields = [field.name for field in fields(self)]
-        for key, value in data.items():
-            if key in cls_fields:
-                setattr(self, key, value)
+        super().__init__(data)
+
 
 @dataclass
-class LinkGroup:
+class LinkGroup(DataInit):
     """
     Data class for a group of links in a generic system. Can be a LAG.
     """
@@ -48,22 +55,17 @@ class LinkGroup:
         return self.link_group_id is link_group_id
 
     def __init__(self, data: Dict[str, Any]):
-        # logging.warning(f"LinkGroup::init {data=}")
-        cls_fields = [field.name for field in fields(self)]
-        for key, value in data.items():
-            if key in cls_fields:
-                setattr(self, key, value)
-        # breakpoint()
+        super().__init__(data)
         self.link_group_members = [ LinkMember(data) ]
+        # logging.warning(f"LinkGroup::init added LinkMember {self.link_group_members=}")
 
     def add_link(self, data: Dict[str, Any]):
-        # logging.warning(f"LinkGroup::update {self=}")
         self.link_group_members.append(LinkMember(data))
-        # logging.warning(f"LinkGroup::update end {self=}")
+        # logging.warning(f"LinkGroup::add_link added LinkMember {self.link_group_members=}")
 
 
 @dataclass
-class GenericSystem:
+class GenericSystem(DataInit):
     """
     Data class for a generic system.
     """
@@ -73,35 +75,21 @@ class GenericSystem:
     link_groups: Optional[List[LinkGroup]]  # optional only during initial creation
 
     def __init__(self, data: Dict[str, Any]):
-        logging.warning(f"GenericSystem::init {data=}")
-        cls_fields = [field.name for field in fields(self)]
-        # logging.warning(f"GenericSystem::init {cls_fields=} {'server_label' in cls_fields=} {'blueprint' in cls_fields=}")
-        for key, value in data.items():
-            # logging.warning(f"GenericSystem::init {key=}, {value=} {key in cls_fields=}")
-            # breakpoint()
-            if key in cls_fields:
-                # logging.warning(f"GenericSystem::init matched {key=}, {value=}")
-                setattr(self, key, value)
+        super().__init__(data)
         self.link_groups = []
-        self.add_link_group(data)
-        # breakpoint()
-        logging.warning(f"GenericSystem::init end {self=}")
     
     def add_link_group(self, data):
-        logging.warning(f"GenericSystem::update {self=}")
-        link_group_id = data['link_group_id']
-        if link_group_id:
-            # process LAG
-            for link_group in self.link_groups:
-                if link_group.is_ae_id(link_group_id):
-                    # existing AE. link_group exists. Add link to it
-                    link_group.add_link(data)
-                    return
+        if link_group_id := data['link_group_id']:
+            the_link_groups = [x for x in self.link_groups if x.link_group_id == link_group_id]
+            if the_link_groups:
+                the_link_groups[0].add_link(data)
+                return
         # new AE or non AE. Create it
         self.link_groups.append(LinkGroup(data))
 
+
 @dataclass
-class ServerBlueprint:
+class ServerBlueprint(DataInit):
     """
     Data class for a server blueprint.
     """
@@ -111,6 +99,7 @@ class ServerBlueprint:
 
     def __new__(cls, data: Dict[str, Any]):        
         blueprint = data['blueprint']
+        # logging.warning(f"ServerBlueprint::__new__ {data=}")
         if blueprint in cls._bps:
             return cls._bps[blueprint]
         else:
@@ -120,18 +109,15 @@ class ServerBlueprint:
 
     def __init__(self, data: Dict[str, Any]):
         if not hasattr(self, 'servers'):
-            cls_fields = (field.name for field in fields(self))
-            for key, value in data.items():
-                if key in cls_fields:
-                    setattr(self, key, value)
+            super().__init__(data)
             self.servers = {}
         server_label = data['server_label']        
-        # breakpoint()
-        logging.warning(f"ServerBlueprint::init processing GS {server_label=}")
+        # logging.warning(f"ServerBlueprint::init processing GS {server_label=}")
         if server_label not in self.servers:
             self.servers[server_label] = GenericSystem(data)
         this_server = self.servers[server_label]
         this_server.add_link_group(data)
+        # logging.warning(f"ServerBlueprint::init end GS {server_label=} {this_server=}")
 
 
 def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: list):
