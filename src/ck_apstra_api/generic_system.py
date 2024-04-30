@@ -51,6 +51,8 @@ class LinkMember(DataInit):
         Initialize the link member with the given input dict.
         """
         super().__init__(data)
+        if self.link_tags and isinstance(self.link_tags, str):
+            self.link_tags = self.link_tags.split(',')
         self.link_speed = self.link_speed.upper()
 
     def fetch_apstra(self, server_link_nodes: Dict[str, Any]) -> Result[str, str]:
@@ -67,6 +69,18 @@ class LinkMember(DataInit):
             return Ok('matched')
         return Ok('nof-found')
 
+    def diff(self):
+        """
+        Diff the loaded data with the apstra controller.
+        """
+        return_message = ""
+        if self.fetched_server_ifname != self.server_ifname:
+            return_message += f"LinkMember:diff(), {self.fetched_server_ifname=} != {self.server_ifname=}"
+        if self.link_tags != self.fetched_link_tags:
+            return_message += f"LinkMember:diff(), {self.switch_label=}:{self.switch_ifname=} tags mismatch {self.link_tags} != {self.fetched_link_tags}"
+        return Ok(return_message)
+
+
 @dataclass
 class LinkGroup(DataInit):
     """
@@ -79,9 +93,12 @@ class LinkGroup(DataInit):
     link_group_members: Optional[List[LinkMember]]  # the list of links in the link group. optional only during initial creation
     link_group_fetched_ae_id: Optional[str] = None  # the fetched ae_id from the apstra controller
     link_group_fetched_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
+    link_group_fetched_lag_mode: Optional[str] = None  # the fetched lag mode from the apstra controller
 
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
+        if self.link_group_tags and isinstance(self.link_group_tags, str):
+            self.link_group_tags = self.link_group_tags.split(',')
         self.link_group_members = [ LinkMember(data) ]
         # logging.warning(f"LinkGroup::init added LinkMember {self.link_group_members=}")
 
@@ -111,7 +128,28 @@ class LinkGroup(DataInit):
                 # the ae_id is the evpn id if present
                 self.link_group_fetched_ae_id = server_link_nodes[CkEnum.EVPN_INTERFACE]['id'] or server_link_nodes[CkEnum.AE_INTERFACE]['id']
                 self.link_group_ifname = server_link_nodes[CkEnum.AE_INTERFACE]['if_name']
+                self.link_group_fetched_lag_mode = server_link_nodes[CkEnum.AE_INTERFACE]['lag_mode']
+                logging.warning(f"LinkGroup::fetch_apstra {self=} {server_link_nodes[CkEnum.AE_INTERFACE]=} {self.link_group_fetched_lag_mode=}")
             return Ok('matched')
+    
+    def diff(self):
+        """
+        Diff the loaded data with the apstra controller.
+        """
+        return_message = ""
+        if self.link_group_ifname and self.link_group_fetched_ae_id is None:
+            return_message += f"LinkGroup:diff(), {self.link_group_ifname=} is absent in blueprint"
+        if self.link_group_tags != self.link_group_fetched_tags:
+            return_message += f"LinkGroup:diff(), {self.link_group_ifname=} tags mismatch {self.link_group_tags} != {self.link_group_fetched_tags}"
+        if self.link_group_lag_mode != self.link_group_fetched_lag_mode:
+            return_message += f"LinkGroup:diff(), {self.link_group_ifname=} lag mode mismatch {self.link_group_lag_mode} != {self.link_group_fetched_lag_mode}"
+        for member in self.link_group_members:
+            member_result = member.diff()
+            if isinstance(member_result, Err):
+                return Err(f"LinkGroup:diff(), {self.link_group_ifname=}, {member.switch_label=}:{member.switch_ifname=}, Error: {member_result.err_value}")
+            return_message += member_result.ok_value
+        return Ok(return_message)
+
 
 @dataclass
 class GenericSystem(DataInit):
@@ -123,12 +161,18 @@ class GenericSystem(DataInit):
     server_tags: Optional[List[str]]
     link_groups: Optional[List[LinkGroup]]  # optional only during initial creation
     gs_id: Optional[str] = None # generic system node id to be fetched from the blueprint
+    fetched_server_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
+
+    # TODO: node('system', name='system', role='generic').in_('tag').node('tag', name='system_tag')
+
 
     def __init__(self, data: Dict[str, Any]):
         """
         Initialize the generic system with the given input dict.
         """
         super().__init__(data)
+        if self.server_tags and isinstance(self.server_tags, str):
+            self.server_tags = self.server_tags.split(',')
         self.link_groups = []
     
     def load_link_group(self, data):
@@ -147,15 +191,21 @@ class GenericSystem(DataInit):
         """
         Fetch the generic system from the apstra controller.
         """
+        # fetch from setver interface nodes
         server_link_result = apstra_bp.get_server_interface_nodes(self.server_label)
         if isinstance(server_link_result, Err):
             return Err(f"GenericSystem:fetch_apstra(), {self.server_label=}, Error: {server_link_result.err_value}")
         server_links = server_link_result.ok_value
         if len(server_links):
             logging.warning(f"GenericSystem:fetch_apstra(), {self.server_label=} present in blueprint {apstra_bp.label}")
-            # import pprint
-            # pprint.pprint(server_links)
             self.gs_id = server_links[0][CkEnum.GENERIC_SYSTEM]['id']
+            self.fetched_server_tags = server_links[0][CkEnum.GENERIC_SYSTEM]['tags']
+            #
+            tag_result = apstra_bp.query(f"node('system', name='system', label='{self.server_label}', role='generic').in_('tag').node('tag', name='system_tag')")
+            if isinstance(tag_result, Err):
+                return Err(f"GenericSystem:fetch_apstra(), {self.server_label=}, Error: {tag_result.err_value}")
+            tags = tag_result.ok_value
+            self.fetched_server_tags = [tag['system_tag']['label'] for tag in tags]
             # iterate fetched server links
             for server_link_nodes in server_links:
                 # iterate over the link groups
@@ -165,7 +215,22 @@ class GenericSystem(DataInit):
                         return Err(f"GenericSystem:fetch_apstra(), {self.server_label=}, {lg.link_group_ifname=}, Error: {lg_fetch_result.err_value}")
 
 
-
+    def diff(self):
+        """
+        Diff the loaded data with the apstra controller.
+        """
+        return_message = ""
+        if self.gs_id is None:
+            return Ok(f"GenericSystem:diff(), {self.server_label=} is absent in blueprint")
+        if self.server_tags != self.fetched_server_tags:
+            return_message += f"GenericSystem:diff(), {self.server_label=} tags mismatch {self.server_tags} != {self.fetched_server_tags}"
+        for lg in self.link_groups:
+            lg_result = lg.diff()
+            if isinstance(lg_result, Err):
+                return Err(f"GenericSystem:diff(), {self.server_label=}, {lg.link_group_ifname=}, Error: {lg_result.err_value}")
+            return_message += lg_result.ok_value
+        return Ok(return_message)
+    
 @dataclass
 class ServerBlueprint(DataInit):
     """
@@ -224,6 +289,17 @@ class ServerBlueprint(DataInit):
             result = generic_system.fetch_apstra(ck_bp)
             if isinstance(result, Err):
                 return Err(f"ServerBlueprint:fetch_apstra(), {self.blueprint=}, {server_label=}, Error: {result.err_value}")
+
+
+    def diff(self):
+        """
+        Diff the loaded data with the apstra controller.
+        """
+        for server_label, generic_system in self.servers.items():
+            diff_result = generic_system.diff()
+            if isinstance(diff_result, Err):
+                return Err(f"ServerBlueprint:diff(), {self.blueprint=}, {server_label=}, Error: {diff_result.err_value}")
+            logging.warning(f"ServerBlueprint:diff(), {self.blueprint=}, {server_label=}, {diff_result.ok_value=}")
 
 
 def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: list):
@@ -735,10 +811,13 @@ if __name__ == "__main__":
     for row in the_rows:
         print(f"{row=}")
         bp = ServerBlueprint(row)
-        pprint.pprint(bp)
         # logging.warning(f"{bp=}")
         bp.fetch_apstra(apstra)
-    
+        pprint.pprint(bp)
+
+    for bp_label, server_bp in ServerBlueprint.iterate_server_blueprints():
+        server_bp.diff()
+
     # for bp_label, server_bp in ServerBlueprint.iterate_server_blueprints():
     #     bp = CkApstraBlueprint(apstra, bp_label)
     #     bp.fetch_blueprint()
