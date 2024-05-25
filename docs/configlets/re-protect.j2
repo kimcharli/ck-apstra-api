@@ -1,0 +1,49 @@
+policy-options {
+    prefix-list ssh-whitelist {
+        10.85.192.0/26;
+        10.104.0.0/16;
+    }
+    prefix-list apstra-servers {
+        10.85.192.45/32;
+    }
+}
+firewall {
+    family inet {
+        filter re-protect {
+            term ssh-allow {
+                from {
+                    source-prefix-list {
+                        ssh-whitelist;
+                        apstra-servers;
+                    }
+                    protocol tcp;
+                    destination-port [ ssh 830 ];
+                }
+                then accept;
+            }
+            term ssh-deny {
+                from {
+                    protocol tcp;
+                    destination-port [ ssh 830 ];
+                }
+                then {
+                    reject;
+                }
+            }
+            term else {
+                then accept;
+            }
+        }
+    }
+}
+interfaces {
+    lo0 {
+        unit 0 {
+            family inet {
+                filter {
+                    input re-protect;
+                }
+            }
+        }
+    }
+}

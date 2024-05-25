@@ -1,0 +1,10 @@
+{# https://www.juniper.net/documentation/us/en/software/junos/multicast-l2/topics/topic-map/layer-2-forwarding-tables.html #}
+{% if 'QFX5130' in hcl or 'QFX5700' in hcl %}
+system {
+    packet-forwarding-options {
+        forwarding-profile {
+            host-profile;
+        }
+    }
+}
+{% endif %}

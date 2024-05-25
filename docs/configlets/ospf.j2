@@ -12,14 +12,14 @@ set policy-options policy-statement Export_To_OSPF term irbs then accept
 set policy-options community FROM_OSPF members 7:30003
 {% for vrf in security_zones.values() %}
 {% if vrf['vrf_name'] == 'corp_trust' %}
-set routing-instances corp_trust routing-options router-id {{ vrf['loopback_ip'] }}
-set routing-instances corp_trust protocols ospf area 0.0.0.1 interface {{ vrf['loopback_intf'] }} passive
-set routing-instances corp_trust protocols ospf area 0.0.0.1 interface irb.20 mtu 1500
-set routing-instances corp_trust protocols ospf area 0.0.0.1 interface irb.910 mtu 1500
-set routing-instances corp_trust protocols ospf area 0.0.0.1 interface irb.912 mtu 1500
-set routing-instances corp_trust protocols ospf export Export_To_OSPF
-delete routing-instances corp_trust protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
-set routing-instances corp_trust protocols evpn ip-prefix-routes export Import_From_OSPF 
-set routing-instances corp_trust protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
+set routing-instances {{ vrf['vrf_name'] }} routing-options router-id {{ vrf['loopback_ip'] }}
+set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface {{ vrf['loopback_intf'] }} passive
+set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface irb.20 mtu 1500
+set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface irb.910 mtu 1500
+set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface irb.912 mtu 1500
+set routing-instances {{ vrf['vrf_name'] }} protocols ospf export Export_To_OSPF
+delete routing-instances {{ vrf['vrf_name'] }} protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
+set routing-instances {{ vrf['vrf_name'] }} protocols evpn ip-prefix-routes export Import_From_OSPF 
+set routing-instances {{ vrf['vrf_name'] }} protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
 {% endif %}
 {% endfor %}
