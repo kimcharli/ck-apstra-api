@@ -203,7 +203,7 @@ class CkApstraBlueprint:
         )"""
         # self.logger.warning(f"get_server_interface_nodes() {system_label=} {interface_query=}")
         # query_result = self.query(interface_query)
-        return self.query(interface_query)
+        return Ok(self.query(interface_query))
 
     def get_switch_interface_nodes(self, switch_labels=None, intf_name=None) -> Result[List, str]:
         """
@@ -223,7 +223,7 @@ class CkApstraBlueprint:
             label_selection = f" label='{switch_labels}',"
         else:
             self.logger.warning(f"{switch_labels=} is not a list or string")
-            return []
+            return Ok([])
         intf_name_filter = f", if_name='{intf_name}'" if intf_name else ""
         interface_query = f"""match(
             node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
@@ -246,7 +246,7 @@ class CkApstraBlueprint:
             )
         )"""
         interface_nodes_result = self.query(interface_query)
-        return interface_nodes_result
+        return Ok(interface_nodes_result)
 
     def get_single_vlan_ct_id(self, vn_id: int):
         '''

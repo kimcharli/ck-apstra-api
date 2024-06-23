@@ -221,15 +221,15 @@ def cli(logging_level: str = ''):
     # prep_logging(log_level)
     pass
 
-from ck_apstra_api.generic_system import click_read_generic_systems, click_add_generic_systems, click_assign_connecitivity_templates
-cli.add_command(click_read_generic_systems)
-cli.add_command(click_add_generic_systems)
-cli.add_command(click_assign_connecitivity_templates)
-cli.add_command(click_import_routing_zones)
-cli.add_command(click_import_virtual_networks)
-cli.add_command(click_add_bp_from_json)
-cli.add_command(click_get_bp_into_json)
-cli.add_command(click_get_lldp_data)
+# from ck_apstra_api.generic_system import click_read_generic_systems, click_add_generic_systems, click_assign_connecitivity_templates
+# cli.add_command(click_read_generic_systems)
+# cli.add_command(click_add_generic_systems)
+# cli.add_command(click_assign_connecitivity_templates)
+# cli.add_command(click_import_routing_zones)
+# cli.add_command(click_import_virtual_networks)
+# cli.add_command(click_add_bp_from_json)
+# cli.add_command(click_get_bp_into_json)
+# cli.add_command(click_get_lldp_data)
 
 from ck_apstra_api.ip_endpoint import click_add_ip_endpoints
 cli.add_command(click_add_ip_endpoints)

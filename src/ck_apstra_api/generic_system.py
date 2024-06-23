@@ -3,10 +3,12 @@ import logging
 from math import isnan
 from pathlib import Path
 from dataclasses import dataclass, fields, field
-from typing import List, Optional, Any, TypeVar, Annotated, Dict
+from typing import List, Optional, Any, TypeVar, Annotated, Dict, ClassVar
+from collections import defaultdict
 import os
 import uuid
 import pprint
+from enum import Enum, StrEnum, auto
 
 import pandas as pd
 import numpy as np
@@ -14,6 +16,23 @@ from result import Result, Ok, Err
 
 from ck_apstra_api.apstra_session import CkApstraSession
 from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
+
+
+class GsCsvKeys(StrEnum):
+    BLUEPRINT = auto()
+    SERVER = auto()
+    EXT = auto()
+    TAGS_SERVER = auto()
+    AE = auto()
+    LAG_MODE = auto()
+    CT_NAMES = auto()
+    TAGS_AE = auto()
+    SPEED = auto()
+    IFNAME = auto()
+    SWITCH = auto()
+    SWITCH_IFNAME = auto()
+    TAGS_LINK = auto()
+    COMMENT = auto()
 
 
 @dataclass
@@ -26,8 +45,6 @@ class DataInit:
         for key, value in data.items():
             if key in cls_fields:
                 setattr(self, key, value)
-            # else:
-            #     setattr(self, key, None)
 
 
 @dataclass
@@ -35,13 +52,13 @@ class LinkMember(DataInit):
     """
     Data class for a single link in a generic system. Can be part of LinkGroup
     """
-    link_speed: Optional[str]
-    server_ifname: Optional[str]
-    switch_label: str
+    speed: Optional[str]
+    ifname: Optional[str]
+    switch: str
     switch_ifname: str
-    link_tags: Optional[List[str]]
-    fetched_link_tags: Optional[List[str]] = None
+    tags_link: Optional[List[str]]
     comment: Optional[str] = None
+    fetched_tags_link: Optional[List[str]] = None
     fetched_server_ifname: Optional[str] = None
     fetched_switch_id: Optional[str] = None
     fetched_switch_intf_id: Optional[str] = None
@@ -51,9 +68,9 @@ class LinkMember(DataInit):
         Initialize the link member with the given input dict.
         """
         super().__init__(data)
-        if self.link_tags and isinstance(self.link_tags, str):
-            self.link_tags = self.link_tags.split(',')
-        self.link_speed = self.link_speed.upper()
+        if self.tags_link and isinstance(self.tags_link, str):
+            self.tags_link = self.tags_link.split(',')
+        self.speed = self.speed.upper()
 
     def fetch_apstra(self, server_link_nodes: Dict[str, Any]) -> Result[str, str]:
         """
@@ -61,13 +78,13 @@ class LinkMember(DataInit):
         return Ok('matched') or Ok('not-found') if matched, or Err if didn't match
         """
         if server_link_nodes[CkEnum.MEMBER_SWITCH]['label'] == self.switch_label and server_link_nodes[CkEnum.MEMBER_INTERFACE]['if_name'] == self.switch_ifname:
-            if server_link_nodes[CkEnum.LINK]['speed'] != self.link_speed:
-                return Err(f"Error: {self.switch_label}:{self.switch_ifname} speed mismatch {server_link_nodes[CkEnum.LINK]['speed']} != {self.link_speed}")
+            if server_link_nodes[CkEnum.LINK]['speed'] != self.speed:
+                yield Err(f"Error: {self.switch_label}:{self.switch_ifname} speed mismatch {server_link_nodes[CkEnum.LINK]['speed']} != {self.speed}")
             self.fetched_server_ifname = server_link_nodes[CkEnum.GENERIC_SYSTEM_INTERFACE]['if_name']
             self.fetched_switch_id = server_link_nodes[CkEnum.MEMBER_SWITCH]['id']
             self.fetched_switch_intf_id = server_link_nodes[CkEnum.MEMBER_INTERFACE]['id']            
-            return Ok('matched')
-        return Ok('nof-found')
+            yield Ok('matched')
+        yield Ok('not-found')
 
     def diff(self):
         """
@@ -76,9 +93,9 @@ class LinkMember(DataInit):
         return_message = ""
         if self.fetched_server_ifname != self.server_ifname:
             return_message += f"LinkMember:diff(), {self.fetched_server_ifname=} != {self.server_ifname=}"
-        if self.link_tags != self.fetched_link_tags:
-            return_message += f"LinkMember:diff(), {self.switch_label=}:{self.switch_ifname=} tags mismatch {self.link_tags} != {self.fetched_link_tags}"
-        return Ok(return_message)
+        if self.tags_link != self.fetched_tags_link:
+            return_message += f"LinkMember:diff(), {self.switch_label=}:{self.switch_ifname=} tags mismatch {self.tags_link} != {self.fetched_tags_link}"
+        yield Ok(return_message)
 
 
 @dataclass
@@ -86,69 +103,72 @@ class LinkGroup(DataInit):
     """
     Data class for a group of links in a generic system. Can be a LAG.
     """
-    link_group_ifname: Optional[str]  # the unique id for the link group within the generic system. If not provided, the link will be treated as a non-LAG single link
-    link_group_lag_mode: Optional[str]  # the LAG mode for the link group. 'lacp_active', 'lacp_passive', for None for static LAG or non-LAG single link
-    link_group_ct_names: Optional[List[str]]  # the list of connectivity templates for the link group, or non-LAG single link
-    link_group_tags: Optional[List[str]]  # the list of tags for the link group, or non-LAG single link
-    link_group_members: Optional[List[LinkMember]]  # the list of links in the link group. optional only during initial creation
+    ae: Optional[str]  # the unique id for the link group within the generic system. When absent, the link will be treated as a non-LAG single link
+    lag_mode: Optional[str]  # the LAG mode for the link group. 'lacp_active', 'lacp_passive', for None for static LAG or non-LAG single link
+    ct_names: Optional[List[str]]  # the list of connectivity templates for the link group, or non-LAG single link
+    tags_ae: Optional[List[str]]  # the list of tags for the link group, or non-LAG single link
+    members: Optional[List[LinkMember]]  # the list of links in the link group. optional only during initial creation
     link_group_fetched_ae_id: Optional[str] = None  # the fetched ae_id from the apstra controller
     link_group_fetched_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
     link_group_fetched_lag_mode: Optional[str] = None  # the fetched lag mode from the apstra controller
 
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
-        if self.link_group_tags and isinstance(self.link_group_tags, str):
-            self.link_group_tags = self.link_group_tags.split(',')
-        self.link_group_members = [ LinkMember(data) ]
-        # logging.warning(f"LinkGroup::init added LinkMember {self.link_group_members=}")
+        if self.tags_ae and isinstance(self.tags_ae, str):
+            self.tags_ae = self.tags_ae.split(',')
+        self.members = [ LinkMember(data) ]
+        # logging.warning(f"LinkGroup::init added LinkMember {self.members=}")
 
     def load_link_member(self, data: Dict[str, Any]):
         """
         Load the link member data from input dict into the link group.
         """
-        self.link_group_members.append(LinkMember(data))
-        # logging.warning(f"LinkGroup::load_link_member added LinkMember {self.link_group_members=}")
+        self.members.append(LinkMember(data))
+        # logging.warning(f"LinkGroup::load_link_member added LinkMember {self.members=}")
 
     def fetch_apstra(self, server_link_nodes: Dict[str, Any]) -> Result[str, str]:
         """
         Fetch the link group from the apstra controller.
         """
-        for member in self.link_group_members:
-            fetch_result = member.fetch_apstra(server_link_nodes)
+        yield Ok(f"LinkGroup::fetch_apstra() {self.ae=}")
+        for member in self.members:
+            for res in member.fetch_apstra(server_link_nodes):
+                fetch_result = res
+                yield res
             if isinstance(fetch_result, Err):
-                return Err(f"LinkGroup::fetch_apstra(), {self.link_group_ifname=}, {self.link_group_lag_mode=}, {self.link_group_ct_names=}, {self.link_group_tags=}, Error: {fetch_result.err_value}")
+                yield Err(f"LinkGroup::fetch_apstra(), {self.ae=}, {self.link_group_lag_mode=}, {self.link_group_ct_names=}, {self.tags_ae=}, Error: {fetch_result.err_value}")
             if fetch_result.ok_value == 'not-found':
                 # the member didn't match. Continue to the rest of the members
                 continue
             # member matched. Update the link group
-            if self.link_group_ifname:
+            if self.ae:
                 # the link group should be a LAG
                 if not server_link_nodes[CkEnum.EVPN_INTERFACE]:
-                    return Err(f"LingGroup::fetch_apstra {self.link_group_ifname=} Error: Missing AE for {self.member=}")
+                    yield Err(f"LingGroup::fetch_apstra {self.ae=} Error: Missing AE for {self.member=}")
                 # the ae_id is the evpn id if present
                 self.link_group_fetched_ae_id = server_link_nodes[CkEnum.EVPN_INTERFACE]['id'] or server_link_nodes[CkEnum.AE_INTERFACE]['id']
-                self.link_group_ifname = server_link_nodes[CkEnum.AE_INTERFACE]['if_name']
+                self.ae = server_link_nodes[CkEnum.AE_INTERFACE]['if_name']
                 self.link_group_fetched_lag_mode = server_link_nodes[CkEnum.AE_INTERFACE]['lag_mode']
-                logging.warning(f"LinkGroup::fetch_apstra {self=} {server_link_nodes[CkEnum.AE_INTERFACE]=} {self.link_group_fetched_lag_mode=}")
-            return Ok('matched')
+                yield Ok(f"LinkGroup::fetch_apstra {self=} {server_link_nodes[CkEnum.AE_INTERFACE]=} {self.link_group_fetched_lag_mode=}")
+            yield Ok('matched')
     
     def diff(self):
         """
         Diff the loaded data with the apstra controller.
         """
         return_message = ""
-        if self.link_group_ifname and self.link_group_fetched_ae_id is None:
-            return_message += f"LinkGroup:diff(), {self.link_group_ifname=} is absent in blueprint"
-        if self.link_group_tags != self.link_group_fetched_tags:
-            return_message += f"LinkGroup:diff(), {self.link_group_ifname=} tags mismatch {self.link_group_tags} != {self.link_group_fetched_tags}"
+        if self.ae and self.link_group_fetched_ae_id is None:
+            return_message += f"LinkGroup:diff(), {self.ae=} is absent in blueprint"
+        if self.tags_ae != self.link_group_fetched_tags:
+            return_message += f"LinkGroup:diff(), {self.ae=} tags mismatch {self.tags_ae} != {self.link_group_fetched_tags}"
         if self.link_group_lag_mode != self.link_group_fetched_lag_mode:
-            return_message += f"LinkGroup:diff(), {self.link_group_ifname=} lag mode mismatch {self.link_group_lag_mode} != {self.link_group_fetched_lag_mode}"
-        for member in self.link_group_members:
+            return_message += f"LinkGroup:diff(), {self.ae=} lag mode mismatch {self.link_group_lag_mode} != {self.link_group_fetched_lag_mode}"
+        for member in self.members:
             member_result = member.diff()
             if isinstance(member_result, Err):
-                return Err(f"LinkGroup:diff(), {self.link_group_ifname=}, {member.switch_label=}:{member.switch_ifname=}, Error: {member_result.err_value}")
+                yield Err(f"LinkGroup:diff(), {self.ae=}, {member.switch_label=}:{member.switch_ifname=}, Error: {member_result.err_value}")
             return_message += member_result.ok_value
-        return Ok(return_message)
+        yield Ok(return_message)
 
 
 @dataclass
@@ -156,9 +176,9 @@ class GenericSystem(DataInit):
     """
     Data class for a generic system.
     """
-    server_label: str
-    is_external: Optional[bool]
-    server_tags: Optional[List[str]]
+    server: str
+    ext: Optional[bool]
+    tags_server: Optional[List[str]]
     link_groups: Optional[List[LinkGroup]]  # optional only during initial creation
     gs_id: Optional[str] = None # generic system node id to be fetched from the blueprint
     fetched_server_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
@@ -171,16 +191,16 @@ class GenericSystem(DataInit):
         Initialize the generic system with the given input dict.
         """
         super().__init__(data)
-        if self.server_tags and isinstance(self.server_tags, str):
-            self.server_tags = self.server_tags.split(',')
+        if self.tags_server and isinstance(self.tags_server, str):
+            self.tags_server = self.tags_server.split(',')
         self.link_groups = []
     
     def load_link_group(self, data):
         """
         Load the link group data from input dict into the generic system.
         """
-        if link_group_ifname := data['link_group_ifname']:
-            the_link_groups = [x for x in self.link_groups if x.link_group_ifname == link_group_ifname]
+        if ae := data[GsCsvKeys.AE]:
+            the_link_groups = [x for x in self.link_groups if x.ae == ae]
             if the_link_groups:
                 the_link_groups[0].load_link_member(data)
                 return
@@ -191,19 +211,22 @@ class GenericSystem(DataInit):
         """
         Fetch the generic system from the apstra controller.
         """
-        # fetch from setver interface nodes
-        server_link_result = apstra_bp.get_server_interface_nodes(self.server_label)
-        if isinstance(server_link_result, Err):
-            return Err(f"GenericSystem:fetch_apstra(), {self.server_label=}, Error: {server_link_result.err_value}")
+        # fetch from server interface nodes
+        yield Ok(f"GenericSystem:fetch_apstra() {self.server=}")
+        for res in apstra_bp.get_server_interface_nodes(self.server):
+            server_link_result = res
+            yield res
+        # if isinstance(server_link_result, Err):
+        #     yield Err(f"GenericSystem:fetch_apstra(), {self.server=}, Error: {server_link_result.err_value}")
         server_links = server_link_result.ok_value
         if len(server_links):
-            logging.warning(f"GenericSystem:fetch_apstra(), {self.server_label=} present in blueprint {apstra_bp.label}")
+            yield Ok(f"GenericSystem:fetch_apstra(), {self.server=} present in blueprint {apstra_bp.label}")
             self.gs_id = server_links[0][CkEnum.GENERIC_SYSTEM]['id']
             self.fetched_server_tags = server_links[0][CkEnum.GENERIC_SYSTEM]['tags']
             #
-            tag_result = apstra_bp.query(f"node('system', name='system', label='{self.server_label}', role='generic').in_('tag').node('tag', name='system_tag')")
+            tag_result = apstra_bp.query(f"node('system', name='system', label='{self.server}', role='generic').in_('tag').node('tag', name='system_tag')")
             if isinstance(tag_result, Err):
-                return Err(f"GenericSystem:fetch_apstra(), {self.server_label=}, Error: {tag_result.err_value}")
+                yield Err(f"GenericSystem:fetch_apstra(), {self.server=}, Error: {tag_result.err_value}")
             tags = tag_result.ok_value
             self.fetched_server_tags = [tag['system_tag']['label'] for tag in tags]
             # iterate fetched server links
@@ -212,7 +235,7 @@ class GenericSystem(DataInit):
                 for lg in self.link_groups:
                     lg_fetch_result = lg.fetch_apstra(server_link_nodes)
                     if isinstance(lg_fetch_result, Err):
-                        return Err(f"GenericSystem:fetch_apstra(), {self.server_label=}, {lg.link_group_ifname=}, Error: {lg_fetch_result.err_value}")
+                        yield Err(f"GenericSystem:fetch_apstra(), {self.server=}, {lg.ae=}, Error: {lg_fetch_result.err_value}")
 
 
     def diff(self):
@@ -221,28 +244,28 @@ class GenericSystem(DataInit):
         """
         return_message = ""
         if self.gs_id is None:
-            return Ok(f"GenericSystem:diff(), {self.server_label=} is absent in blueprint")
+            yield Ok(f"GenericSystem:diff(), {self.server_label=} is absent in blueprint")
         if self.server_tags != self.fetched_server_tags:
             return_message += f"GenericSystem:diff(), {self.server_label=} tags mismatch {self.server_tags} != {self.fetched_server_tags}"
         for lg in self.link_groups:
             lg_result = lg.diff()
             if isinstance(lg_result, Err):
-                return Err(f"GenericSystem:diff(), {self.server_label=}, {lg.link_group_ifname=}, Error: {lg_result.err_value}")
+                yield Err(f"GenericSystem:diff(), {self.server_label=}, {lg.ae=}, Error: {lg_result.err_value}")
             return_message += lg_result.ok_value
-        return Ok(return_message)
+        yield Ok(return_message)
     
 @dataclass
 class ServerBlueprint(DataInit):
     """
-    Data class for a server blueprint.
+    Data class for a blueprint for generic system building.
     """
     blueprint: str
     servers: Dict[str, GenericSystem]  # optional only during initial creation
-    _bps = {}
+    _bps: ClassVar[CkApstraBlueprint] = {}  # Dict[str, ServerBlueprint]
     # ck_bp: CkApstraBlueprint
 
     def __new__(cls, data: Dict[str, Any]):        
-        blueprint = data['blueprint']
+        blueprint = data[GsCsvKeys.BLUEPRINT]
         # logging.warning(f"ServerBlueprint::__new__ {data=}")
         if blueprint in cls._bps:
             return cls._bps[blueprint]
@@ -253,12 +276,12 @@ class ServerBlueprint(DataInit):
 
     def __init__(self, data: Dict[str, Any]):
         """
-        Initialize the server blueprint with the given input dics.
+        Initialize the server blueprint with the given input data.
         """
         if not hasattr(self, 'servers'):
             super().__init__(data)
             self.servers = {}
-        server_label = data['server_label']        
+        server_label = data[GsCsvKeys.SERVER]        
         # logging.warning(f"ServerBlueprint::init processing GS {server_label=}")
         if server_label not in self.servers:
             self.servers[server_label] = GenericSystem(data)
@@ -282,16 +305,18 @@ class ServerBlueprint(DataInit):
         """
         Fetch the apstra blueprint from the server.
         """
+        yield Ok(f"ServerBlueprint:fetch_apstra() {self.blueprint=}")
         ck_bp = CkApstraBlueprint(apstra_session, self.blueprint)
         if ck_bp.id is None:
-            return Err(f"ServerBlueprint:fetch_apstra() Error: BP {self.blueprint=} - id not found")
+            yield Err(f"ServerBlueprint:fetch_apstra() Error: BP {self.blueprint=} - id not found")
         for server_label, generic_system in self.servers.items():
-            result = generic_system.fetch_apstra(ck_bp)
-            if isinstance(result, Err):
-                return Err(f"ServerBlueprint:fetch_apstra(), {self.blueprint=}, {server_label=}, Error: {result.err_value}")
+            for res in generic_system.fetch_apstra(ck_bp):
+                yield res
+            # if isinstance(result, Err):
+            #     yield Err(f"ServerBlueprint:fetch_apstra(), {self.blueprint=}, {server_label=}, Error: {result.err_value}")
 
 
-    def diff(self):
+    def diff(self): 
         """
         Diff the loaded data with the apstra controller.
         """
@@ -300,6 +325,9 @@ class ServerBlueprint(DataInit):
             if isinstance(diff_result, Err):
                 return Err(f"ServerBlueprint:diff(), {self.blueprint=}, {server_label=}, Error: {diff_result.err_value}")
             logging.warning(f"ServerBlueprint:diff(), {self.blueprint=}, {server_label=}, {diff_result.ok_value=}")
+
+
+
 
 
 def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: list):
@@ -584,7 +612,7 @@ def assign_connectivity_templates(apstra_bp, generic_system_label: str, gs_links
 
 
 
-def add_single_generic_system(bp, gs_label: str, gs_links_list) -> Result[str, str]:
+def add_single_generic_system_old(bp, gs_label: str, gs_links_list) -> Result[str, str]:
     """
     Add a single generic system to the Apstra server from the given generic systems data.
     """
@@ -605,8 +633,6 @@ def add_single_generic_system(bp, gs_label: str, gs_links_list) -> Result[str, s
         'links': [],
         'new_systems': [],
     }
-
-
 
 
     # gs_count += 1
@@ -741,58 +767,277 @@ def add_single_generic_system(bp, gs_label: str, gs_links_list) -> Result[str, s
         return Err(error_message)
 
     return Ok('done')
-                                                                             
 
-def add_generic_system(bp, gs_data: GenericSystem) -> Result[str, str]:
+
+def add_single_generic_system(bp, gs_data) -> Result[str, str]:
     """
     Add a single generic system to the Apstra server from the given generic systems data.
     """
-    func_name = "add_generic_system"
+    func_name = "add_single_generic_system"
+    server_link_result = bp.get_server_interface_nodes(gs_label)
+    if isinstance(server_link_result, Err):
+        error_message = f"Error: generic system {gs_label} has absent server {gs_label}\n\tFrom get_server_interface_nodes {server_link_result.err_value}"
+        # logging.warning(f"add_single_generic_system {error_message}")
+        return Err(error_message)
+    server_links = server_link_result.ok_value
+    if len(server_links):
+        logging.warning(f"{func_name} Skipping: Generic system {gs_label} already exists in blueprint {bp.label}")
+        # TODO: which return value to use?
+        return Ok('done')
 
-    ## create the generic systems
-    # bp_total = server_bps.bp_count  # total number of blueprints
-    bp_count = 0
-    logging.warning(f"{func_name} Adding generic systems to {bp_total} blueprints")
-    return Ok('ok')
+    # generic system absent. Add it.
+    generic_system_spec = {
+        'links': [],
+        'new_systems': [],
+    }
 
-    logging.info(f"{func_name} Adding generic systems to {bp_total} blueprints")
-    for bp_label, bp_data in generic_systems.items():
-        bp_count += 1
-        logging.info(f"{func_name} Adding generic systems to blueprint {bp_count}/{bp_total}: {bp_label}")
-        bp = CkApstraBlueprint(apstra_session, bp_label)
-        # logging.debug(f"{bp=}, {bp.id=}")
-        gs_total = len(bp_data)
-        gs_count = 0
-        logging.info(f"{func_name} Adding {gs_total} generic systems to blueprint {bp_label}")
-        for gs_label, gs_links_list in bp_data.items():
-            gs_count += 1
-            gs_link_total = len(gs_links_list)
-            logging.info(f"{func_name} Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
-            add_single_gs_result = add_single_generic_system(bp, gs_label, gs_links_list)
-            if isinstance(add_single_gs_result, Err):
-                logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_single_generic_system: {add_single_gs_result.err_value}")
-                # return None, f"{func_name} {error}"
 
-        ## form LACP in the BP iterating over the generic systems
-        for gs_label, gs_links_list in bp_data.items():
-            form_lacp(bp, gs_label, gs_links_list)
-            add_tags_result = add_tags(bp, gs_label, gs_links_list)
-            if isinstance(add_tags_result, Err):
-                logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_tags: {add_tags_result.err_value}")
-                # return None, f"add_generic_system {error}"
+    # gs_count += 1
+    gs_link_total = len(gs_links_list)
+    # logging.info(f"add_generic_system Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
+    # existing_gs_result = bp.get_system_node_from_label(gs_label)
+    # if isinstance(existing_gs_result, Ok) and existing_gs_result.ok_value:
+    #     error_message = f"add_single_generic_system Skipping: Generic system {gs_label} already exists in blueprint {bp.label}"
+    #     # TODO: verify the content
+    #     return Err(error_message)
+    # if gs_link_total > 1:
+    #     logging.warning(f"Adding generic system {gs_label} with {gs_link_total} links\n{gs_links_list}")
+    #     return
+    generic_system_spec = {
+        'links': [],
+        'new_systems': [],
+    }
+    # to form logical device
+    speed_count = {}
+    system_type = 'server'
+
+    for link in gs_links_list:
+    #     logging.debug(f"{link=}")
+        # make sure upper case
+        link_speed = link['speed'].upper()
+        system_type = 'external' if link['is_external'] else 'server'
+        for link_id_num in range(1, 5):
+            # link_id_num = link_number + 1
+            switch_label = link[f"switch{link_id_num}"]
+            this_ifname = link[f"switch_intf{link_id_num}"]
+            # skip if data is missing
+            if not switch_label:
                 continue
-            rename_generic_system_intf(bp, gs_label, gs_links_list)
+            if this_ifname[:2] not in ['et', 'xe', 'ge']:
+                error_message = f"Error: wrong interface for {gs_label} - {switch_label}:{this_ifname}"
+                # logging.warning(f"add_single_generic_system Error : {error_message}")
+                return Err(error_message)
+            logging.debug(f"{switch_label=}")
+            switch_node_result = bp.get_system_node_from_label(switch_label)
+            if isinstance(switch_node_result, Err):
+                error_message = f"Error: generic system {gs_label} has absent switch {switch_label}\n\tFrom get_system_node_from_label {error}"
+                # logging.warning(f"add_single_generic_system {error_message}")
+                return Err(error_message)
+            switch_node = switch_node_result.ok_value
+            if not switch_node:
+                return None, f"Error: {switch_label} not found in blueprint {bp.label}"
+            switch_id = switch_node['id']
+            transformation_id_result = bp.get_transformation_id(switch_label, this_ifname , link_speed)
+            if isinstance(transformation_id_result, Err):
+                error_message = f"Error: generic system {gs_label} has absent transformation {switch_label}:{this_ifname}\n\tFrom get_transformation_id {transformation_id_result.err_value}"
+                logging.warning(f"add_single_generic_system {error_message}")
+                return Err(error_message)
+            transformation_id = transformation_id_result.ok_value
+            link_spec = {
+                'switch': {
+                    'system_id': switch_id,
+                    # 'transformation_id': bp.get_transformation_id(link[f"switch{link_id_num}"], this_ifname , link_speed),
+                    'transformation_id': transformation_id,
+                    'if_name': link[f"switch_intf{link_id_num}"],
+                },
+                'system': {
+                    'system_id': None,
+                },
+                # 'lag_mode':link['lag_mode'],
+                'lag_mode': None,
+            }
+            generic_system_spec['links'].append(link_spec)
+            # speed_count[link_speed] = getattr(speed_count, link_speed, 0) + 1
+            logging.debug(f"{link_speed=}, {speed_count=}")
+            if link_speed not in speed_count:
+                speed_count[link_speed] = 1
+            else:
+                speed_count[link_speed] += 1
 
-            # # update connectivity templates - this should be run after lag update
-            # assign_connectivity_templates(job_env, gs_label, gs_links_list)
-            assign_connectivity_templates(bp, gs_label, gs_links_list)
+    new_system = {
+        'system_type': system_type,
+        'label': gs_label,
+        'port_channel_id_min': 0,
+        'port_channel_id_max': 0,
+        'logical_device': {
+            'display_name': None,
+            'id': None,
+            'panels': [
+                {
+                    'panel_layout': {
+                        'row_count': 1,
+                        'column_count': sum(speed_count.values()),
+                    },
+                    'port_indexing': {
+                        'order': 'T-B, L-R',
+                        'start_index': 1,
+                        'schema': 'absolute'
+                    },
+                    "port_groups": [
+                        # {
+                        #     "count": 4,
+                        #     "speed": {
+                        #         "unit": "G",
+                        #         "value": 10
+                        #     },
+                        #     "roles": [
+                        #         "leaf",
+                        #         "access"
+                        #     ]
+                        # }
+                    ]
+                }
+            ]
+        },
+    }
+    display_name = 'auto'
+    for speed, count in speed_count.items():
+        port_group = {
+            'count': count,
+            'speed': {
+                'unit': speed[-1],
+                'value': int(speed[:-1]),
+            },
+            'roles': ['leaf', 'access'],
+        }
+        new_system['logical_device']['panels'][0]['port_groups'].append(port_group)
+        display_name = f"{display_name}-{count}x{speed}"
+    new_system['logical_device']['display_name'] = display_name
+    new_system['logical_device']['id'] = display_name
+    generic_system_spec['new_systems'].append(new_system)
+    logging.debug(f"add_single_generic_system {generic_system_spec=}, {speed_count=}")
 
-    return Ok(f"{func_name}: {bp_total} blueprints, {gs_total} generic systems added")
+    generic_system_created_result = bp.add_generic_system(generic_system_spec)
+    if isinstance(generic_system_created_result, Err):
+        error_message = f"Error: generic system {gs_label} not created\n\tFrom add_generic_system {generic_system_created_result.err_value}"
+        # logging.warning(error_message)
+        return Err(error_message)
 
+    return Ok('done')
+
+
+def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: list) -> Result[str, str]:
+    """
+    Add generic systems to the apstra server.
+
+    Parameters
+    ----------
+    apstra_session : CkApstraSession
+        The apstra session object.
+
+    generic_system_rows : list
+        The each list represents a link in the generic system. They keys are GsCsvKeys.
+
+    """
+    func_name = "add_generic_systems"
+
+    for row in generic_system_rows:
+        bp = ServerBlueprint(row)
+        # logging.debug(f"{row=}")
+        # yield Ok(f"{func_name} Adding {bp.blueprint=} {bp=}")
+
+    yield Ok(f"{func_name} {ServerBlueprint._bps=}")
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        yield Ok(f"{func_name} Reading {bp_label=} {sbp=}")
+        for res in sbp.fetch_apstra(apstra_session):
+            yield res
+    yield Ok(f"{func_name} fetched {ServerBlueprint._bps=}")
+        # yield Ok(f"{func_name} Reading {bp.blueprint=}")
+    # yield Ok(f"{func_name} {ServerBlueprint._bps=}")
+    # for bp_label, sbp in ServerBlueprint._bps:
+    #     yield Ok(f"{func_name} Reading {bp_label=}")
+
+    # sorted_generic_systems = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    
+    # no_ae_count = 0  # increment for each ae links
+
+    # for item in generic_system_rows:
+    #     blueprint = item['blueprint']
+    #     server = item['server']
+    #     no_ae_count += 1
+    #     ae = item['ae'] or f'no_ae_{no_ae_count}'  # Use 'no_ae' if ae is empty
+
+    #     # Server attributes
+    #     server_attrs = {
+    #         'ext': item['ext'],
+    #         'tags_server': item['tags_server']
+    #     }
+
+    #     # AE attributes
+    #     ae_attrs = {
+    #         'lag_mode': item['lag_mode'],
+    #         'ct_names': item['ct_names'],
+    #         'tags_ae': item['tags_ae'],
+    #     }
+
+    #     # Link attributes
+    #     link_attrs = {
+    #         'speed': item['speed'],
+    #         'ifname': item['ifname'],
+    #         'switch': item['switch'],
+    #         'switch_ifname': item['switch_ifname'],
+    #         'tags_link': item['tags_link'],
+    #         'comment': item['comment']
+    #     }
+
+    #     # Update the sorted data structure            
+    #     if server not in sorted_generic_systems[blueprint]:
+    #         sorted_generic_systems[blueprint][server] = server_attrs
+    #         sorted_generic_systems[blueprint][server]['ae'] = defaultdict(list)
+
+    #     if ae not in sorted_generic_systems[blueprint][server]['ae']:
+    #         sorted_generic_systems[blueprint][server]['ae'][ae] = ae_attrs
+    #         sorted_generic_systems[blueprint][server]['ae'][ae]['links'] = []
+
+    #     sorted_generic_systems[blueprint][server]['ae'][ae]['links'].append(link_attrs)
+
+    # yield Ok(f"{func_name} Adding {sorted_generic_systems=}")
+    # bp_total = len(sorted_generic_systems.keys())
+    # bp_count = 0
+    # for bp_label, generic_systems in sorted_generic_systems.items():
+    #     bp = CkApstraBlueprint(apstra_session, bp_label)
+    #     bp_count += 1
+    #     gs_total = len(generic_systems.keys())
+    #     gs_count = 0
+    #     yield Ok(f"{func_name} Adding {gs_total} generic systems to blueprint {bp_label} ({bp_count} of {bp_total})")
+    #     for gs_label, gs_data in generic_systems.items():
+    #         gs_count += 1
+    #         gs_ae_total = len(gs_data['ae'].keys())            
+    #         yield Ok(f"{func_name} Adding generic system {gs_label} ({gs_count} of {gs_total}) with {gs_ae_total} AE(s)")
+    #         for res in add_single_generic_system(bp, gs_data):
+    #             yield res
+    #         # if isinstance(add_single_gs_result, Err):
+    #         #     logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_single_generic_system: {add_single_gs_result.err_value}")
+    #         #     # return None, f"{func_name} {error}"
+
+    #     # ## form LACP in the BP iterating over the generic systems
+    #     # for gs_label, gs_links_list in bp_data.items():
+    #     #     form_lacp(bp, gs_label, gs_links_list)
+    #     #     add_tags_result = add_tags(bp, gs_label, gs_links_list)
+    #     #     if isinstance(add_tags_result, Err):
+    #     #         logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_tags: {add_tags_result.err_value}")
+    #     #         # return None, f"add_generic_system {error}"
+    #     #         continue
+    #     #     rename_generic_system_intf(bp, gs_label, gs_links_list)
+
+    #     #     # # update connectivity templates - this should be run after lag update
+    #     #     # assign_connectivity_templates(job_env, gs_label, gs_links_list)
+    #     #     assign_connectivity_templates(bp, gs_label, gs_links_list)
+
+    # return Ok(f"{func_name} {bp_total} blueprints done")
 
 
 if __name__ == "__main__":
-    # click_add_generic_systems()
     apstra_server_host = '10.85.192.45'
     apstra_server_port = '443'
     apstra_server_username = 'admin'

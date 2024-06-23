@@ -1,0 +1,19 @@
+leaf01:
+  vn11:
+    tagged_interfaces:
+    - ae1
+    vlan_id: 11
+    vxlan_id: 10011
+  vn12:
+    tagged_interfaces:
+    - ae1
+    vlan_id: 12
+    vxlan_id: 10012
+leaf02:
+  vn11:
+    description: vn11_blue_vxlan10011
+    tagged_interfaces:
+    - ae1
+    vlan_id: 11
+    vxlan_id: 10011
+
