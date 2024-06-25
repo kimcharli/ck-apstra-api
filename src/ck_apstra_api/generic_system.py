@@ -19,6 +19,7 @@ from ck_apstra_api.apstra_blueprint import CkApstraBlueprint, CkEnum
 
 
 class GsCsvKeys(StrEnum):
+    LINE = auto()
     BLUEPRINT = auto()
     SERVER = auto()
     EXT = auto()
@@ -52,6 +53,7 @@ class LinkMember(DataInit):
     """
     Data class for a single link in a generic system. Can be part of LinkGroup
     """
+    line: int   # the line number in the csv file to be used for matching. Had local use per CSV file
     speed: Optional[str]
     ifname: Optional[str]
     switch: str
@@ -63,6 +65,8 @@ class LinkMember(DataInit):
     fetched_switch_id: Optional[str] = None
     fetched_switch_intf_id: Optional[str] = None
 
+    log_prefix: str = field(default='', repr=False)  # not to print in __repr__
+
     def __init__(self, data: Dict[str, Any]):
         """
         Initialize the link member with the given input dict.
@@ -70,21 +74,33 @@ class LinkMember(DataInit):
         super().__init__(data)
         if self.tags_link and isinstance(self.tags_link, str):
             self.tags_link = self.tags_link.split(',')
+        elif self.tags_link == '':
+            self.tags_link = []
         self.speed = self.speed.upper()
+        self.log_prefix = f"LinkMember({self.switch}:{self.switch_ifname}-{self.ifname})"
+
+    # TODO: init to [] for fetched_tags_link
+    def __post_init__(self):
+        self.fetched_tags_link = []
+
 
     def fetch_apstra(self, server_link_nodes: Dict[str, Any]) -> Result[str, str]:
         """
         Fetch the link member from the apstra controller.
         return Ok('matched') or Ok('not-found') if matched, or Err if didn't match
         """
-        if server_link_nodes[CkEnum.MEMBER_SWITCH]['label'] == self.switch_label and server_link_nodes[CkEnum.MEMBER_INTERFACE]['if_name'] == self.switch_ifname:
+        log_prefix = f"{self.log_prefix}::fetch_apstra()"
+        yield Ok(f"{log_prefix} begin")
+        if server_link_nodes[CkEnum.MEMBER_SWITCH]['label'] == self.switch and server_link_nodes[CkEnum.MEMBER_INTERFACE]['if_name'] == self.switch_ifname:
+            yield Ok(f"{log_prefix} {server_link_nodes=}")
             if server_link_nodes[CkEnum.LINK]['speed'] != self.speed:
-                yield Err(f"Error: {self.switch_label}:{self.switch_ifname} speed mismatch {server_link_nodes[CkEnum.LINK]['speed']} != {self.speed}")
+                yield Err(f"Error: {log_prefix} speed mismatch {server_link_nodes[CkEnum.LINK]['speed']} != {self.speed}")
             self.fetched_server_ifname = server_link_nodes[CkEnum.GENERIC_SYSTEM_INTERFACE]['if_name']
             self.fetched_switch_id = server_link_nodes[CkEnum.MEMBER_SWITCH]['id']
             self.fetched_switch_intf_id = server_link_nodes[CkEnum.MEMBER_INTERFACE]['id']            
-            yield Ok('matched')
-        yield Ok('not-found')
+            yield Ok(f"{log_prefix} found {CkEnum.GENERIC_SYSTEM_INTERFACE}['if_name']={server_link_nodes[CkEnum.GENERIC_SYSTEM_INTERFACE]['if_name']} {CkEnum.MEMBER_SWITCH}['id']={server_link_nodes[CkEnum.MEMBER_SWITCH]['id']}")
+            return
+        yield Ok(f'{log_prefix} not-found')
 
     def diff(self):
         """
@@ -112,11 +128,14 @@ class LinkGroup(DataInit):
     link_group_fetched_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
     link_group_fetched_lag_mode: Optional[str] = None  # the fetched lag mode from the apstra controller
 
+    log_prefix: str = field(default='', repr=False)  # not to print in __repr__
+
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
         if self.tags_ae and isinstance(self.tags_ae, str):
             self.tags_ae = self.tags_ae.split(',')
         self.members = [ LinkMember(data) ]
+        self.log_prefix = f"LinkGroup({self.ae})"
         # logging.warning(f"LinkGroup::init added LinkMember {self.members=}")
 
     def load_link_member(self, data: Dict[str, Any]):
@@ -130,7 +149,8 @@ class LinkGroup(DataInit):
         """
         Fetch the link group from the apstra controller.
         """
-        yield Ok(f"LinkGroup::fetch_apstra() {self.ae=}")
+        log_prefix = f"{self.log_prefix}::fetch_apstra()"
+        yield Ok(f"{log_prefix} begin")
         for member in self.members:
             for res in member.fetch_apstra(server_link_nodes):
                 fetch_result = res
@@ -177,12 +197,14 @@ class GenericSystem(DataInit):
     Data class for a generic system.
     """
     server: str
-    ext: Optional[bool]
+    ext: Optional[bool]  # TBD: the external flag for the generic system
     tags_server: Optional[List[str]]
     link_groups: Optional[List[LinkGroup]]  # optional only during initial creation
     gs_id: Optional[str] = None # generic system node id to be fetched from the blueprint
     fetched_server_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
 
+    log_prefix: str = field(default='', repr=False)  # not to print in __repr__
+    
     # TODO: node('system', name='system', role='generic').in_('tag').node('tag', name='system_tag')
 
 
@@ -193,6 +215,7 @@ class GenericSystem(DataInit):
         super().__init__(data)
         if self.tags_server and isinstance(self.tags_server, str):
             self.tags_server = self.tags_server.split(',')
+        self.log_prefix = f"GenericSystem({self.server})"
         self.link_groups = []
     
     def load_link_group(self, data):
@@ -211,31 +234,34 @@ class GenericSystem(DataInit):
         """
         Fetch the generic system from the apstra controller.
         """
-        # fetch from server interface nodes
-        yield Ok(f"GenericSystem:fetch_apstra() {self.server=}")
-        for res in apstra_bp.get_server_interface_nodes(self.server):
-            server_link_result = res
-            yield res
-        # if isinstance(server_link_result, Err):
-        #     yield Err(f"GenericSystem:fetch_apstra(), {self.server=}, Error: {server_link_result.err_value}")
+        log_prefix = f"{self.log_prefix}::fetch_apstra()"
+        # fetch interface nodes from Apstra
+        yield Ok(f"{log_prefix} begin")
+        server_link_result = apstra_bp.get_server_interface_nodes(self.server)
         server_links = server_link_result.ok_value
+        yield f"{log_prefix} {server_links=}"
+        # if isinstance(server_link_result, Err): 
+        #     yield Err(f"GenericSystem:fetch_apstra(), {self.server=}, Error: {server_link_result.err_value}")
         if len(server_links):
-            yield Ok(f"GenericSystem:fetch_apstra(), {self.server=} present in blueprint {apstra_bp.label}")
+            yield Ok(f"{log_prefix} present in blueprint {apstra_bp.label}")
             self.gs_id = server_links[0][CkEnum.GENERIC_SYSTEM]['id']
             self.fetched_server_tags = server_links[0][CkEnum.GENERIC_SYSTEM]['tags']
             #
             tag_result = apstra_bp.query(f"node('system', name='system', label='{self.server}', role='generic').in_('tag').node('tag', name='system_tag')")
             if isinstance(tag_result, Err):
-                yield Err(f"GenericSystem:fetch_apstra(), {self.server=}, Error: {tag_result.err_value}")
+                yield Err(f"{log_prefix} Error: {tag_result.err_value}")
             tags = tag_result.ok_value
             self.fetched_server_tags = [tag['system_tag']['label'] for tag in tags]
             # iterate fetched server links
             for server_link_nodes in server_links:
                 # iterate over the link groups
                 for lg in self.link_groups:
-                    lg_fetch_result = lg.fetch_apstra(server_link_nodes)
-                    if isinstance(lg_fetch_result, Err):
-                        yield Err(f"GenericSystem:fetch_apstra(), {self.server=}, {lg.ae=}, Error: {lg_fetch_result.err_value}")
+                    for res in lg.fetch_apstra(server_link_nodes):
+                        lg_fetch_result = res
+                        if isinstance(lg_fetch_result, Err):
+                            yield Err(f"{log_prefix} {lg.ae=}, Error: {lg_fetch_result.err_value}")
+                        else:
+                            yield res
 
 
     def diff(self):

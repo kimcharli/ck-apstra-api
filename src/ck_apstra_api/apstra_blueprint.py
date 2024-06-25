@@ -203,7 +203,7 @@ class CkApstraBlueprint:
         )"""
         # self.logger.warning(f"get_server_interface_nodes() {system_label=} {interface_query=}")
         # query_result = self.query(interface_query)
-        return Ok(self.query(interface_query))
+        return self.query(interface_query)
 
     def get_switch_interface_nodes(self, switch_labels=None, intf_name=None) -> Result[List, str]:
         """
