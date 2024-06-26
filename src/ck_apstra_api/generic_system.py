@@ -121,9 +121,11 @@ class LinkMember(DataInit):
     comment: Optional[str] = None
     # fetched data
     fetched_server_ifname: Optional[str] = None
+    fetched_server_intf_id: Optional[str] = None
     fetched_switch_id: Optional[str] = None
     fetched_switch_intf_id: Optional[str] = None
     fetched_tags_link: Optional[List[str]] = None
+    fetched_link_id: Optional[str] = None
 
     bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
     fetched_evpn_interface: Optional[Dict[str, Any]] = field(default=None, repr=False)   # the evpn_interface node fetched from the apstra controller
@@ -166,7 +168,9 @@ class LinkMember(DataInit):
             self.fetched_switch_id = found[CkEnum.MEMBER_SWITCH]['id']
             self.fetched_switch_intf_id = found[CkEnum.MEMBER_INTERFACE]['id'] 
             self.fetched_evpn_interface = found[CkEnum.EVPN_INTERFACE]
-            self.fetched_ae_interface = found[CkEnum.AE_INTERFACE]         
+            self.fetched_ae_interface = found[CkEnum.AE_INTERFACE]
+            self.fetched_link_id = found[CkEnum.LINK]['id']
+            self.fetched_server_intf_id = found[CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
             # yield Ok(f"{log_prefix} link present - switch({self.switch}:{self.fetched_switch_id}) {self.switch_ifname}:{self.fetched_switch_intf_id} {self.fetched_server_ifname=}")
         else:
             # not found. Load data from switch links
@@ -211,6 +215,33 @@ class LinkMember(DataInit):
             'link_group_label': None
         }
         return link_spec
+
+    @property
+    def rename_spec(self):
+        """
+        Return the rename spec for the link member
+        """
+        log_prefix = f"{self.log_prefix}::rename_spec()"
+        # logging.warning(f"{log_prefix} begin {self=}")
+        if self.fetched_server_ifname != self.ifname:
+            return {
+                'endpoints': [
+                    {
+                        'interface': {
+                            'id': self.fetched_switch_intf_id
+                        }
+                    },
+                    {
+                        'interface': {
+                            'id': self.fetched_server_intf_id,
+                            'if_name': self.ifname
+                        }
+                    }
+                ],
+                'id': self.fetched_link_id
+            }
+        else:
+            return None
 
 @dataclass
 class LinkGroup(DataInit):
@@ -271,7 +302,31 @@ class LinkGroup(DataInit):
                     self.fetched_lag_mode = member.fetched_ae_interface['lag_mode']
         yield Ok(f"{log_prefix} done {self}")
         
-    
+    def form_lacp(self):
+        """
+        Form the LACP for the link group
+        """
+        log_prefix = f"{self.log_prefix}::form_lacp()"
+
+        if not self.lag_mode:
+            # None or ''
+            yield Ok(f"{log_prefix} {self.ae=} is not for lag. Skipping")
+            return
+        
+        if self.fetched_ae_id:
+            yield Ok(f"{log_prefix} {self.ae=} is already lag {self.fetched_ae_id}. Skipping")
+            return
+
+        lag_spec = {
+            'links': {x.fetched_link_id: {'group_label': self.ae, 'lag_mode': self.lag_mode} for x in self.members}
+        }
+        # update LACP
+        lag_updated = self.bp.patch_leaf_server_link_labels(lag_spec)
+        if lag_updated:
+            yield Err(f"Unexpected return: LACP updated for link group {self.ae} {self.lag_mode=} in blueprint {self.bp.label}: {lag_updated}")
+        else:
+            yield Err(f"{log_prefix} {self.ae=} has no ae_id. Skipping")
+
     @property
     def link_spec(self):
         """
@@ -303,6 +358,21 @@ class LinkGroup(DataInit):
                 yield Err(f"LinkGroup:diff(), {self.ae=}, {member.switch_label=}:{member.switch_ifname=}, Error: {member_result.err_value}")
             return_message += member_result.ok_value
         yield Ok(return_message)
+
+
+    def rename_interfaces(self):
+        log_prefix = f"{self.log_prefix}::rename_interfaces()"
+        rename_spec = {'links': [member.rename_spec for member in self.members if member.rename_spec]}
+        # for member in self.members:
+        #     rename_spec.append(member.rename_spec)
+        yield Ok(f"{log_prefix} {self.ae=} {rename_spec=}")
+        if rename_spec['links']:
+            rename_updated = self.bp.patch_cable_map(rename_spec)
+            if rename_updated:
+                yield Err(f"Unexpected return: Interface renamed for link group {self.ae} in blueprint {self.bp.label}: {rename_updated}")
+            else:
+                yield Ok(f"{self.log_prefix} {self.ae=} rename done")
+
 
 
 @dataclass
@@ -461,6 +531,22 @@ class GenericSystem(DataInit):
             return
         yield Ok(f"{log_prefix} created")
 
+    def form_lacp(self):
+        """
+        Form the LACP for the generic system
+        """
+        for lg in self.link_groups:
+            for res in lg.form_lacp():
+                yield res
+
+    def rename_interfaces(self):
+        """
+        Rename the interfaces for the generic system
+        """
+        for lg in self.link_groups:
+            for res in lg.rename_interfaces():
+                yield res
+
 
 @dataclass
 class ServerBlueprint(DataInit):
@@ -469,11 +555,11 @@ class ServerBlueprint(DataInit):
     """
     blueprint: str
     # child
-    servers: Dict[str, GenericSystem]  # optional only during initial creation
+    servers: Dict[str, GenericSystem] = field(default_factory=dict, repr=False) # optional only during initial creation
     #fetched value
-    ck_bp: CkApstraBlueprint = None
+    ck_bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
     # class variable to store the server data
-    _bps: ClassVar[CkApstraBlueprint] = {}  # Dict[str, ServerBlueprint]
+    _bps: ClassVar[CkApstraBlueprint] = field(default={}, repr=False)  # Dict[str, ServerBlueprint]
 
     def __new__(cls, data: Dict[str, Any]):        
         blueprint = data[GsCsvKeys.BLUEPRINT]
@@ -508,10 +594,6 @@ class ServerBlueprint(DataInit):
         for k, v in self.servers.items():
             yield k, v
 
-    # @classmethod
-    # @property
-    # def bp_count(cls):
-    #     return len(cls._bps)
     def fetch_apstra(self, apstra_session: CkApstraSession) -> Result[str, str]:
         """
         Fetch the apstra blueprint from the server.
@@ -523,8 +605,6 @@ class ServerBlueprint(DataInit):
         for server_label, generic_system in self.servers.items():
             for res in generic_system.fetch_apstra(self.ck_bp):
                 yield res
-            # if isinstance(result, Err):
-            #     yield Err(f"ServerBlueprint:fetch_apstra(), {self.blueprint=}, {server_label=}, Error: {result.err_value}")
 
 
     def diff(self): 
@@ -545,72 +625,22 @@ class ServerBlueprint(DataInit):
         for generic_system in self.servers.values():
             for res in generic_system.create():
                 yield res
-            # if isinstance(result, Err):
-            #     yield Err(f"ServerBlueprint:add_generic_system(), {self.blueprint=}, {server_label=}, Error: {result.err_value}")
 
-
-
-def form_lacp(apstra_bp, generic_system_label: str, generic_system_links_list: list):
-    # bp = job_env.main_bp
-    bp = apstra_bp
-    bp_label = bp.label
-    lag_spec = {
-        'links': {
-            # <link_node_id>: {
-            #     'group_label': group_label,
-            #     'lag_mode': lag_mode,
-            # }
-        }
-    }
-    link_id_num = 0
-    for link in generic_system_links_list:
-        lag_mode = link['lag_mode']
-        if lag_mode is None:
-            # logging.debug(f"Skipping: Generic system {generic_system_label} has no lag_mode")
-            continue                
-        if lag_mode not in [ 'lacp_active', 'lacp_passive']:
-            logging.warning(f"form_lacp Skipping: Generic system {generic_system_label} has invalid lag_mode {lag_mode}")
-            continue
-        link_id_num += 1
-        group_label = f"link{link_id_num}"
-        # iterate over the 4 member interfaces and links list
-        for member_number in range(4):
-            member_number += 1
-            sw_label = link[f"label{member_number}"] if f"label{member_number}" in link else link[f"switch{member_number}"]
-            sw_ifname = link[f"ifname{member_number}"] if f"ifname{member_number}" in link else link[f"switch_intf{member_number}"]
-            gs_ifname = link[f"gs_ifname{member_number}"] if f"gs_ifname{member_number}" in link else link[f"server_intf{member_number}"]
-            # skip if now switch is defined
-            if not sw_label or not sw_ifname:
-                continue
-            if sw_ifname[:2] not in ['et', 'xe', 'ge']:
-                # TODO: should fail on input validation
-                logging.warning(f"form_lacp Skipping: Switch for {generic_system_label}, {sw_ifname[:2]} has invalid interface name {sw_ifname}:{sw_ifname}")
-                continue
-            switch_link_nodes_result = bp.get_switch_interface_nodes([sw_label], sw_ifname)
-            if isinstance(switch_link_nodes_result, Err):
-                return Err(f"form_lacp Err: {sw_label}:{sw_ifname} not found in blueprint {bp.label}")
-            switch_link_nodes = switch_link_nodes_result.ok_value
-            if switch_link_nodes is None or len(switch_link_nodes) == 0:
-                logging.warning(f"form_lacp Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
-                continue
-            link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
-            sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
-            gs_if_node_id = switch_link_nodes[0][CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
-            link_spec = {
-                'group_label': group_label,
-                'lag_mode': lag_mode,
-            }
-            lag_spec['links'][link_node_id] = link_spec
-            # logging.warning(f"{gs_links_list=}, {link_spec=}, {sw_label=}, {sw_ifname=}")
-            
-    # update LACP
-    if len(lag_spec['links']) > 0:
-        logging.debug(f"{lag_spec=}")
-        lag_updated = bp.patch_leaf_server_link_labels(lag_spec)
-        if lag_updated:
-            logging.warning(f"Unexpected return: LACP updated for generic system {generic_system_label} in blueprint {bp_label}: {lag_updated}")
-        # logging.debug(f"lag_updated: {lag_updated}")
+    def form_lacp(self):
+        """
+        Form the LACP for the generic system
+        """
+        for generic_system in self.servers.values():
+            for res in generic_system.form_lacp():
+                yield res
     
+    def rename_interfaces(self):
+        """
+        Rename the interfaces for the generic system
+        """
+        for generic_system in self.servers.values():
+            for res in generic_system.rename_interfaces():
+                yield res
 
 # def add_tags(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
 #     bp = job_env.main_bp
@@ -660,89 +690,6 @@ def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: li
                 bp.post_tagging(link_node_id, tags_to_add=member_tags)
                 
     return Ok('done')
-
-# def rename_generic_system_intf(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
-#     bp = job_env.main_bp
-def rename_generic_system_intf(apstra_bp, generic_system_label: str, generic_system_links_list: list):
-    bp = apstra_bp
-    bp_label = bp.label
-    patch_cable_map_spec = {
-        'links': [
-            # {
-            #     'endpoints': [
-            #         {
-            #             'interface': {
-            #                 'id': <switch_intf_node_id>
-            #             }
-            #         },
-            #         {
-            #             'interface': {
-            #                 'id': <generic_system_intf_node_id>,
-            #                 'if_name': <generci_system_ifname>,
-            #             }
-            #         }
-            #     ],
-            #     'id': <link_node_id>
-            # }
-        ]
-    }
-    link_id_num = 0
-    for link in generic_system_links_list:
-        link_id_num += 1
-        group_label = f"link{link_id_num}"
-        for member_number in range(4):
-            member_number += 1
-            sw_label = link[f"label{member_number}"] if f"label{member_number}" in link else link[f"switch{member_number}"]
-            sw_ifname = link[f"ifname{member_number}"] if f"ifname{member_number}" in link else link[f"switch_intf{member_number}"]
-            gs_ifname = link[f"gs_ifname{member_number}"] if f"gs_ifname{member_number}" in link else link[f"server_intf{member_number}"]
-            # skip if data is missing
-            if not sw_label or not sw_ifname:
-                continue
-            if sw_ifname[:2] not in ['et', 'xe', 'ge']:
-                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
-                continue
-            switch_link_nodes_result = bp.get_switch_interface_nodes([sw_label], sw_ifname)
-            # logging.warning(f"{sw_label=}, {sw_ifname=}, {len(switch_link_nodes)=}")
-            # logging.debug(f"{label_label=}, {link[label_label]=}")
-            # logging.debug(f"{len(switch_link_nodes)=}, {switch_link_nodes=}")
-            if isinstance(switch_link_nodes_result, Err):
-                return Err(f"rename_generic_system_intf Err: {sw_label}:{sw_ifname} not found in blueprint {bp.label}\n\t get_switch_interface_nodes {switch_link_nodes_result.err_value}") 
-            switch_link_nodes = switch_link_nodes_result.ok_value
-            if switch_link_nodes is None or len(switch_link_nodes) == 0:
-                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
-                continue
-            link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
-            sw_if_node_id = switch_link_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
-            gs_if_node_id = switch_link_nodes[0][CkEnum.GENERIC_SYSTEM_INTERFACE]['id']
-            
-            # patch_cable_map_spec
-            if gs_ifname is not None and len(gs_ifname):
-                patch_cable_map_spec['links'].append({
-                    'endpoints': [
-                        {
-                            'interface': {
-                                'id': sw_if_node_id
-                            }
-                        },
-                        {
-                            'interface': {
-                                'id': gs_if_node_id,
-                                'if_name': gs_ifname,
-                            }
-                        }
-
-                    ],
-                    'id': link_node_id                            
-                })
-
-    # upddate generic system interface names
-    if len(patch_cable_map_spec['links']) > 0:
-        logging.debug(f"{patch_cable_map_spec=}")
-        patch_cable_map_spec_updated = bp.patch_cable_map(patch_cable_map_spec)
-        if patch_cable_map_spec_updated:
-            logging.warning(f"Unexpected return: cable map updated for generic system {generic_system_label} in blueprint {bp_label}: {patch_cable_map_spec_updated}")
-        # logging.debug(f"patch_cable_map_spec_updated: {patch_cable_map_spec_updated}"
-
 
 # def assign_connectivity_templates(job_env: CkJobEnv, generic_system_label: str, gs_links_list: list):
 #     # update connectivity templates - this should be run after lag update
@@ -831,320 +778,6 @@ def assign_connectivity_templates(apstra_bp, generic_system_label: str, gs_links
         # logging.debug(f"ct_assign_updated: {ct_assign_updated}"
 
 
-
-def add_single_generic_system_old(bp, gs_label: str, gs_links_list) -> Result[str, str]:
-    """
-    Add a single generic system to the Apstra server from the given generic systems data.
-    """
-    func_name = "add_single_generic_system"
-    server_link_result = bp.get_server_interface_nodes(gs_label)
-    if isinstance(server_link_result, Err):
-        error_message = f"Error: generic system {gs_label} has absent server {gs_label}\n\tFrom get_server_interface_nodes {server_link_result.err_value}"
-        # logging.warning(f"add_single_generic_system {error_message}")
-        return Err(error_message)
-    server_links = server_link_result.ok_value
-    if len(server_links):
-        logging.warning(f"{func_name} Skipping: Generic system {gs_label} already exists in blueprint {bp.label}")
-        # TODO: which return value to use?
-        return Ok('done')
-
-    # generic system absent. Add it.
-    generic_system_spec = {
-        'links': [],
-        'new_systems': [],
-    }
-
-
-    # gs_count += 1
-    gs_link_total = len(gs_links_list)
-    # logging.info(f"add_generic_system Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
-    # existing_gs_result = bp.get_system_node_from_label(gs_label)
-    # if isinstance(existing_gs_result, Ok) and existing_gs_result.ok_value:
-    #     error_message = f"add_single_generic_system Skipping: Generic system {gs_label} already exists in blueprint {bp.label}"
-    #     # TODO: verify the content
-    #     return Err(error_message)
-    # if gs_link_total > 1:
-    #     logging.warning(f"Adding generic system {gs_label} with {gs_link_total} links\n{gs_links_list}")
-    #     return
-    generic_system_spec = {
-        'links': [],
-        'new_systems': [],
-    }
-    # to form logical device
-    speed_count = {}
-    system_type = 'server'
-
-    for link in gs_links_list:
-    #     logging.debug(f"{link=}")
-        # make sure upper case
-        link_speed = link['speed'].upper()
-        system_type = 'external' if link['is_external'] else 'server'
-        for link_id_num in range(1, 5):
-            # link_id_num = link_number + 1
-            switch_label = link[f"switch{link_id_num}"]
-            this_ifname = link[f"switch_intf{link_id_num}"]
-            # skip if data is missing
-            if not switch_label:
-                continue
-            if this_ifname[:2] not in ['et', 'xe', 'ge']:
-                error_message = f"Error: wrong interface for {gs_label} - {switch_label}:{this_ifname}"
-                # logging.warning(f"add_single_generic_system Error : {error_message}")
-                return Err(error_message)
-            logging.debug(f"{switch_label=}")
-            switch_node_result = bp.get_system_node_from_label(switch_label)
-            if isinstance(switch_node_result, Err):
-                error_message = f"Error: generic system {gs_label} has absent switch {switch_label}\n\tFrom get_system_node_from_label {error}"
-                # logging.warning(f"add_single_generic_system {error_message}")
-                return Err(error_message)
-            switch_node = switch_node_result.ok_value
-            if not switch_node:
-                return None, f"Error: {switch_label} not found in blueprint {bp.label}"
-            switch_id = switch_node['id']
-            transformation_id_result = bp.get_transformation_id(switch_label, this_ifname , link_speed)
-            if isinstance(transformation_id_result, Err):
-                error_message = f"Error: generic system {gs_label} has absent transformation {switch_label}:{this_ifname}\n\tFrom get_transformation_id {transformation_id_result.err_value}"
-                logging.warning(f"add_single_generic_system {error_message}")
-                return Err(error_message)
-            transformation_id = transformation_id_result.ok_value
-            link_spec = {
-                'switch': {
-                    'system_id': switch_id,
-                    # 'transformation_id': bp.get_transformation_id(link[f"switch{link_id_num}"], this_ifname , link_speed),
-                    'transformation_id': transformation_id,
-                    'if_name': link[f"switch_intf{link_id_num}"],
-                },
-                'system': {
-                    'system_id': None,
-                },
-                # 'lag_mode':link['lag_mode'],
-                'lag_mode': None,
-            }
-            generic_system_spec['links'].append(link_spec)
-            # speed_count[link_speed] = getattr(speed_count, link_speed, 0) + 1
-            logging.debug(f"{link_speed=}, {speed_count=}")
-            if link_speed not in speed_count:
-                speed_count[link_speed] = 1
-            else:
-                speed_count[link_speed] += 1
-
-    new_system = {
-        'system_type': system_type,
-        'label': gs_label,
-        'port_channel_id_min': 0,
-        'port_channel_id_max': 0,
-        'logical_device': {
-            'display_name': None,
-            'id': None,
-            'panels': [
-                {
-                    'panel_layout': {
-                        'row_count': 1,
-                        'column_count': sum(speed_count.values()),
-                    },
-                    'port_indexing': {
-                        'order': 'T-B, L-R',
-                        'start_index': 1,
-                        'schema': 'absolute'
-                    },
-                    "port_groups": [
-                        # {
-                        #     "count": 4,
-                        #     "speed": {
-                        #         "unit": "G",
-                        #         "value": 10
-                        #     },
-                        #     "roles": [
-                        #         "leaf",
-                        #         "access"
-                        #     ]
-                        # }
-                    ]
-                }
-            ]
-        },
-    }
-    display_name = 'auto'
-    for speed, count in speed_count.items():
-        port_group = {
-            'count': count,
-            'speed': {
-                'unit': speed[-1],
-                'value': int(speed[:-1]),
-            },
-            'roles': ['leaf', 'access'],
-        }
-        new_system['logical_device']['panels'][0]['port_groups'].append(port_group)
-        display_name = f"{display_name}-{count}x{speed}"
-    new_system['logical_device']['display_name'] = display_name
-    new_system['logical_device']['id'] = display_name
-    generic_system_spec['new_systems'].append(new_system)
-    logging.debug(f"add_single_generic_system {generic_system_spec=}, {speed_count=}")
-
-    generic_system_created_result = bp.add_generic_system(generic_system_spec)
-    if isinstance(generic_system_created_result, Err):
-        error_message = f"Error: generic system {gs_label} not created\n\tFrom add_generic_system {generic_system_created_result.err_value}"
-        # logging.warning(error_message)
-        return Err(error_message)
-
-    return Ok('done')
-
-
-def add_single_generic_system(bp, gs_data) -> Result[str, str]:
-    """
-    Add a single generic system to the Apstra server from the given generic systems data.
-    """
-    func_name = "add_single_generic_system"
-    server_link_result = bp.get_server_interface_nodes(gs_label)
-    if isinstance(server_link_result, Err):
-        error_message = f"Error: generic system {gs_label} has absent server {gs_label}\n\tFrom get_server_interface_nodes {server_link_result.err_value}"
-        return Err(error_message)
-    server_links = server_link_result.ok_value
-    if len(server_links):
-        logging.warning(f"{func_name} Skipping: Generic system {gs_label} already exists in blueprint {bp.label}")
-        # TODO: which return value to use?
-        return Ok('done')
-
-    # generic system absent. Add it.
-    generic_system_spec = {
-        'links': [],
-        'new_systems': [],
-    }
-
-
-    # gs_count += 1
-    gs_link_total = len(gs_links_list)
-    # logging.info(f"add_generic_system Adding generic system {gs_count}/{gs_total}: {gs_label} with {gs_link_total} links")
-    # existing_gs_result = bp.get_system_node_from_label(gs_label)
-    # if isinstance(existing_gs_result, Ok) and existing_gs_result.ok_value:
-    #     error_message = f"add_single_generic_system Skipping: Generic system {gs_label} already exists in blueprint {bp.label}"
-    #     # TODO: verify the content
-    #     return Err(error_message)
-    # if gs_link_total > 1:
-    #     logging.warning(f"Adding generic system {gs_label} with {gs_link_total} links\n{gs_links_list}")
-    #     return
-    generic_system_spec = {
-        'links': [],
-        'new_systems': [],
-    }
-    # to form logical device
-    speed_count = {}
-    system_type = 'server'
-
-    for link in gs_links_list:
-    #     logging.debug(f"{link=}")
-        # make sure upper case
-        link_speed = link['speed'].upper()
-        system_type = 'external' if link['is_external'] else 'server'
-        for link_id_num in range(1, 5):
-            # link_id_num = link_number + 1
-            switch_label = link[f"switch{link_id_num}"]
-            this_ifname = link[f"switch_intf{link_id_num}"]
-            # skip if data is missing
-            if not switch_label:
-                continue
-            if this_ifname[:2] not in ['et', 'xe', 'ge']:
-                error_message = f"Error: wrong interface for {gs_label} - {switch_label}:{this_ifname}"
-                # logging.warning(f"add_single_generic_system Error : {error_message}")
-                return Err(error_message)
-            logging.debug(f"{switch_label=}")
-            switch_node_result = bp.get_system_node_from_label(switch_label)
-            if isinstance(switch_node_result, Err):
-                error_message = f"Error: generic system {gs_label} has absent switch {switch_label}\n\tFrom get_system_node_from_label {error}"
-                # logging.warning(f"add_single_generic_system {error_message}")
-                return Err(error_message)
-            switch_node = switch_node_result.ok_value
-            if not switch_node:
-                return None, f"Error: {switch_label} not found in blueprint {bp.label}"
-            switch_id = switch_node['id']
-            transformation_id_result = bp.get_transformation_id(switch_label, this_ifname , link_speed)
-            if isinstance(transformation_id_result, Err):
-                error_message = f"Error: generic system {gs_label} has absent transformation {switch_label}:{this_ifname}\n\tFrom get_transformation_id {transformation_id_result.err_value}"
-                logging.warning(f"add_single_generic_system {error_message}")
-                return Err(error_message)
-            transformation_id = transformation_id_result.ok_value
-            link_spec = {
-                'switch': {
-                    'system_id': switch_id,
-                    # 'transformation_id': bp.get_transformation_id(link[f"switch{link_id_num}"], this_ifname , link_speed),
-                    'transformation_id': transformation_id,
-                    'if_name': link[f"switch_intf{link_id_num}"],
-                },
-                'system': {
-                    'system_id': None,
-                },
-                # 'lag_mode':link['lag_mode'],
-                'lag_mode': None,
-            }
-            generic_system_spec['links'].append(link_spec)
-            # speed_count[link_speed] = getattr(speed_count, link_speed, 0) + 1
-            logging.debug(f"{link_speed=}, {speed_count=}")
-            if link_speed not in speed_count:
-                speed_count[link_speed] = 1
-            else:
-                speed_count[link_speed] += 1
-
-    new_system = {
-        'system_type': system_type,
-        'label': gs_label,
-        'port_channel_id_min': 0,
-        'port_channel_id_max': 0,
-        'logical_device': {
-            'display_name': None,
-            'id': None,
-            'panels': [
-                {
-                    'panel_layout': {
-                        'row_count': 1,
-                        'column_count': sum(speed_count.values()),
-                    },
-                    'port_indexing': {
-                        'order': 'T-B, L-R',
-                        'start_index': 1,
-                        'schema': 'absolute'
-                    },
-                    "port_groups": [
-                        # {
-                        #     "count": 4,
-                        #     "speed": {
-                        #         "unit": "G",
-                        #         "value": 10
-                        #     },
-                        #     "roles": [
-                        #         "leaf",
-                        #         "access"
-                        #     ]
-                        # }
-                    ]
-                }
-            ]
-        },
-    }
-    display_name = 'auto'
-    for speed, count in speed_count.items():
-        port_group = {
-            'count': count,
-            'speed': {
-                'unit': speed[-1],
-                'value': int(speed[:-1]),
-            },
-            'roles': ['leaf', 'access'],
-        }
-        new_system['logical_device']['panels'][0]['port_groups'].append(port_group)
-        display_name = f"{display_name}-{count}x{speed}"
-    new_system['logical_device']['display_name'] = display_name
-    new_system['logical_device']['id'] = display_name
-    generic_system_spec['new_systems'].append(new_system)
-    logging.debug(f"add_single_generic_system {generic_system_spec=}, {speed_count=}")
-
-    generic_system_created_result = bp.add_generic_system(generic_system_spec)
-    if isinstance(generic_system_created_result, Err):
-        error_message = f"Error: generic system {gs_label} not created\n\tFrom add_generic_system {generic_system_created_result.err_value}"
-        # logging.warning(error_message)
-        return Err(error_message)
-
-    return Ok('done')
-
-
 def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: list) -> Result[str, str]:
     """
     Add generic systems to the apstra server.
@@ -1178,6 +811,24 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
         for res in sbp.add_generic_systems():
             yield res
     yield Ok(f"{func_name} generic_systems added {ServerBlueprint._bps=}")
+
+    # AGAIN, fetch the blueprints from the apstra server and store them in the data classes
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for res in sbp.fetch_apstra(apstra_session):
+            yield res
+    yield Ok(f"{func_name} after generic system creation - fetched {ServerBlueprint._bps=}")
+
+    # form LACP for the generic systems
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for res in sbp.form_lacp():
+            yield res
+    yield Ok(f"{func_name} lacp formed {ServerBlueprint._bps=}")
+
+    # fix the server interface names
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for res in sbp.rename_interfaces():
+            yield res
+    yield Ok(f"{func_name} interfaces renamed {ServerBlueprint._bps=}")
 
 
         # yield Ok(f"{func_name} Reading {bp.blueprint=}")
