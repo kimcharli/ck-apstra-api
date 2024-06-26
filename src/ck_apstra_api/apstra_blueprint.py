@@ -207,7 +207,7 @@ class CkApstraBlueprint:
 
     def get_switch_interface_nodes(self, switch_labels=None, intf_name=None) -> Result[List, str]:
         """
-        Return interface nodes of the switches
+        Return interface nodes of the switches. The once not conencted to generic system may not appear.
             switch_labels: list of system labels, a str for the single system label, or None for all switches
             return CkEnum.MEMBER_INTERFACE and CkEnum.MEMBER_SWITCH
                 optionally CkEnum.EVPN_INTERFACE if it is a LAG
@@ -226,11 +226,14 @@ class CkApstraBlueprint:
             return Ok([])
         intf_name_filter = f", if_name='{intf_name}'" if intf_name else ""
         interface_query = f"""match(
-            node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
-                .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
-                .out('link').node('link', name='{CkEnum.LINK}')
-                .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter})
-                .in_('hosted_interfaces').node('system', system_type='switch',{label_selection} name='{CkEnum.MEMBER_SWITCH}'),
+            node('system', system_type='switch',{label_selection} name='{CkEnum.MEMBER_SWITCH}')
+                .out('hosted_interfaces').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}'{intf_name_filter}),
+            optional(
+                node(name='{CkEnum.MEMBER_INTERFACE}')
+                    .out('link').node('link', name='{CkEnum.LINK}')
+                    .in_('link').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
+                    .in_('hosted_interfaces').node('system', system_type='server', name='{CkEnum.GENERIC_SYSTEM}')
+            ),
             optional(
                 node(name='{CkEnum.REDUNDANCY_GROUP}')
                     .out('hosted_interfaces').node('interface', po_control_protocol='evpn', name='{CkEnum.EVPN_INTERFACE}')
@@ -245,8 +248,9 @@ class CkApstraBlueprint:
                 node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
             )
         )"""
+
         interface_nodes_result = self.query(interface_query)
-        return Ok(interface_nodes_result)
+        return interface_nodes_result
 
     def get_single_vlan_ct_id(self, vn_id: int):
         '''

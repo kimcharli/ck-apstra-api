@@ -5,7 +5,7 @@ from pathlib import Path
 from dataclasses import dataclass, fields, field
 from types import GeneratorType
 from typing import Generator, List, Optional, Any, TypeVar, Annotated, Dict, ClassVar
-from collections import defaultdict
+from collections import Counter, defaultdict
 import os
 import uuid
 import pprint
@@ -83,22 +83,29 @@ class LeafSwitch:
         """
         self.log_prefix = f"LeafSwitch({switch_label})"
         self.switch_label = switch_label
-        log_prefix = f"{self.log_prefix}::init()"
+        # log_prefix = f"{self.log_prefix}::init()"
+        self.bp = bp
         
         switch_interfaces_nodes_result = self.bp.get_switch_interface_nodes(self.switch_label)
+        # logging.warning(f"{self.log_prefix} {switch_interfaces_nodes_result=}")
         if isinstance(switch_interfaces_nodes_result, Err):
             return Err(f"LeafSwitch::__init__ {self.switch_label=} not found in blueprint {self.bp.label}")
         self.nodes = switch_interfaces_nodes_result.ok_value
         # self.id = self.nodes[0][CkEnum.MEMBER_SWITCH]['id']
+        # logging.warning(f"{self.log_prefix} {self.switch_label=} {self.nodes=}")
         self.interfaces = {x[CkEnum.MEMBER_INTERFACE]['if_name']: x[CkEnum.MEMBER_INTERFACE] for x in self.nodes}
 
     @property
     def id(self):
         return self.nodes[0][CkEnum.MEMBER_SWITCH]['id']
     
-    @property
+    # might not be needed
     def interface_id(self, if_name: str) -> str:
-        return self.interfaces[if_name]['id']
+        # logging.warning(f"{self.log_prefix} {if_name=} {self.interfaces=}")
+        if if_name in self.interfaces:
+            return self.interfaces[if_name]['id']
+        else:
+            return None
 
 @dataclass
 class LinkMember(DataInit):
@@ -118,7 +125,7 @@ class LinkMember(DataInit):
     fetched_switch_intf_id: Optional[str] = None
     fetched_tags_link: Optional[List[str]] = None
 
-    bp: CkApstraBlueprint = None
+    bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
     fetched_evpn_interface: Optional[Dict[str, Any]] = field(default=None, repr=False)   # the evpn_interface node fetched from the apstra controller
     fetched_ae_interface: Optional[Dict[str, Any]] = field(default=None, repr=False)  # the ae_interface node fetched from the apstra controller
 
@@ -164,7 +171,7 @@ class LinkMember(DataInit):
         else:
             # not found. Load data from switch links
             switch = LeafSwitch(self.switch, self.bp)
-            self.fetched_switch_id = switch.id()
+            self.fetched_switch_id = switch.id
             self.fetched_switch_intf_id = switch.interface_id(self.switch_ifname)
             # yield Ok(f"{log_prefix} link absent - switch({self.switch}:{self.fetched_switch_id}) {self.switch_ifname}:{self.fetched_switch_intf_id} {self.fetched_server_ifname=}")
         yield Ok(f"{log_prefix} done {self}")
@@ -180,11 +187,30 @@ class LinkMember(DataInit):
             return_message += f"LinkMember:diff(), {self.switch_label=}:{self.switch_ifname=} tags mismatch {self.tags_link} != {self.fetched_tags_link}"
         yield Ok(return_message)
 
-
     @property
     def application_point(self):
         """Return application point to be used to assign the connectivity template"""
         return self.fetched_evpn_interfaces['id'] if self.fetched_evpn_interface else self.fetched_switch_id
+
+    @property
+    def link_spec(self):
+        """
+        Return the link spec for the link member
+        """
+        transformation_id_result = self.bp.get_transformation_id(self.switch, self.switch_ifname , self.speed)
+        link_spec = {
+            'switch': {
+                'system_id': self.fetched_switch_id,
+                'transformation_id': transformation_id_result.ok_value,
+                'if_name': self.switch_ifname,
+            },
+            'system': {
+                'system_id': None,
+            },
+            'lag_mode': None,
+            'link_group_label': None
+        }
+        return link_spec
 
 @dataclass
 class LinkGroup(DataInit):
@@ -203,7 +229,7 @@ class LinkGroup(DataInit):
     fetched_ct_names: Optional[List[str]] = None
     fetched_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
 
-    bp: CkApstraBlueprint = None
+    bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
 
     log_prefix: str = field(default='', repr=False)  # not to print in __repr__
 
@@ -230,7 +256,7 @@ class LinkGroup(DataInit):
         """
         log_prefix = f"{self.log_prefix}::fetch_apstra()"
         self.bp = apstra_bp
-        yield Ok(f"{log_prefix} begin")
+        # yield Ok(f"{log_prefix} begin")
         # interate over the members and see if they have group link associated
         for counter, member in enumerate(self.members):
             for res in member.fetch_apstra(server_links, self.bp):
@@ -246,6 +272,20 @@ class LinkGroup(DataInit):
         yield Ok(f"{log_prefix} done {self}")
         
     
+    @property
+    def link_spec(self):
+        """
+        Return the link spec for the link group gathered from the links
+        """
+        data = []
+        for member in self.members:
+            data.append(member.link_spec)
+        return data
+    
+    @property
+    def speed_count(self):
+        return [x.speed for x in self.members]
+
     def diff(self):
         """
         Diff the loaded data with the apstra controller.
@@ -278,7 +318,7 @@ class GenericSystem(DataInit):
     # fetched
     gs_id: Optional[str] = None # generic system node id to be fetched from the blueprint
     fetched_server_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
-    bp: CkApstraBlueprint = None
+    bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
 
     log_prefix: str = field(default='', repr=False)  # not to print in __repr__
     
@@ -354,12 +394,72 @@ class GenericSystem(DataInit):
         yield Ok(return_message)
     
 
-    def create(self, ck_bp):
+    @property
+    def system_type(self):
+        return 'external' if self.ext else 'server'
+
+    def create(self):
         log_prefix = f"{self.log_prefix}::create()"
         if self.gs_id:
-            yield Ok(f"{log_prefix} present. Skipping")
+            yield Ok(f"{log_prefix} present. No need to create this. Skipping")
             return
-        yield Ok(f"{log_prefix} absent. Start creating")
+        speed_count = []
+        for lg in self.link_groups:
+            sc = lg.speed_count
+            speed_count.extend(sc)
+        display_name_list = ['ck-auto']
+        port_groups = []
+        # yield Ok(f"{log_prefix} {speed_count=} {Counter(speed_count)=}")
+        for speed, count in dict(Counter(speed_count)).items():
+            port_groups.append({
+                "count": count,
+                "speed": {
+                    "unit": speed[-1],
+                    "value": int(speed[:-1])
+                },
+                "roles": [
+                    "leaf",
+                    "access"
+                ]
+            })
+            display_name_list.append(f"{count}x{speed[:-1]}")
+        generic_system_spec = {
+            'links': [],
+            'new_systems': [{
+                'system_type': self.system_type,
+                'label': self.server,
+                'port_channel_id_min': 0,
+                'port_channel_id_max': 0,
+                'logical_device': {
+                    'display_name': '-'.join(display_name_list),
+                    'id': '-'.join(display_name_list),
+                    'panels': [
+                        {
+                            'panel_layout': {
+                                'row_count': 1,
+                                'column_count': len(speed_count),
+                            },
+                            'port_indexing': {
+                                'order': 'T-B, L-R',
+                                'start_index': 1,
+                                'schema': 'absolute'
+                            },
+                            "port_groups": port_groups
+                        }
+                    ]
+                },
+
+            }],
+        }
+        for lg in self.link_groups:
+            generic_system_spec['links'].extend(lg.link_spec)
+        # creating the generic system
+        yield Ok(f"{log_prefix} creating {generic_system_spec=}")
+        generic_system_created_result = self.bp.add_generic_system(generic_system_spec)
+        if isinstance(generic_system_created_result, Err):
+            yield Err(f"{log_prefix} failed to create {generic_system_created_result.err_value}")
+            return
+        yield Ok(f"{log_prefix} created")
 
 
 @dataclass
@@ -438,12 +538,12 @@ class ServerBlueprint(DataInit):
             logging.warning(f"ServerBlueprint:diff(), {self.blueprint=}, {server_label=}, {diff_result.ok_value=}")
 
 
-    def add_generic_systems(self, apstra_server):
+    def add_generic_systems(self):
         """
         Add the generic system to the apstra server.
         """
         for generic_system in self.servers.values():
-            for res in generic_system.create(self.ck_bp):
+            for res in generic_system.create():
                 yield res
             # if isinstance(result, Err):
             #     yield Err(f"ServerBlueprint:add_generic_system(), {self.blueprint=}, {server_label=}, Error: {result.err_value}")
@@ -1075,7 +1175,7 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
     # create the generic systems and the links
     for bp_label, sbp in ServerBlueprint._bps.items():
         # yield Ok(f"{func_name} fetching {bp_label=} {sbp=}")
-        for res in sbp.add_generic_systems(apstra_session):
+        for res in sbp.add_generic_systems():
             yield res
     yield Ok(f"{func_name} generic_systems added {ServerBlueprint._bps=}")
 
