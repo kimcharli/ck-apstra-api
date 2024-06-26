@@ -8,7 +8,8 @@ from ck_apstra_api.generic_system import add_generic_systems, GsCsvKeys
 logger = logging.getLogger(__name__)
 
 @pytest.fixture
-def load_gs_csv_file(gs_csv):
+def load_gs_csv_file(gs_csv) -> list[dict]:
+    """Load CSV file and return a list of dictionaries."""
     data = []
     with open(f"tests/fixtures/{gs_csv}", 'r') as csvfile:
         csv_reader = csv.reader(csvfile)
