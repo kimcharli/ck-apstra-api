@@ -272,10 +272,12 @@ class CkApstraBlueprint:
         untagged_ct = len(untagged_nodes) and untagged_nodes[0]['ct']['id'] or None
         # untagged_ct = [x['id'] for x in ct_list if x and 'untagged' in x['ep_endpoint_policy']['attributes']][0] or None
         return (tagged_ct, untagged_ct)
+    
 
+    @cache
     def get_ct_ids(self, ct_labels: list) -> list:
         '''
-        Get the CT IDs from the CT labels
+        Return the CT IDs from the connectivity template names(labels)
         '''
         if isinstance(ct_labels, str):
             ct_labels = [ct_labels]
@@ -290,6 +292,7 @@ class CkApstraBlueprint:
             self.logger.debug(f"No CTs found for {ct_labels=}")
             return []
         return [x['ep']['id'] for x in ct_list]
+    
     
     def add_generic_system(self, generic_system_spec: dict) -> Result[List, str]:
         """

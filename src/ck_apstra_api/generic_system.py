@@ -255,9 +255,9 @@ class LinkGroup(DataInit):
     # child
     members: Optional[List[LinkMember]] = field(default=None, repr=False) # the list of links in the link group. optional only during initial creation
     # fetched
-    fetched_ae_id: Optional[str] = None  # the fetched ae_id from the apstra controller. It will be the member link id in case of non-lag
+    fetched_ae_id: Optional[str] = None  # The fetched ae_id from evpn-interface or the interface id of the member interface id in case of non-lag
     fetched_lag_mode: Optional[str] = None  # the fetched lag mode from the apstra controller
-    fetched_ct_names: Optional[List[str]] = None
+    fetched_ct_names: Optional[List[str]] = None # the fetched ct_names from the apstra controller
     fetched_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
 
     bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
@@ -271,6 +271,11 @@ class LinkGroup(DataInit):
         if not self.ae:
             self.ae = f"____{data[GsCsvKeys.LINE]}"
         self.members = [LinkMember(data)]
+        if self.ct_names and isinstance(self.ct_names, str):
+            self.ct_names = [x.strip() for x in self.ct_names.split(',')]
+        elif not self.ct_names:
+            self.ct_names = []
+        self.fetched_ct_names = []
         self.log_prefix = f"LinkGroup({self.ae})"
         # logging.warning(f"LinkGroup::init added LinkMember {self.members=}")
 
@@ -297,6 +302,9 @@ class LinkGroup(DataInit):
                 if member.fetched_evpn_interface:
                     # TODO: decide between this and member.application_point()
                     self.fetched_ae_id = member.fetched_evpn_interface['id']
+                if not self.lag_mode:
+                    # non lag interface gets ct point to the member
+                    self.fetched_ae_id = member.fetched_switch_intf_id
                 if member.fetched_ae_interface:
                     self.ae = member.fetched_ae_interface['if_name']
                     self.fetched_lag_mode = member.fetched_ae_interface['lag_mode']
@@ -373,6 +381,16 @@ class LinkGroup(DataInit):
             else:
                 yield Ok(f"{self.log_prefix} {self.ae=} rename done")
 
+    def add_vlans(self):
+        log_prefix = f"{self.log_prefix}::add_vlans()"
+        logging.warning(f"{log_prefix} {self.ct_names=} {self.fetched_ct_names=}")
+        if len(self.ct_names):
+            return {
+                'id': self.fetched_ae_id,
+                'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': True} for x in self.ct_names]
+            }
+        else:
+            return None
 
 
 @dataclass
@@ -442,8 +460,10 @@ class GenericSystem(DataInit):
                 yield Err(f"{log_prefix} Error: {tag_result.err_value}")
             tags = tag_result.ok_value
             self.fetched_server_tags = [tag['system_tag']['label'] for tag in tags]
-        # if server_links is None or len(server_links) == 0:
-        #     yield Ok(f"{log_prefix} not found in blueprint {apstra_bp.label}")
+
+
+
+
         yield f"{log_prefix} done {self}"
 
 
@@ -547,6 +567,18 @@ class GenericSystem(DataInit):
             for res in lg.rename_interfaces():
                 yield res
 
+    def add_vlans(self):
+        """
+        Add the vlans to the generic system
+        """
+        vlan_spec = {
+            'application_points': []
+        }
+        for lg in self.link_groups:
+            vlan_spec['application_points'].append(lg.add_vlans())
+        # TODO: implement Result to catch error
+        ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
+        yield Ok(f"{self.log_prefix} {vlan_spec=} {ct_assign_updated=}")
 
 @dataclass
 class ServerBlueprint(DataInit):
@@ -642,6 +674,15 @@ class ServerBlueprint(DataInit):
             for res in generic_system.rename_interfaces():
                 yield res
 
+    def add_vlans(self):
+        """
+        Add the vlans to the generic system
+        """
+        for generic_system in self.servers.values():
+            for res in generic_system.add_vlans():
+                yield res
+
+
 # def add_tags(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
 #     bp = job_env.main_bp
 def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: list) -> Result[str, str]:
@@ -691,92 +732,6 @@ def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: li
                 
     return Ok('done')
 
-# def assign_connectivity_templates(job_env: CkJobEnv, generic_system_label: str, gs_links_list: list):
-#     # update connectivity templates - this should be run after lag update
-#     bp = job_env.main_bp
-def assign_connectivity_templates(apstra_bp, generic_system_label: str, gs_links_list: list):
-    # update connectivity templates - this should be run after lag update
-    bp = apstra_bp
-    bp_label = bp.label
-    ct_assign_spec = {
-        'application_points': [
-            # {
-            #     'id': <interface_id>,
-            #     'policies': [
-            #         {
-            #             'policy': <ct-id>,
-            #             'used': True,
-            #         }
-            #     ]
-            # }
-        ]
-
-    }
-    for link in gs_links_list:
-        # ct_names takes precedence
-        ct_names = link['ct_names']
-        # untagged_vlan = link['untagged_vlan']
-        # tagged_vlans = link['tagged_vlans']
-        ct_ids = []
-        # if (ct_names and len(ct_names) == 0) and untagged_vlan is None and len(tagged_vlans) == 0:
-        if ct_names and len(ct_names) == 0:
-            logging.debug(f"Skipping: Generic system {generic_system_label} has no CTs {link=}")
-            continue
-        if ct_names:
-            ct_name_list = ct_names.split(',')
-            ct_ids = bp.get_ct_ids(ct_name_list)
-            if len(ct_ids) != len(ct_name_list):
-                logging.error(f"Skipping: Generic system {generic_system_label} has wrong data {ct_name_list=} {ct_ids=}")
-                continue
-        # else:
-        #     # can have untagged too
-        #     # TODO: check if the CTs exist and create if not
-        #     # TODO: naming rule
-        #     if link['tagged_vlans']:
-        #         for tagged_vlan_id in link['tagged_vlans']:
-        #             ct_ids.append(bp.get_single_vlan_ct_or_create(tagged_vlan_id, is_tagged=True))
-        #         # logging.debug(f"{untagged_vlan=}, {ct_ids=}")
-        #     if untagged_vlan:
-        #         # conentional name: vn123-untagged
-        #         # untagged_vlan_name = f"vn{untagged_vlan_id}-untagged"
-        #         # ct_ids = bp.get_ct_ids([untagged_vlan_name])
-        #         # if len(ct_ids) != 1:
-        #         #     added = bp.add_single_vlan_ct(200000 + untagged_vlan_id, untagged_vlan_id, is_tagged=False)
-        #         #     logging.debug(f"Added CT {untagged_vlan_name}: {added}")
-        #         # ct_ids = bp.get_ct_ids([untagged_vlan_name])
-        #         # logging.debug(f"{untagged_vlan_name=}, {ct_ids=}")
-        #         ct_ids.append(bp.get_single_vlan_ct_or_create(untagged_vlan, is_tagged=False))
-        #         logging.debug(f"{untagged_vlan=}, {ct_ids=}")
-        if 'ct_ids' not in locals():
-            logging.debug(f"Skipping: Generic system {generic_system_label} has no CTs")
-            continue
-        logging.debug(f"{link=} {ct_ids=}")
-        # intf_nodes = bp.get_switch_interface_nodes([link['label1']], link['ifname1'])
-        intf_nodes_result = bp.get_switch_interface_nodes([link['switch1']], link['switch_intf1'])
-        if isinstance(intf_nodes_result, Err):
-            return Err(f"assign_connectivity_templates Err: {link['switch1']}:{link['switch_intf1']} not found in blueprint {bp.label}")
-        intf_nodes = intf_nodes_result.ok_value
-        if len(intf_nodes) == 0:
-            logging.warning(f"{len(intf_nodes)=}, {intf_nodes=}")
-            # logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {link['label1']}:{link['ifname1']}")
-            logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {link['switch1']}:{link['switch_intf1']}")
-            continue
-        ap_id = None
-        if intf_nodes[0][CkEnum.EVPN_INTERFACE]:
-            ap_id = intf_nodes[0][CkEnum.EVPN_INTERFACE]['id']
-        else:
-            ap_id = intf_nodes[0][CkEnum.MEMBER_INTERFACE]['id']
-        ct_assign_spec['application_points'].append({
-            'id': ap_id,
-            'policies': [{ 'policy': ct_id, 'used': True } for ct_id in ct_ids]
-        })
-
-    if len(ct_assign_spec['application_points']) > 0:
-        # logging.debug(f"{ct_assign_spec=}")
-        ct_assign_updated = bp.patch_obj_policy_batch_apply(ct_assign_spec, params={'async': 'full'})
-        logging.debug(f"CT assign updated for generic system {generic_system_label} in blueprint {bp_label}: {ct_assign_updated} {ct_assign_spec=}")
-        # logging.debug(f"ct_assign_updated: {ct_assign_updated}"
-
 
 def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: list) -> Result[str, str]:
     """
@@ -824,6 +779,13 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
             yield res
     yield Ok(f"{func_name} lacp formed {ServerBlueprint._bps=}")
 
+    # AGAIN YET, fetch the blueprints from the apstra server and store them in the data classes
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for res in sbp.fetch_apstra(apstra_session):
+            yield res
+    yield Ok(f"{func_name} after form lag - fetched {ServerBlueprint._bps=}")
+
+
     # fix the server interface names
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.rename_interfaces():
@@ -831,89 +793,12 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
     yield Ok(f"{func_name} interfaces renamed {ServerBlueprint._bps=}")
 
 
-        # yield Ok(f"{func_name} Reading {bp.blueprint=}")
-    # yield Ok(f"{func_name} {ServerBlueprint._bps=}")
-    # for bp_label, sbp in ServerBlueprint._bps:
-    #     yield Ok(f"{func_name} Reading {bp_label=}")
+    # fix the connectivity templates
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for res in sbp.add_vlans():
+            yield res
+    yield Ok(f"{func_name} vlans added {ServerBlueprint._bps=}")
 
-    # sorted_generic_systems = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    
-    # no_ae_count = 0  # increment for each ae links
-
-    # for item in generic_system_rows:
-    #     blueprint = item['blueprint']
-    #     server = item['server']
-    #     no_ae_count += 1
-    #     ae = item['ae'] or f'no_ae_{no_ae_count}'  # Use 'no_ae' if ae is empty
-
-    #     # Server attributes
-    #     server_attrs = {
-    #         'ext': item['ext'],
-    #         'tags_server': item['tags_server']
-    #     }
-
-    #     # AE attributes
-    #     ae_attrs = {
-    #         'lag_mode': item['lag_mode'],
-    #         'ct_names': item['ct_names'],
-    #         'tags_ae': item['tags_ae'],
-    #     }
-
-    #     # Link attributes
-    #     link_attrs = {
-    #         'speed': item['speed'],
-    #         'ifname': item['ifname'],
-    #         'switch': item['switch'],
-    #         'switch_ifname': item['switch_ifname'],
-    #         'tags_link': item['tags_link'],
-    #         'comment': item['comment']
-    #     }
-
-    #     # Update the sorted data structure            
-    #     if server not in sorted_generic_systems[blueprint]:
-    #         sorted_generic_systems[blueprint][server] = server_attrs
-    #         sorted_generic_systems[blueprint][server]['ae'] = defaultdict(list)
-
-    #     if ae not in sorted_generic_systems[blueprint][server]['ae']:
-    #         sorted_generic_systems[blueprint][server]['ae'][ae] = ae_attrs
-    #         sorted_generic_systems[blueprint][server]['ae'][ae]['links'] = []
-
-    #     sorted_generic_systems[blueprint][server]['ae'][ae]['links'].append(link_attrs)
-
-    # yield Ok(f"{func_name} Adding {sorted_generic_systems=}")
-    # bp_total = len(sorted_generic_systems.keys())
-    # bp_count = 0
-    # for bp_label, generic_systems in sorted_generic_systems.items():
-    #     bp = CkApstraBlueprint(apstra_session, bp_label)
-    #     bp_count += 1
-    #     gs_total = len(generic_systems.keys())
-    #     gs_count = 0
-    #     yield Ok(f"{func_name} Adding {gs_total} generic systems to blueprint {bp_label} ({bp_count} of {bp_total})")
-    #     for gs_label, gs_data in generic_systems.items():
-    #         gs_count += 1
-    #         gs_ae_total = len(gs_data['ae'].keys())            
-    #         yield Ok(f"{func_name} Adding generic system {gs_label} ({gs_count} of {gs_total}) with {gs_ae_total} AE(s)")
-    #         for res in add_single_generic_system(bp, gs_data):
-    #             yield res
-    #         # if isinstance(add_single_gs_result, Err):
-    #         #     logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_single_generic_system: {add_single_gs_result.err_value}")
-    #         #     # return None, f"{func_name} {error}"
-
-    #     # ## form LACP in the BP iterating over the generic systems
-    #     # for gs_label, gs_links_list in bp_data.items():
-    #     #     form_lacp(bp, gs_label, gs_links_list)
-    #     #     add_tags_result = add_tags(bp, gs_label, gs_links_list)
-    #     #     if isinstance(add_tags_result, Err):
-    #     #         logging.warning(f"{func_name} Error for {gs_label=}:\n\tFrom add_tags: {add_tags_result.err_value}")
-    #     #         # return None, f"add_generic_system {error}"
-    #     #         continue
-    #     #     rename_generic_system_intf(bp, gs_label, gs_links_list)
-
-    #     #     # # update connectivity templates - this should be run after lag update
-    #     #     # assign_connectivity_templates(job_env, gs_label, gs_links_list)
-    #     #     assign_connectivity_templates(bp, gs_label, gs_links_list)
-
-    # return Ok(f"{func_name} {bp_total} blueprints done")
 
 
 if __name__ == "__main__":
@@ -941,11 +826,5 @@ if __name__ == "__main__":
 
     for bp_label, server_bp in ServerBlueprint.iterate_server_blueprints():
         server_bp.diff()
-
-    # for bp_label, server_bp in ServerBlueprint.iterate_server_blueprints():
-    #     bp = CkApstraBlueprint(apstra, bp_label)
-    #     bp.fetch_blueprint()
-    #     # for gs_label, gs_data in bp.iterate_generic_systems():
-    #     #     add_generic_system(bp, gs_data)
 
  
