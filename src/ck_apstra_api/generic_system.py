@@ -106,6 +106,7 @@ class LeafSwitch:
             return self.interfaces[if_name]['id']
         else:
             return None
+    
 
 @dataclass
 class LinkMember(DataInit):
@@ -308,6 +309,25 @@ class LinkGroup(DataInit):
                 if member.fetched_ae_interface:
                     self.ae = member.fetched_ae_interface['if_name']
                     self.fetched_lag_mode = member.fetched_ae_interface['lag_mode']
+
+        if self.fetched_ae_id:
+            # get CT attached to the ae_id
+            ct_query = f"""
+                match(
+                    node('ep_endpoint_policy', policy_type_name='batch', name='CT_NODE')
+                        .in_().node('ep_application_instance', name='EPAE_NODE')
+                        .out('ep_affected_by').node('ep_group')
+                        .in_('ep_member_of').node('interface', name='INTERFACE_NODE', id='{self.fetched_ae_id}')
+                ).distinct(['CT_NODE'])
+                """
+            ct_result = self.bp.query(ct_query)
+            if isinstance(ct_result, Err):              
+                yield Err(f"{log_prefix} Error: {ct_result.err_value}")
+            # yield Ok(f"{log_prefix} {self.ae=} {ct_result.ok_value}")
+            self.fetched_ct_names = [x['CT_NODE']['label'] for x in ct_result.ok_value]
+            # yield Ok(f"{log_prefix} {self.ae=} {self.fetched_ct_names=}")
+
+
         yield Ok(f"{log_prefix} done {self}")
         
     def form_lacp(self):
@@ -383,15 +403,19 @@ class LinkGroup(DataInit):
 
     def add_vlans(self):
         log_prefix = f"{self.log_prefix}::add_vlans()"
-        logging.warning(f"{log_prefix} {self.ct_names=} {self.fetched_ct_names=}")
-        if len(self.ct_names):
-            return {
+        # logging.warning(f"{log_prefix} {self.ct_names=} {self.fetched_ct_names=}")
+        vlans_to_add = [x for x in self.ct_names if x not in self.fetched_ct_names]
+        vlans_to_remove = [x for x in self.fetched_ct_names if x not in self.ct_names]
+        if len(vlans_to_add):
+            yield {
                 'id': self.fetched_ae_id,
-                'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': True} for x in self.ct_names]
+                'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': True} for x in vlans_to_add]
             }
-        else:
-            return None
-
+        if len(vlans_to_remove):
+            yield {
+                'id': self.fetched_ae_id,
+                'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': False} for x in vlans_to_remove]
+            }
 
 @dataclass
 class GenericSystem(DataInit):
@@ -460,9 +484,6 @@ class GenericSystem(DataInit):
                 yield Err(f"{log_prefix} Error: {tag_result.err_value}")
             tags = tag_result.ok_value
             self.fetched_server_tags = [tag['system_tag']['label'] for tag in tags]
-
-
-
 
         yield f"{log_prefix} done {self}"
 
@@ -575,10 +596,13 @@ class GenericSystem(DataInit):
             'application_points': []
         }
         for lg in self.link_groups:
-            vlan_spec['application_points'].append(lg.add_vlans())
+            vlan_piece = [x for x in lg.add_vlans()]
+            if vlan_piece:
+                vlan_spec['application_points'].append(vlan_piece[0])
         # TODO: implement Result to catch error
-        ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
-        yield Ok(f"{self.log_prefix} {vlan_spec=} {ct_assign_updated=}")
+        if len(vlan_spec['application_points']):
+            ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
+        yield Ok(f"{self.log_prefix} done - {len(vlan_spec['application_points'])} vlans")
 
 @dataclass
 class ServerBlueprint(DataInit):
@@ -785,13 +809,11 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
             yield res
     yield Ok(f"{func_name} after form lag - fetched {ServerBlueprint._bps=}")
 
-
     # fix the server interface names
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.rename_interfaces():
             yield res
     yield Ok(f"{func_name} interfaces renamed {ServerBlueprint._bps=}")
-
 
     # fix the connectivity templates
     for bp_label, sbp in ServerBlueprint._bps.items():
