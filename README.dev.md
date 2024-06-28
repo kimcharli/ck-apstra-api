@@ -11,6 +11,16 @@ poetry config virtualenvs.in-project true
 poetry export --without-hashes --format=requirements.txt > requirements.txt
 ```
 
+
+## in case of uv venv
+
+```
+uv venv
+source .venv/bin/activate
+uv pip install ck-apstra-api
+```
+
+
 ## run
 
 

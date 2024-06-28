@@ -1,68 +1,24 @@
 from pathlib import Path
 import click
-from dotenv import load_dotenv
 import os
-import pandas as pd
 import logging
 import time
 import json
 from datetime import datetime
 from pprint import pprint
+import csv
 
-from ck_apstra_api.apstra_session import prep_logging
 from ck_apstra_api.apstra_session import CkApstraSession
-from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
 
-class CkJobEnv:
-    # session: CkApstraSession
-    # log_level: str
-    # session: CkApstraSession
-    # main_bp: CkApstraBlueprint
-    # excel_input_file: str
-    # main_blueprint_name: str
-    # config_dir: str
-    # bp_json_file: str
-
-    def __init__(self, command: str = None, bp_name: str = None):
-        load_dotenv()
-        self.log_level = os.getenv('logging_level')
-        prep_logging(self.log_level)
-        apstra_server_host = os.getenv('apstra_server_host')
-        apstra_server_port = os.getenv('apstra_server_port')
-        apstra_server_username = os.getenv('apstra_server_username')
-        apstra_server_password = os.getenv('apstra_server_password')
-        self.session = CkApstraSession(
-            apstra_server_host, 
-            apstra_server_port,
-            apstra_server_username,
-            apstra_server_password,
-            )
-        self.main_blueprint_name = bp_name or os.getenv('main_blueprint')
-        # self.main_blueprint_name = os.getenv('main_blueprint')
-        # in case of skipping the bp loading
-        if command and command == 'add-bp-from-json':
-            self.bp_json_file = os.getenv('bp_json_file')
-            return
-        self.main_bp = CkApstraBlueprint(self.session, self.main_blueprint_name)
-        self.excel_input_file = os.getenv('excel_input_file')
-        self.config_dir = os.getenv('config_dir')
-
-    def get_bp_json_file(self):
-        if hasattr(self, 'bp_json_file') and self.bp_json_file != '':
-            return self.bp_json_file
-        datetime_str = time.strftime("%Y-%m-%d-%H:%M")
-        return f"{self.main_blueprint_name}-{datetime.now().strftime('%Y-%m-%d-%H:%M:%S')}.json"
-
-
-def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None, new_bp_name: str = None):
+def add_bp_from_json(host_ip, host_port, host_user, host_password, bp_name, bp_json_file: str = None, new_bp_name: str = None):
     """
     Add a blueprint from a json file
     The json file - job_env.bp_json_file
     The blueprint label - job_env.main_blueprint_name
 
     """
-    bp_json = ''
-    bp_json_file = bp_json_file or job_env.bp_json_file or input('Blueprint json file: ')
+    return
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
     logging.info(f"{bp_json_file=}")
     with open(bp_json_file, 'r') as f:
         bp_json = f.read()
@@ -73,7 +29,7 @@ def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None, new_bp_name: s
             node_dict['system_id'] = None
             # node_dict['deploy_mode'] = 'undeploy'
         if node_dict['type'] == 'metadata':
-            node_dict['label'] = job_env.main_blueprint_name      
+            node_dict['label'] = bp_name     
         for k, v in node_dict.items():
             if k == 'tags':
                 if v is None or v == "['null']":
@@ -84,7 +40,7 @@ def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None, new_bp_name: s
                 })
         node_list.append(node_dict)        
 
-    bp_dict['label'] = new_bp_name or job_env.main_blueprint_name
+    bp_dict['label'] = new_bp_name or bp_name
 
     relationship_list = [
         rel_dict for rel_id, rel_dict in bp_dict['relationships'].items()
@@ -97,44 +53,37 @@ def add_bp_from_json(job_env: CkJobEnv, bp_json_file: str = None, new_bp_name: s
         'nodes': node_list,
         'relationships': relationship_list
     }
-    bp_created = job_env.session.post('blueprints', data=bp_spec)
+    bp_created = session.post('blueprints', data=bp_spec)
     logging.info(f"push_bp_from_json() BP bp_created = {bp_created}")
 
-@click.command(name='add-bp-from-json')
-@click.option('--bp-json-file', default='')
-@click.option('--new-bp-name', default='')
-def click_add_bp_from_json(bp_json_file, new_bp_name):
-    job_env = CkJobEnv(command='add-bp-from-json')
-    add_bp_from_json(job_env, bp_json_file=bp_json_file, new_bp_name=new_bp_name)
 
 
-def get_bp_into_json(job_env: CkJobEnv, bp_name, json_path):
+def get_bp_into_json(host_ip, host_port, host_user, host_password, bp_name, json_path):
     """
     Create a blueprint into a json file
     The blueprint label - job_env.main_blueprint_name
     The json file - job_env.bp_json_file
     """
-    the_bp_name = bp_name if bp_name != '' else job_env.main_blueprint_name
-    the_json_path = json_path if json_path != '' else job_env.get_bp_json_file()
+    return
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    the_bp_name = bp_name
+    the_json_path = json_path
     logging.info(f"{the_bp_name=} {the_json_path=}")
 
-    the_blueprint_data = job_env.main_bp.dump()
+    # TODO: fix - load bp data
+    the_blueprint_data = bp_name
     logging.info(f"{the_blueprint_data.keys()=}")
     with open(the_json_path, 'w') as f:
         f.write(json.dumps(the_blueprint_data, indent=2))
 
     return
 
-@click.command(name='get-bp-into-json')
-@click.option('--bp-name', default='')
-@click.option('--json-path', default='')
-def click_get_bp_into_json(bp_name, json_path):
-    job_env = CkJobEnv(command='get-bp-into-json',bp_name=bp_name)
-    get_bp_into_json(job_env, bp_name, json_path)
 
 
-def import_routing_zones(job_env: CkJobEnv, input_file_path_string: str = None, sheet_name: str = 'routing_zones'):
-    bp = job_env.main_bp
+def import_routing_zones(host_ip, host_port, host_user, host_password, input_file_path_string: str = None, sheet_name: str = 'routing_zones'):
+    return
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
     excel_file_sting = input_file_path_string or os.getenv('excel_input_file')
     input_file_path = Path(excel_file_sting) 
     df = pd.read_excel(input_file_path, sheet_name=sheet_name)
@@ -174,13 +123,12 @@ def import_routing_zones(job_env: CkJobEnv, input_file_path_string: str = None, 
     patched = bp.patch_resource_groups(loopback_ips_spec)
     logging.debug(f"{patched=} {patched.text=}")
 
-@click.command(name='import-routing-zones')
-def click_import_routing_zones():
-    job_env = CkJobEnv()
-    import_routing_zones(job_env)
 
 
-def import_virtual_networks(job_env: CkJobEnv, input_file_path_string: str = None, sheet_name: str = 'virtual_networks'):
+def import_virtual_networks(host_ip, host_port, host_user, host_password, input_file_path_string: str = None, sheet_name: str = 'virtual_networks'):
+    return
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
     bp = job_env.main_bp
     excel_file_sting = input_file_path_string or os.getenv('excel_input_file')
     input_file_path = Path(excel_file_sting) 
@@ -189,13 +137,12 @@ def import_virtual_networks(job_env: CkJobEnv, input_file_path_string: str = Non
     imported = bp.patch_virtual_networks_csv_bulk(df.to_csv(index=False))
     logging.debug(f"{imported=} {imported.text=}")
 
-@click.command(name='import-virtual-networks')
-def click_import_virtual_networks():
-    job_env = CkJobEnv()
-    import_virtual_networks(job_env)
 
 
-def get_lldp_data(job_env: CkJobEnv):
+def get_lldp_data(host_ip, host_port, host_user, host_password, bp_name: str = 'terra'):
+    return
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
     bp = job_env.main_bp
     lldp_data = bp.get_lldp_data()
     for link in lldp_data['links']:
@@ -206,33 +153,56 @@ def get_lldp_data(job_env: CkJobEnv):
     
     return lldp_data
 
-@click.command(name='get-lldp-data', help='Get LLDP data between managed switches')
-def click_get_lldp_data():
-    job_env = CkJobEnv()
-    get_lldp_data(job_env)
-
 
 @click.group()
-@click.option('--logging-level', default='')
-def cli(logging_level: str = ''):
-    # job_env = CkJobEnv(logging_level)
-    # load_dotenv()
-    # log_level = os.getenv('logging_level', 'DEBUG')
-    # prep_logging(log_level)
+# @click.option('--host-ip', type=str, default='10.85.192.45')
+def cli():    
     pass
 
-# from ck_apstra_api.generic_system import click_read_generic_systems, click_add_generic_systems, click_assign_connecitivity_templates
-# cli.add_command(click_read_generic_systems)
-# cli.add_command(click_add_generic_systems)
-# cli.add_command(click_assign_connecitivity_templates)
-# cli.add_command(click_import_routing_zones)
-# cli.add_command(click_import_virtual_networks)
-# cli.add_command(click_add_bp_from_json)
-# cli.add_command(click_get_bp_into_json)
-# cli.add_command(click_get_lldp_data)
 
-from ck_apstra_api.ip_endpoint import click_add_ip_endpoints
-cli.add_command(click_add_ip_endpoints)
+@cli.command()
+@click.argument('host_ip', nargs=1, type=str, default='10.85.192.45')
+@click.argument('host_port', nargs=1, type=str, default=443)
+@click.argument('host_user', nargs=1, type=str, default='admin')
+@click.argument('host_password', nargs=1, type=str, default='admin')
+@click.argument('gs_csv', nargs=1, type=str, default='tests/fixtures/gs_sample.csv')
+def generic_system(host_ip: str, host_port: str, host_user: str, host_password: str, gs_csv: str):
+    """
+    Add generic systems from a CSV file
+    """
+    from ck_apstra_api.generic_system import GsCsvKeys, add_generic_systems
+    from ck_apstra_api.apstra_session import CkApstraSession
+    from result import Ok, Err
+    import logging
 
-from ck_apstra_api.pull_device_configuration import click_pull_configurations
-cli.add_command(click_pull_configurations)
+    logger = logging.getLogger('generic_system()')
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        )
+    logger.info(f"{host_ip=} {host_port=} {host_user=} {host_password=} {gs_csv=}")
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    data = []
+    with open(gs_csv, 'r') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        headers = next(csv_reader)  # Read the header row
+        expected_headers = [header.value for header in GsCsvKeys]
+        if headers != expected_headers:
+            raise ValueError("CSV header mismatch. Expected headers: " + ', '.join(expected_headers))
+
+        for row in csv_reader:
+            data.append(dict(zip(headers, row)))
+
+    for res in add_generic_systems(session, data):
+        if isinstance(res, Ok):
+            logger.info(res.ok_value)
+        elif isinstance(res, Err):
+            logger.warning(res.err_value)
+        else:
+            logger.info(f"text {res}")
+
+
+if __name__ == "__main__":
+    cli()

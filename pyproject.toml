@@ -1,6 +1,6 @@
 [project]
 name = "ck-apstra-api"
-version = "0.3.4"
+version = "0.4.0"
 description = "An implementation to use Apstra API"
 license = {text = "MIT License"}
 authors = [ { name = "Charlie Kim", email = "kimcharli@gmail.com" } ]
@@ -8,10 +8,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     'requests == 2.31.0',
-    'pandas == 2.1.1',
-    'pydantic == 2.4.2',
-    'openpyxl == 3.1.2',
-    'python-dotenv == 1.0.0',
     'click == 8.1.7',
     'result == 0.16.1',
 ]
@@ -25,7 +21,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.poetry]
 name = "ck-apstra-api"
-version = "0.3.3"
+version = "0.4.0"
 description = "An implementation to use Apstra API"
 authors = [ "Charlie Kim <ckim@juniper.net>" ]
 license = "MIT"
@@ -34,10 +30,6 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "<3.13,>=3.11"
 requests = "^2.31.0"
-pandas = "^2.1.1"
-pydantic = "^2.4.2"
-openpyxl = "^3.1.2"
-python-dotenv = "^1.0.0"
 click = "^8.1.7"
 result = "0.16.1"
 
@@ -55,7 +47,7 @@ name = "pypi"
 priority = "primary"
 
 [tool.poetry.scripts]
-ck-api = "ck_apstra_api.cli:cli"
+ck-cli = "ck_apstra_api.cli:cli"
 
 
 [tool.pytest.ini_options]

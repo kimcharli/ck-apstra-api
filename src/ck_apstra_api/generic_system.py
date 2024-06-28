@@ -1,18 +1,12 @@
 
 import logging
-from math import isnan
 from pathlib import Path
 from dataclasses import dataclass, fields, field
 from types import GeneratorType
 from typing import Generator, List, Optional, Any, TypeVar, Annotated, Dict, ClassVar
 from collections import Counter, defaultdict
-import os
-import uuid
-import pprint
 from enum import Enum, StrEnum, auto
 
-import pandas as pd
-import numpy as np
 from result import Result, Ok, Err
 
 from ck_apstra_api.apstra_session import CkApstraSession
@@ -774,7 +768,7 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
 
     # build data classes for the server blueprints, the generic systems and the links
     for row in generic_system_rows:
-        bp = ServerBlueprint(row)
+        _ = ServerBlueprint(row)
     yield Ok(f"{func_name} {ServerBlueprint._bps=}")
 
     # fetch the blueprints from the apstra server and store them in the data classes
@@ -822,31 +816,5 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
     yield Ok(f"{func_name} vlans added {ServerBlueprint._bps=}")
 
 
-
-if __name__ == "__main__":
-    apstra_server_host = '10.85.192.45'
-    apstra_server_port = '443'
-    apstra_server_username = 'admin'
-    apstra_server_password = 'admin'
-
-    apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
-    apstra.print_token()
-
-    the_columns = None
-    df = pd.read_csv('./tests/fixtures/sample_generic_system.csv').replace(np.nan, None)
-    columns =  [{"name": col, "label": col, "field": col} for col in df.columns]
-    logging.warning(f"{columns=}")
-    the_rows=[{col: row[col] for col in df.columns} for _, row in df.iterrows()]
-    logging.warning(f"{the_rows=}")
-
-    for row in the_rows:
-        print(f"{row=}")
-        bp = ServerBlueprint(row)
-        # logging.warning(f"{bp=}")
-        bp.fetch_apstra(apstra)
-        pprint.pprint(bp)
-
-    for bp_label, server_bp in ServerBlueprint.iterate_server_blueprints():
-        server_bp.diff()
 
  
