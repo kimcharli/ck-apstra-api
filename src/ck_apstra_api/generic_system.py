@@ -175,17 +175,6 @@ class LinkMember(DataInit):
             # yield Ok(f"{log_prefix} link absent - switch({self.switch}:{self.fetched_switch_id}) {self.switch_ifname}:{self.fetched_switch_intf_id} {self.fetched_server_ifname=}")
         yield Ok(f"{log_prefix} done {self}")
 
-    def diff(self):
-        """
-        Diff the loaded data with the apstra controller.
-        """
-        return_message = ""
-        if self.fetched_server_ifname != self.server_ifname:
-            return_message += f"LinkMember:diff(), {self.fetched_server_ifname=} != {self.server_ifname=}"
-        if self.tags_link != self.fetched_tags_link:
-            return_message += f"LinkMember:diff(), {self.switch_label=}:{self.switch_ifname=} tags mismatch {self.tags_link} != {self.fetched_tags_link}"
-        yield Ok(return_message)
-
     @property
     def application_point(self):
         """Return application point to be used to assign the connectivity template"""
@@ -305,7 +294,7 @@ class LinkGroup(DataInit):
                     self.fetched_lag_mode = member.fetched_ae_interface['lag_mode']
 
         if self.fetched_ae_id:
-            # get CT attached to the ae_id
+            # get any CT attached to the ae_id and update the fetched_ct_names
             ct_query = f"""
                 match(
                     node('ep_endpoint_policy', policy_type_name='batch', name='CT_NODE')
@@ -317,11 +306,7 @@ class LinkGroup(DataInit):
             ct_result = self.bp.query(ct_query)
             if isinstance(ct_result, Err):              
                 yield Err(f"{log_prefix} Error: {ct_result.err_value}")
-            # yield Ok(f"{log_prefix} {self.ae=} {ct_result.ok_value}")
             self.fetched_ct_names = [x['CT_NODE']['label'] for x in ct_result.ok_value]
-            # yield Ok(f"{log_prefix} {self.ae=} {self.fetched_ct_names=}")
-
-
         yield Ok(f"{log_prefix} done {self}")
         
     def form_lacp(self):
@@ -362,25 +347,6 @@ class LinkGroup(DataInit):
     @property
     def speed_count(self):
         return [x.speed for x in self.members]
-
-    def diff(self):
-        """
-        Diff the loaded data with the apstra controller.
-        """
-        return_message = ""
-        if self.ae and self.link_group_fetched_ae_id is None:
-            return_message += f"LinkGroup:diff(), {self.ae=} is absent in blueprint"
-        if self.tags_ae != self.link_group_fetched_tags:
-            return_message += f"LinkGroup:diff(), {self.ae=} tags mismatch {self.tags_ae} != {self.link_group_fetched_tags}"
-        if self.link_group_lag_mode != self.link_group_fetched_lag_mode:
-            return_message += f"LinkGroup:diff(), {self.ae=} lag mode mismatch {self.link_group_lag_mode} != {self.link_group_fetched_lag_mode}"
-        for member in self.members:
-            member_result = member.diff()
-            if isinstance(member_result, Err):
-                yield Err(f"LinkGroup:diff(), {self.ae=}, {member.switch_label=}:{member.switch_ifname=}, Error: {member_result.err_value}")
-            return_message += member_result.ok_value
-        yield Ok(return_message)
-
 
     def rename_interfaces(self):
         log_prefix = f"{self.log_prefix}::rename_interfaces()"
@@ -480,24 +446,6 @@ class GenericSystem(DataInit):
             self.fetched_server_tags = [tag['system_tag']['label'] for tag in tags]
 
         yield f"{log_prefix} done {self}"
-
-
-    def diff(self):
-        """
-        Diff the loaded data with the apstra controller.
-        """
-        return_message = ""
-        if self.gs_id is None:
-            yield Ok(f"GenericSystem:diff(), {self.server_label=} is absent in blueprint")
-        if self.server_tags != self.fetched_server_tags:
-            return_message += f"GenericSystem:diff(), {self.server_label=} tags mismatch {self.server_tags} != {self.fetched_server_tags}"
-        for lg in self.link_groups:
-            lg_result = lg.diff()
-            if isinstance(lg_result, Err):
-                yield Err(f"GenericSystem:diff(), {self.server_label=}, {lg.ae=}, Error: {lg_result.err_value}")
-            return_message += lg_result.ok_value
-        yield Ok(return_message)
-    
 
     @property
     def system_type(self):
@@ -656,18 +604,6 @@ class ServerBlueprint(DataInit):
             for res in generic_system.fetch_apstra(self.ck_bp):
                 yield res
 
-
-    def diff(self): 
-        """
-        Diff the loaded data with the apstra controller.
-        """
-        for server_label, generic_system in self.servers.items():
-            diff_result = generic_system.diff()
-            if isinstance(diff_result, Err):
-                return Err(f"ServerBlueprint:diff(), {self.blueprint=}, {server_label=}, Error: {diff_result.err_value}")
-            logging.warning(f"ServerBlueprint:diff(), {self.blueprint=}, {server_label=}, {diff_result.ok_value=}")
-
-
     def add_generic_systems(self):
         """
         Add the generic system to the apstra server.
@@ -751,7 +687,7 @@ def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: li
     return Ok('done')
 
 
-def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: list) -> Result[str, str]:
+def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: list) -> Generator[Result[str, str], Any, Any]:
     """
     Add generic systems to the apstra server.
 
@@ -817,4 +753,45 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
 
 
 
- 
+def get_generic_systems(apstra_session: CkApstraSession, out_csv: str ) -> Generator[Result[str, str], Any, Any]:
+    """
+    Get the generic systems from the apstra server and write them to the csv file.
+
+    Parameters
+    ----------
+    apstra_session : CkApstraSession
+        The apstra session object.
+
+    out_csv : str
+        The output csv file path.
+
+    """
+    func_name = "get_generic_systems"
+
+    yield Ok(f"{func_name} begin")
+    yield Err(f"{func_name} not implemented")
+    return
+
+    # get the generic systems from the apstra server
+    generic_systems = []
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for server_label, gs in sbp.interate_generic_systems():
+            generic_systems.append(gs)
+    yield Ok(f"{func_name} {len(generic_systems)} generic systems found {generic_systems=}")
+
+    # fetch the generic systems from the apstra server
+    for gs in generic_systems:
+        for res in gs.fetch_apstra(apstra_session):
+            yield res
+    yield Ok(f"{func_name} fetched {generic_systems=}")
+
+    # write the generic systems to the csv file
+    with open(out_csv, 'w') as f:
+        f.write(f"{','.join([x.name for x in fields(GenericSystem)])}\n")
+        for gs in generic_systems:
+            f.write(f"{','.join([str(getattr(gs, x.name)) for x in fields(GenericSystem)])}\n")
+    yield Ok(f"{func_name} written to {out_csv=}")
+
+    # return the generic systems
+    yield Ok(f"{func_name} done {generic_systems=}")
+

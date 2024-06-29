@@ -10,6 +10,35 @@ import csv
 
 from ck_apstra_api.apstra_session import CkApstraSession
 
+
+class CustomFormatter(logging.Formatter):
+    grey = "\x1b[38;21m"
+    yellow = "\x1b[33;21m"
+    red = "\x1b[31;21m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        levelname = record.levelname.ljust(8)  # Set the level name to a fixed width (e.g., 8 characters)
+        record.levelname = levelname
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(CustomFormatter())
+
+
 def add_bp_from_json(host_ip, host_port, host_user, host_password, bp_name, bp_json_file: str = None, new_bp_name: str = None):
     """
     Add a blueprint from a json file
@@ -155,37 +184,54 @@ def get_lldp_data(host_ip, host_port, host_user, host_password, bp_name: str = '
 
 
 @click.group()
-# @click.option('--host-ip', type=str, default='10.85.192.45')
-def cli():    
+@click.option('--host-ip', type=str, default='10.85.192.45', help='Host IP address')
+@click.option('--host-port', type=int, default=443, help='Host port')
+@click.option('--host-user', type=str, default='admin', help='Host username')
+@click.option('--host-password', type=str, default='admin', help='Host password')
+@click.version_option(message='%(package)s, %(version)s')
+@click.pass_context
+def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
+    """
+    A CLI tool for interacting with ck-apstra-api
+    """    
+    ctx.ensure_object(dict)
+    ctx.obj['HOST_IP'] = host_ip
+    ctx.obj['HOST_PORT'] = host_port
+    ctx.obj['HOST_USER'] = host_user
+    ctx.obj['HOST_PASSWORD'] = host_password
+    # click.echo(f"host_ip={host_ip} host_port={host_port} host_user={host_user} host_password={host_password}")
     pass
 
-
 @cli.command()
-@click.argument('host_ip', nargs=1, type=str, default='10.85.192.45')
-@click.argument('host_port', nargs=1, type=str, default=443)
-@click.argument('host_user', nargs=1, type=str, default='admin')
-@click.argument('host_password', nargs=1, type=str, default='admin')
-@click.argument('gs_csv', nargs=1, type=str, default='tests/fixtures/gs_sample.csv')
-def generic_system(host_ip: str, host_port: str, host_user: str, host_password: str, gs_csv: str):
+@click.option('--gs-csv-in', type=str, default='~/Downloads/gs_sample.csv', help='Path to the CSV file for generic systems')
+@click.pass_context
+def import_generic_system(ctx, gs_csv_in: str):
     """
-    Add generic systems from a CSV file
+    Import generic systems from a CSV file
     """
     from ck_apstra_api.generic_system import GsCsvKeys, add_generic_systems
     from ck_apstra_api.apstra_session import CkApstraSession
     from result import Ok, Err
     import logging
 
-    logger = logging.getLogger('generic_system()')
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        )
-    logger.info(f"{host_ip=} {host_port=} {host_user=} {host_password=} {gs_csv=}")
+    # logger = logging.getLogger('import_generic_system()')
+    logger = logging.getLogger('import_generic_system')
+    logger.setLevel(logging.INFO)
+    logger.addHandler(ch)
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    # uncomment below for debugging purpose. It prints the username and password
+    # logger.info(f"{ctx.obj=}")
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    gs_csv_path = os.path.expanduser(gs_csv_in)
 
-    data = []
-    with open(gs_csv, 'r') as csvfile:
+    links_to_add = []
+    with open(gs_csv_path, 'r') as csvfile:
         csv_reader = csv.reader(csvfile)
         headers = next(csv_reader)  # Read the header row
         expected_headers = [header.value for header in GsCsvKeys]
@@ -193,9 +239,9 @@ def generic_system(host_ip: str, host_port: str, host_user: str, host_password: 
             raise ValueError("CSV header mismatch. Expected headers: " + ', '.join(expected_headers))
 
         for row in csv_reader:
-            data.append(dict(zip(headers, row)))
+            links_to_add.append(dict(zip(headers, row)))
 
-    for res in add_generic_systems(session, data):
+    for res in add_generic_systems(session, links_to_add):
         if isinstance(res, Ok):
             logger.info(res.ok_value)
         elif isinstance(res, Err):
@@ -203,6 +249,41 @@ def generic_system(host_ip: str, host_port: str, host_user: str, host_password: 
         else:
             logger.info(f"text {res}")
 
+
+@cli.command()
+@click.option('--gs-csv-out', type=str, default='~/gs.csv', help='Path to the CSV file for generic systems')
+@click.pass_context
+def export_generic_system(ctx, gs_csv_out: str):
+    """
+    Export generic systems to a CSV file
+    """
+    from ck_apstra_api.generic_system import get_generic_systems
+    from ck_apstra_api.apstra_session import CkApstraSession
+    from result import Ok, Err
+    import logging
+
+    logger = logging.getLogger('export_generic_system.')
+    logger.setLevel(logging.INFO)
+    logger.addHandler(ch)
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    # uncomment below for debugging purpose. It prints the username and password
+    logger.info(f"{ctx.obj=}")
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    gs_csv_path = os.path.expanduser(gs_csv_out)
+
+    for res in get_generic_systems(session, gs_csv_path):
+        if isinstance(res, Ok):
+            logger.info(res.ok_value)
+        elif isinstance(res, Err):
+            logger.warning(res.err_value)
+        else:
+            logger.info(f"text {res}")
 
 if __name__ == "__main__":
     cli()
