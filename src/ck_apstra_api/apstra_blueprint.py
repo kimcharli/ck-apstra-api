@@ -39,6 +39,7 @@ class CkApstraBlueprint:
         Args:
             session: The Apstra session object.
             label: The label of the blueprint.
+            id: The ID of the blueprint in case it is known
         """
         self.session = session
         self.label = label
@@ -50,35 +51,25 @@ class CkApstraBlueprint:
             self.design = this_blueprint['design']
         else:
             self.get_id()
-        self.url_prefix = f"{self.session.url_prefix}/blueprints/{self.id}"
-
-        # self.system_label_2_id_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
-        # self.system_id_2_label_cache = {}  # { system_label: { id: id, interface_map_id: id, device_profile_id: id }
-        self.logger.debug(f"{self.id=}")
+            if self.id:
+                self.url_prefix = f"{self.session.url_prefix}/blueprints/{self.id}"
 
 
     def get_id(self) -> str:
         """
-        Get the ID of the blueprint.
+        Get the ID of the blueprint or None
 
         Returns:
-            The ID of the blueprint.
+            The ID of the blueprint. None if the blueprint does not exist.
         """
         if self.id:
             return self.id
         # get summary lists of all the blueprints
-        for blueprints in self.session.get_items('blueprints')['items']:
-            if blueprints['label'] == self.label:
-                self.id = blueprints['id']
-                self.design = blueprints['design']
-                return self.id
-        #     bp = [x for x in blueprints if x['label'] == self.label][0]
-        # self.id = bp['id']
-        # self.design = bp['design']
-        # self.id = [x['id'] for x in blueprints if x['label'] == self.label][0]
-        if self.id is None:
-            raise ValueError(f"Blueprint '{self.label}' not found.")
+        bp = [x for x in self.session.get_items('blueprints')['items'] if x['label'] == self.label]
+        if bp:
+            self.id = bp[0]['id']
         return self.id
+        
 
     def dump(self) -> dict:
         """
@@ -171,7 +162,7 @@ class CkApstraBlueprint:
             return None
         return self.system_id_2_label_cache[system_id]
 
-    def get_server_interface_nodes(self, generic_system_label, intf_name=None) -> Result[str, str]:
+    def get_server_interface_nodes(self, generic_system_label: str = None, intf_name: str = None) -> Result[str, str]:
         """
         Return interface nodes of a system label
             return CkEnum.MEMBER_INTERFACE and CkEnum.MEMBER_SWITCH
@@ -181,8 +172,9 @@ class CkApstraBlueprint:
         TODO: cache generic system interface id
         called by move_access_switch
         """
+        gs_label_filter = f"label='{generic_system_label}', " if generic_system_label else ''
         interface_query = f"""match(
-            node('system', system_type='server', label='{generic_system_label}', name='{CkEnum.GENERIC_SYSTEM}')
+            node('system', system_type='server', {gs_label_filter} name='{CkEnum.GENERIC_SYSTEM}')
                 .out('hosted_interfaces').node('interface', name='{CkEnum.GENERIC_SYSTEM_INTERFACE}')
                 .out('link').node('link', name='{CkEnum.LINK}')
                 .in_('link').node('interface', if_type='ethernet', name='{CkEnum.MEMBER_INTERFACE}')
@@ -728,41 +720,3 @@ class CkApstraBlueprint:
         items = self.session.get_items(f"blueprints/{self.id}/{item}")
         return items
 
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-    import os
-
-    load_dotenv()
-    log_level = os.getenv('logging_level', 'DEBUG')
-    prep_logging(log_level)
-
-    # apstra_server_host = os.getenv('apstra_server_host')
-    # apstra_server_port = os.getenv('apstra_server_port')
-    # apstra_server_username = os.getenv('apstra_server_username')
-    # apstra_server_password = os.getenv('apstra_server_password')
-    apstra_server_host = '10.85.192.50'
-    apstra_server_port = '443'
-    apstra_server_username = 'admin'
-    apstra_server_password = 'zaq1@WSXcde3$RFV'
-
-    apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
-    # bp = CkApstraBlueprint(apstra, os.getenv('main_blueprint'))
-    bp = CkApstraBlueprint(apstra, 'infor-pristine')
-    # breakpoint()
-    # bp = CkApstraBlueprint(apstra, 'ATLANTA-Master')
-    # links = bp.get_switch_interface_nodes(['atl1tor-r5r15a', 'atl1tor-r5r15b'])
-    links_result = bp.get_switch_interface_nodes('atl1tor-r5r15a')
-    # links_result = bp.get_switch_interface_nodes()
-    # links_result = bp.get_server_interface_nodes('r5r15-sys018')
-    # # links = bp.get_server_interface_nodes('atl1tor-r1r16')
-    print(f"{links_result=} {len(links_result.ok_value)=}")
-    # # query_str1 = f"""match(
-    # #     node('virtual_network', vn_id='101353', name='vn').in_('member_vns').node('security_zone', name='rz'),
-    # #     node(name='vn').out('instantiated_by').node('vn_instance', name='vn_instance')
-    # #         .in_('hosted_vn_instances').node(name='switch')
-    # #         .in_('composed_of_systems').node('redundancy_group', name='redundancy_group'),
-    # # )"""
-    # result = bp.query(query_str1)
-    # print(f"{query_str1=} {len(result)=} {result=}")
-    print(bp.get_id())

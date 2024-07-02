@@ -8,35 +8,11 @@ from datetime import datetime
 from pprint import pprint
 import csv
 
-from ck_apstra_api.apstra_session import CkApstraSession
+# from ck_apstra_api.apstra_session import CkApstraSession, CustomFormatter
 
-
-class CustomFormatter(logging.Formatter):
-    grey = "\x1b[38;21m"
-    yellow = "\x1b[33;21m"
-    red = "\x1b[31;21m"
-    bold_red = "\x1b[31;1m"
-    reset = "\x1b[0m"
-    format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s (%(filename)s:%(lineno)d)"
-
-    FORMATS = {
-        logging.DEBUG: grey + format + reset,
-        logging.INFO: grey + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset
-    }
-
-    def format(self, record):
-        levelname = record.levelname.ljust(8)  # Set the level name to a fixed width (e.g., 8 characters)
-        record.levelname = levelname
-        log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-ch.setFormatter(CustomFormatter())
+# ch = logging.StreamHandler()
+# ch.setLevel(logging.DEBUG)
+# ch.setFormatter(CustomFormatter())
 
 
 def add_bp_from_json(host_ip, host_port, host_user, host_password, bp_name, bp_json_file: str = None, new_bp_name: str = None):
@@ -199,8 +175,60 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
     ctx.obj['HOST_PORT'] = host_port
     ctx.obj['HOST_USER'] = host_user
     ctx.obj['HOST_PASSWORD'] = host_password
-    # click.echo(f"host_ip={host_ip} host_port={host_port} host_user={host_user} host_password={host_password}")
     pass
+
+
+@cli.command()
+@click.pass_context
+def server_check(ctx):
+    """
+    Test the connectivity to the server
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'server_check()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    logger.info(f"version {session.version=} {session.token=}")
+    session.logout()
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.pass_context
+def blueprint_check(ctx, bp_name: str):
+    """
+    Test the connectivity to the blueprint
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'blueprint_check()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    # bp_name = ctx.obj['BP_NAME']
+    bp = CkApstraBlueprint(session, bp_name)
+    logger.info(f"{bp_name=}, {bp.id=}")
+    if bp.id:
+        logger.info(f"Blueprint {bp_name} found")
+    else:
+        logger.warning(f"Blueprint {bp_name} not found")
+        
+    session.logout()
+
+
 
 @cli.command()
 @click.option('--gs-csv-in', type=str, default='~/Downloads/gs_sample.csv', help='Path to the CSV file for generic systems')
@@ -210,14 +238,10 @@ def import_generic_system(ctx, gs_csv_in: str):
     Import generic systems from a CSV file
     """
     from ck_apstra_api.generic_system import GsCsvKeys, add_generic_systems
-    from ck_apstra_api.apstra_session import CkApstraSession
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
     from result import Ok, Err
-    import logging
 
-    # logger = logging.getLogger('import_generic_system()')
-    logger = logging.getLogger('import_generic_system')
-    logger.setLevel(logging.INFO)
-    logger.addHandler(ch)
+    logger = prep_logging('DEBUG', 'import_generic_system()')
 
     host_ip = ctx.obj['HOST_IP']
     host_port = ctx.obj['HOST_PORT']
@@ -258,13 +282,10 @@ def export_generic_system(ctx, gs_csv_out: str):
     Export generic systems to a CSV file
     """
     from ck_apstra_api.generic_system import get_generic_systems
-    from ck_apstra_api.apstra_session import CkApstraSession
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
     from result import Ok, Err
-    import logging
 
-    logger = logging.getLogger('export_generic_system.')
-    logger.setLevel(logging.INFO)
-    logger.addHandler(ch)
+    logger = prep_logging('DEBUG', 'export_generic_system()')
 
     host_ip = ctx.obj['HOST_IP']
     host_port = ctx.obj['HOST_PORT']
@@ -272,7 +293,7 @@ def export_generic_system(ctx, gs_csv_out: str):
     host_password = ctx.obj['HOST_PASSWORD']
 
     # uncomment below for debugging purpose. It prints the username and password
-    logger.info(f"{ctx.obj=}")
+    # logger.info(f"{ctx.obj=}")
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
     gs_csv_path = os.path.expanduser(gs_csv_out)

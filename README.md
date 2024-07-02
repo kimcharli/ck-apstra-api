@@ -1,5 +1,7 @@
 # ck-apstra-api
 
+https://github.com/kimcharli/ck-apstra-api
+
 ## prerequisit
 
 python3.11 or higher
@@ -14,7 +16,7 @@ ckim@ckim-mbp:sandbox % mkdir test
 ckim@ckim-mbp:sandbox % cd test             
 ckim@ckim-mbp:test % python -m venv .venv                      
 ckim@ckim-mbp:test % source .venv/bin/activate
-(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.4.0
+(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.4.2
 ...                                                                                             
 (.venv) ckim@ckim-mbp:test % 
 ```

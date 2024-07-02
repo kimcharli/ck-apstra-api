@@ -8,37 +8,46 @@ import time
 from datetime import datetime
 from result import Result, Ok, Err
 
+
 class CustomFormatter(logging.Formatter):
-    grey = "\x1b[38;20m"
-    yellow = "\x1b[33;20m"
-    red = "\x1b[31;20m"
+    black = "\x1b[30;21m"
+    grey = "\x1b[38;21m"
+    dark_gray = "\x1b[90;21m"
+    white = "\x1b[37;21m"
+    bright_white = "\x1b[97;21m"
+    yellow = "\x1b[33;21m"
+    red = "\x1b[31;21m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format = "%(asctime)s %(levelname)8s %(name)s:%(funcName)s() - %(message)s (%(filename)s:%(lineno)d)"
+    format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s (%(filename)s:%(lineno)d)"
+
     FORMATS = {
-        logging.DEBUG: grey + format + reset,
-        logging.INFO: grey + format + reset,
+        logging.DEBUG: white + format + reset,
+        logging.INFO: dark_gray + format + reset,
         logging.WARNING: yellow + format + reset,
         logging.ERROR: red + format + reset,
         logging.CRITICAL: bold_red + format + reset
     }
 
     def format(self, record):
+        levelname = record.levelname.ljust(8)  # Set the level name to a fixed width (e.g., 8 characters)
+        record.levelname = levelname
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
 
-def prep_logging(log_level: str = 'INFO'):
+def prep_logging(log_level: str = 'INFO', log_name: str = 'root'):
     '''Configure logging options'''
     timestamp = datetime.now().strftime("%Y%m%d-%H:%H:%S")
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(log_level))
     ch.setFormatter(CustomFormatter())
-    root.addHandler(ch)
+    logger.addHandler(ch)
+    return logger
 
 
 # https client session to Apstra Controller
@@ -245,30 +254,3 @@ class CkApstraSession:
         # self.logger.debug(f"post({url}, {data})")
         return self.session.post(url, json=data, params=params)
 
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-    import os
-
-    load_dotenv()
-    log_level = os.getenv('logging_level', 'DEBUG')
-    prep_logging(log_level)
-
-    # apstra_server_host = os.getenv('apstra_server_host')
-    # apstra_server_port = os.getenv('apstra_server_port')
-    # apstra_server_username = os.getenv('apstra_server_username')
-    # apstra_server_password = os.getenv('apstra_server_password')
-    apstra_server_host = '10.85.192.50'
-    apstra_server_port = '443'
-    apstra_server_username = 'admin'
-    apstra_server_password = 'zaq1@WSXcde3$RFV'
-
-    apstra = CkApstraSession(apstra_server_host, apstra_server_port, apstra_server_username, apstra_server_password)
-    apstra.print_token()
-
-    logging.info(f"version {apstra.version}")
-    logging.info(f"Done {apstra.is_online()=}")
-
-    logouted = apstra.logout()
-    logging.info(f"Done {logouted=}")
-
-    logging.info(f"Done {apstra.is_online()=}")
