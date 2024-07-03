@@ -180,14 +180,14 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
 
 @cli.command()
 @click.pass_context
-def server_check(ctx):
+def check_apstra(ctx):
     """
     Test the connectivity to the server
     """
     from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
     from result import Ok, Err
 
-    logger = prep_logging('DEBUG', 'server_check()')
+    logger = prep_logging('DEBUG', 'check_apstra()')
 
     host_ip = ctx.obj['HOST_IP']
     host_port = ctx.obj['HOST_PORT']
@@ -202,7 +202,7 @@ def server_check(ctx):
 @cli.command()
 @click.option('--bp-name', type=str, default='terra', help='Blueprint name')
 @click.pass_context
-def blueprint_check(ctx, bp_name: str):
+def check_blueprint(ctx, bp_name: str):
     """
     Test the connectivity to the blueprint
     """
@@ -210,7 +210,7 @@ def blueprint_check(ctx, bp_name: str):
     from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
     from result import Ok, Err
 
-    logger = prep_logging('DEBUG', 'blueprint_check()')
+    logger = prep_logging('DEBUG', 'check_blueprint()')
 
     host_ip = ctx.obj['HOST_IP']
     host_port = ctx.obj['HOST_PORT']
@@ -305,6 +305,148 @@ def export_generic_system(ctx, gs_csv_out: str):
             logger.warning(res.err_value)
         else:
             logger.info(f"text {res}")
+
+
+@cli.command()
+@click.option('--vn-name', type=str, help='Subject Virtual Network name')
+@click.option('--to-rz', type=str, help='Destination Routing Zone name')
+@click.option('--bp-name', type=str, help='Blueprint name')
+@click.pass_context
+def immigrate_vn(ctx, bp_name: str, vn_name: str, to_rz: str):
+    """Move a Virtual Network to the target Routing Zone"""
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+
+    logger = prep_logging('INFO', 'immigrate_vn()')
+    logger.info(f"{bp_name=} {vn_name=} {to_rz=}")
+
+    TEMP_RZ_LABEL = 'vrf-x'
+    TEMP_VN_LABEL = 'vn-x'
+
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    bp = CkApstraBlueprint(session, bp_name)
+    # find the RZ associated to the VN
+    found_vn_result = bp.query(f"node('security_zone', name='sz').out('member_vns').node('virtual_network', label='{vn_name}', name='vn')")
+    found_vn = found_vn_result.ok_value
+    if len(found_vn) == 0:
+        logger.info(f"Virtual Network {vn_name} not found")
+        return
+    if found_vn[0]['sz']['label'] == to_rz:
+        logger.info(f"Virtual Network {vn_name} already in the target Routing Zone {to_rz}")
+        return
+    vn_old_id = found_vn[0]['vn']['id']
+    logger.info(f"Mission: move vn {vn_name}:{vn_old_id} found in rz {found_vn[0]['sz']['label']} to {to_rz}")
+
+
+    temp_rz_id = None
+    found_temp_sz_result = bp.get_item('security-zones')
+    # logger.info(f"{found_temp_sz_result=}")
+    found_temp_sz_list = [sz_data['id'] for sz_id, sz_data in found_temp_sz_result['items'].items() if sz_data['label'] == TEMP_RZ_LABEL]
+    if len(found_temp_sz_list):
+        temp_rz_id = found_temp_sz_list[0]
+    else:
+        temp_sz_spec = {
+            "sz_type": "evpn",
+            "routing_policy_id": None,
+            "rt_policy": {
+                "import_RTs": None,
+                "export_RTs": None
+            },
+            "junos_evpn_irb_mode": "asymmetric",
+            "vrf_name": "vrf-x",
+            "vlan_id": 4010,
+            "vni_id": 504010,
+            "label": "vrf-x"        
+        }
+        temp_sz_result = bp.post_item('security-zones', temp_sz_spec)
+        logger.info(f"{temp_sz_result=}")
+
+    temp_vn_id = None
+    found_temp_vn_result = bp.get_item('virtual-networks')
+    found_temp_vn_list = [vn_data for vn_id, vn_data in found_temp_vn_result['virtual_networks'].items() if vn_data['label'] == TEMP_VN_LABEL]
+    if len(found_temp_vn_list):
+        temp_vn_id = found_temp_vn_list[0]['id']
+        logger.info(f"temp vn found: {temp_vn_id=}")
+        if found_temp_vn_list[0]['security_zone_id'] != temp_rz_id:
+            logger.error(f"Error: vn {TEMP_VN_LABEL} in a different Routing Zone")
+            return
+    else:
+        # temp vn not found. creating.
+        temp_vn_spec = {
+            "virtual_networks": [
+                {
+                    "virtual_gateway_ipv4_enabled": True,
+                    "vn_id": "203999",
+                    "vn_type": "vxlan",
+                    "svi_ips": [
+                    {
+                        "system_id": "2QKZLUzqCO0ZJ73Fb1I",
+                        "ipv4_mode": "enabled",
+                        "ipv4_addr": None,
+                        "ipv6_mode": "disabled",
+                        "ipv6_addr": None
+                    },
+                    {
+                        "system_id": "qCc9ps52vPppDp2b6rk",
+                        "ipv4_mode": "enabled",
+                        "ipv4_addr": None,
+                        "ipv6_mode": "disabled",
+                        "ipv6_addr": None
+                    }
+                    ],
+                    "virtual_gateway_ipv4": None,
+                    "ipv6_subnet": None,
+                    "bound_to": [
+                    {
+                        "system_id": "xwS1U1FnaNp41i0Haug",
+                        "access_switch_node_ids": [],
+                        "vlan_id": 3999
+                    }
+                    ],
+                    "vni_ids": [
+                        203999
+                    ],
+                    "reserved_vlan_id": None,
+                    "virtual_gateway_ipv6": None,
+                    "rt_policy": {
+                    "import_RTs": None,
+                    "export_RTs": None
+                    },
+                    "label": TEMP_VN_LABEL,
+                    "ipv4_enabled": None,
+                    "virtual_gateway_ipv6_enabled": None,
+                    "ipv6_enabled": None,
+                    "security_zone_id": temp_rz_id,
+                    "dhcp_service": "dhcpServiceDisabled"
+                }
+            ]        
+        }
+        temp_vn_result = bp.post_item('virtual-networks', temp_vn_spec)
+        logger.info(f"{temp_vn_result=}")
+        temp_vn_id = temp_vn_result['id']
+
+    # found the associated CT
+    found_ct_result = bp.query(f"node(id='{vn_old_id}').in_('vn_to_attach').node('ep_endpoint_policy', name='ep')")
+    found_ct_list = found_ct_result.ok_value
+    logger.info(f"{found_ct_list=}")
+    # found_ct = found_ct_result.ok_value
+    # if len(found_ct) == 0:
+    #     logger.info(f"CT not found")
+    #     return
+    # logger.info(f"CT found: {found_ct=}")
+
+
+
+
+    pass
+
+
 
 if __name__ == "__main__":
     cli()
