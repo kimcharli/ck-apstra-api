@@ -24,6 +24,12 @@ ckim@ckim-mbp:test % source .venv/bin/activate
 ## help commands
 
 ```
+(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --version 
+ck_apstra_api, 0.4.4
+(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+```
+
+```
 (.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli          
 Usage: ck-cli [OPTIONS] COMMAND [ARGS]...
 
@@ -38,10 +44,11 @@ Options:
   --help                Show this message and exit.
 
 Commands:
+  check-apstra           Test the connectivity to the server
+  check-blueprint        Test the connectivity to the blueprint
   export-generic-system  Export generic systems to a CSV file
   import-generic-system  Import generic systems from a CSV file
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --version
-ck_apstra_api, 0.4.1
+  relocate-vn            Move a Virtual Network to the target Routing Zone
 (.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
 ```
 
@@ -155,6 +162,157 @@ def import_generic_system(ctx, gs_csv_in: str):
             logger.warning(res.err_value)
         else:
             logger.info(f"text {res}")
+```
+
+
+## Move a Virtual Network to other Routing Zone
+Currenly only takes care of VLANs.
+
+### run example
+```
+(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --host-ip 10.85.192.45 --host-password admin relocate-vn --virtual-network vn2222 --blueprint terra --routing-zone vrf
+2024-07-03 18:47:07,957 - INFO     - immigrate_vn() - Took order blueprint='terra' virtual_network='vn2222' routing_zone='vrf' (cli.py:333)
+2024-07-03 18:47:09,195 - INFO     - immigrate_vn() - Temporary VN x-vn2222 not found. Creating... (cli.py:391)
+2024-07-03 18:47:10,208 - INFO     - immigrate_vn() - Temporary VN x-vn2222:the_order.test_vn_id='mTlYxQM-bvG1oP6mhZQ' created vn_temp_created=<Response [201]> (cli.py:408)
+2024-07-03 18:47:10,208 - INFO     - immigrate_vn() - Ready execute: Order: self.target_vn='vn2222' self.target_vn_id='BPB80Tuop2qUINeUZOU' self.test_vn='x-vn2222' self.test_vn_id='mTlYxQM-bvG1oP6mhZQ' self.target_rz='vrf' self.terget_rz_id='S2WY6qMrf9J6cvoZfeY' (cli.py:410)
+2024-07-03 18:47:12,048 - INFO     - immigrate_vn() - CkApstraBlueprint(terra)::swap_ct_vns(from_vn_id='BPB80Tuop2qUINeUZOU', to_vn_id='mTlYxQM-bvG1oP6mhZQ') patched: ct['id']='1604b264-fa4a-46ec-a47f-1d237b2c5a3f' attr={'tag_type': 'vlan_tagged', 'vn_node_id': 'BPB80Tuop2qUINeUZOU'} patched=<Response [204]> (cli.py:414)
+2024-07-03 18:47:13,360 - INFO     - immigrate_vn() - VN vn2222:BPB80Tuop2qUINeUZOU deleted: deleted=<Response [204]> (cli.py:418)
+2024-07-03 18:47:14,552 - INFO     - immigrate_vn() - VN vn2222:tzPJy0Myr5_b2pP9x1M created: created=<Response [201]> under RZ:vrf (cli.py:424)
+2024-07-03 18:47:14,552 - INFO     - immigrate_vn() - Restoring CTs with new VN x-vn2222:mTlYxQM-bvG1oP6mhZQ (cli.py:427)
+2024-07-03 18:47:16,414 - INFO     - immigrate_vn() - CkApstraBlueprint(terra)::swap_ct_vns(from_vn_id='mTlYxQM-bvG1oP6mhZQ', to_vn_id='tzPJy0Myr5_b2pP9x1M') patched: ct['id']='1604b264-fa4a-46ec-a47f-1d237b2c5a3f' attr={'tag_type': 'vlan_tagged', 'vn_node_id': 'mTlYxQM-bvG1oP6mhZQ'} patched=<Response [204]> (cli.py:429)
+2024-07-03 18:47:17,538 - INFO     - immigrate_vn() - Temporary VN x-vn2222:mTlYxQM-bvG1oP6mhZQ deleted: deleted=<Response [204]> (cli.py:433)
+2024-07-03 18:47:17,538 - INFO     - immigrate_vn() - Order completed: Order: self.target_vn='vn2222' self.target_vn_id='tzPJy0Myr5_b2pP9x1M' self.test_vn='x-vn2222' self.test_vn_id='mTlYxQM-bvG1oP6mhZQ' self.target_rz='vrf' self.terget_rz_id='S2WY6qMrf9J6cvoZfeY' (cli.py:435)
+(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+```
+
+
+### code example
+```python
+@cli.command()
+@click.option('--virtual-network', type=str, required=True, help='Subject Virtual Network name')
+@click.option('--routing-zone', type=str, required=True, help='Destination Routing Zone name')
+@click.option('--blueprint', type=str, required=True, help='Blueprint name')
+@click.pass_context
+def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
+    """
+    Move a Virtual Network to the target Routing Zone
+
+    The virtual network move involves deleting and recreating the virtual network in the target routing zone.
+    To delete the virtual network, the associated CT should be taken care of. Either deassign and delete them and later do reverse.
+    This CT handling trouble can be mitigated with a temporary VN to replace the original VN in the CT. Later, to be reversed later.
+
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging, deep_copy
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+
+    from result import Ok, Err
+
+    logger = prep_logging('INFO', 'immigrate_vn()')
+    logger.info(f"Took order {blueprint=} {virtual_network=} {routing_zone=}")
+
+    # the temporary VN has prefix 'x-' and the same name as the original VN
+    TEMP_VN_LABEL = f"x-{virtual_network}"[0:32]
+    TEMP_VN_ID = '203999'
+    TEMP_VN_VLAN = 3999
+    NODE_NAME_VN = 'vn'
+    NODE_NAME_RZ = 'rz'
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    bp = CkApstraBlueprint(session, blueprint)
+
+    @dataclass
+    class Order(object):
+        target_vn: str = virtual_network
+        target_vn_id: str = None
+        target_vn_spec: dict = None
+        test_vn: str = TEMP_VN_LABEL
+        test_vn_id: str = None
+        test_vn_spec: dict = None
+        target_rz: str = routing_zone
+        terget_rz_id: str = None
+
+        def summary(self):
+            return f"Order: {self.target_vn=} {self.target_vn_id=} {self.test_vn=} {self.test_vn_id=} {self.target_rz=} {self.terget_rz_id=}"
+    the_order = Order()
+
+    # get the target_rz_id
+    found_rz = bp.query(f"node('security_zone', name='{NODE_NAME_RZ}', label='{routing_zone}')").ok_value
+    the_order.terget_rz_id = found_rz[0][NODE_NAME_RZ]['id']
+
+    # get all the VNs
+    found_vns_dict = bp.get_item('virtual-networks')['virtual_networks']
+
+    # pick the target VN data
+    target_vn_node = [vn for vn in found_vns_dict.values() if vn['label'] == virtual_network]    
+    if len(target_vn_node) == 0:
+        logger.error(f"Virtual Network {virtual_network} not found")
+        return
+    the_order.target_vn_spec = target_vn_node[0]
+    the_order.target_vn_id = the_order.target_vn_spec['id']
+    # check if the VN is already in the target RZ
+    if the_order.target_vn_spec['security_zone_id'] == the_order.terget_rz_id:
+        logger.warning(f"Virtual Network {virtual_network} already in the target Routing Zone {routing_zone}")
+        return
+
+    # pick the test VN data
+    test_vn_node = [vn for vn in found_vns_dict.values() if vn['label'] == the_order.test_vn]
+    if len(test_vn_node):
+        the_order.test_vn_spec = test_vn_node[0]
+        the_order.test_vn_id = the_order.test_vn_spec['id']
+        logger.info(f"Temporary VN {the_order.test_vn} found")
+    else:
+        logger.info(f"Temporary VN {the_order.test_vn} not found. Creating...")
+        # starts 
+        # create a temporary VN in the same RZ of the original VN
+        vn_temp_spec = deep_copy(the_order.target_vn_spec)
+        vn_temp_spec['label'] = TEMP_VN_LABEL
+        vn_temp_spec['vn_id'] = TEMP_VN_ID
+        vn_temp_spec['ipv4_subnet'] = None
+        vn_temp_spec['virtual_gateway_ipv4'] = None
+        vn_temp_spec['virtual_gateway_ipv4_enabled'] = None
+        vn_temp_spec['ipv4_enabled'] = None
+        # change the bound_to VLAN to TEMP_VN_VLAN
+        for bound_to in vn_temp_spec['bound_to']:
+            bound_to['vlan_id'] = TEMP_VN_VLAN
+        del vn_temp_spec['id']
+        vn_temp_created = bp.post_item('virtual-networks', vn_temp_spec)
+        the_order.test_vn_id = vn_temp_created.json()['id']
+        the_order.test_vn_spec = vn_temp_spec
+        logger.info(f"Temporary VN {the_order.test_vn}:{the_order.test_vn_id=} created {vn_temp_created=}")
+
+    logger.info(f"Ready execute: {the_order.summary()}")
+
+    # replace CTs with test VN
+    for res in bp.swap_ct_vns(the_order.target_vn_id, the_order.test_vn_id):
+        logger.info(res)
+
+    # delete the original VN
+    deleted = bp.delete_item(f"virtual-networks/{the_order.target_vn_id}")
+    logger.info(f"VN {the_order.target_vn}:{the_order.target_vn_id} deleted: {deleted=}")
+
+    # create the original VN in the target RZ
+    the_order.target_vn_spec['security_zone_id'] = the_order.terget_rz_id
+    created = bp.post_item('virtual-networks', the_order.target_vn_spec)
+    the_order.target_vn_id = created.json()['id']
+    logger.info(f"VN {the_order.target_vn}:{the_order.target_vn_id} created: {created=} under RZ:{the_order.target_rz}")
+
+    # restore the CTs
+    logger.info(f"Restoring CTs with new VN {the_order.test_vn}:{the_order.test_vn_id}")
+    for res in bp.swap_ct_vns(the_order.test_vn_id, the_order.target_vn_id):
+        logger.info(res)
+
+    # remove the temporary VN
+    deleted = bp.delete_item(f"virtual-networks/{the_order.test_vn_id}")
+    logger.info(f"Temporary VN {the_order.test_vn}:{the_order.test_vn_id} deleted: {deleted=}")
+
+    logger.info(f"Order completed: {the_order.summary()}")
+    session.logout()
+
 ```
 
 

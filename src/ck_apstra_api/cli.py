@@ -1,3 +1,6 @@
+import copy
+from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 import click
 import os
@@ -308,21 +311,33 @@ def export_generic_system(ctx, gs_csv_out: str):
 
 
 @cli.command()
-@click.option('--vn-name', type=str, help='Subject Virtual Network name')
-@click.option('--to-rz', type=str, help='Destination Routing Zone name')
-@click.option('--bp-name', type=str, help='Blueprint name')
+@click.option('--virtual-network', type=str, required=True, help='Subject Virtual Network name')
+@click.option('--routing-zone', type=str, required=True, help='Destination Routing Zone name')
+@click.option('--blueprint', type=str, required=True, help='Blueprint name')
 @click.pass_context
-def immigrate_vn(ctx, bp_name: str, vn_name: str, to_rz: str):
-    """Move a Virtual Network to the target Routing Zone"""
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
+    """
+    Move a Virtual Network to the target Routing Zone
+
+    The virtual network move involves deleting and recreating the virtual network in the target routing zone.
+    To delete the virtual network, the associated CT should be taken care of. Either deassign and delete them and later do reverse.
+    This CT handling trouble can be mitigated with a temporary VN to replace the original VN in the CT. Later, to be reversed later.
+
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging, deep_copy
     from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
 
+    from result import Ok, Err
+
     logger = prep_logging('INFO', 'immigrate_vn()')
-    logger.info(f"{bp_name=} {vn_name=} {to_rz=}")
+    logger.info(f"Took order {blueprint=} {virtual_network=} {routing_zone=}")
 
-    TEMP_RZ_LABEL = 'vrf-x'
-    TEMP_VN_LABEL = 'vn-x'
-
+    # the temporary VN has prefix 'x-' and the same name as the original VN
+    TEMP_VN_LABEL = f"x-{virtual_network}"[0:32]
+    TEMP_VN_ID = '203999'
+    TEMP_VN_VLAN = 3999
+    NODE_NAME_VN = 'vn'
+    NODE_NAME_RZ = 'rz'
 
     host_ip = ctx.obj['HOST_IP']
     host_port = ctx.obj['HOST_PORT']
@@ -330,123 +345,95 @@ def immigrate_vn(ctx, bp_name: str, vn_name: str, to_rz: str):
     host_password = ctx.obj['HOST_PASSWORD']
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    bp = CkApstraBlueprint(session, bp_name)
-    # find the RZ associated to the VN
-    found_vn_result = bp.query(f"node('security_zone', name='sz').out('member_vns').node('virtual_network', label='{vn_name}', name='vn')")
-    found_vn = found_vn_result.ok_value
-    if len(found_vn) == 0:
-        logger.info(f"Virtual Network {vn_name} not found")
+    bp = CkApstraBlueprint(session, blueprint)
+
+    @dataclass
+    class Order(object):
+        target_vn: str = virtual_network
+        target_vn_id: str = None
+        target_vn_spec: dict = None
+        test_vn: str = TEMP_VN_LABEL
+        test_vn_id: str = None
+        test_vn_spec: dict = None
+        target_rz: str = routing_zone
+        terget_rz_id: str = None
+
+        def summary(self):
+            return f"Order: {self.target_vn=} {self.target_vn_id=} {self.test_vn=} {self.test_vn_id=} {self.target_rz=} {self.terget_rz_id=}"
+    the_order = Order()
+
+    # get the target_rz_id
+    found_rz = bp.query(f"node('security_zone', name='{NODE_NAME_RZ}', label='{routing_zone}')").ok_value
+    the_order.terget_rz_id = found_rz[0][NODE_NAME_RZ]['id']
+
+    # get all the VNs
+    found_vns_dict = bp.get_item('virtual-networks')['virtual_networks']
+
+    # pick the target VN data
+    target_vn_node = [vn for vn in found_vns_dict.values() if vn['label'] == virtual_network]    
+    if len(target_vn_node) == 0:
+        logger.error(f"Virtual Network {virtual_network} not found")
         return
-    if found_vn[0]['sz']['label'] == to_rz:
-        logger.info(f"Virtual Network {vn_name} already in the target Routing Zone {to_rz}")
+    the_order.target_vn_spec = target_vn_node[0]
+    the_order.target_vn_id = the_order.target_vn_spec['id']
+    # check if the VN is already in the target RZ
+    if the_order.target_vn_spec['security_zone_id'] == the_order.terget_rz_id:
+        logger.warning(f"Virtual Network {virtual_network} already in the target Routing Zone {routing_zone}")
         return
-    vn_old_id = found_vn[0]['vn']['id']
-    logger.info(f"Mission: move vn {vn_name}:{vn_old_id} found in rz {found_vn[0]['sz']['label']} to {to_rz}")
 
-
-    temp_rz_id = None
-    found_temp_sz_result = bp.get_item('security-zones')
-    # logger.info(f"{found_temp_sz_result=}")
-    found_temp_sz_list = [sz_data['id'] for sz_id, sz_data in found_temp_sz_result['items'].items() if sz_data['label'] == TEMP_RZ_LABEL]
-    if len(found_temp_sz_list):
-        temp_rz_id = found_temp_sz_list[0]
+    # pick the test VN data
+    test_vn_node = [vn for vn in found_vns_dict.values() if vn['label'] == the_order.test_vn]
+    if len(test_vn_node):
+        the_order.test_vn_spec = test_vn_node[0]
+        the_order.test_vn_id = the_order.test_vn_spec['id']
+        logger.info(f"Temporary VN {the_order.test_vn} found")
     else:
-        temp_sz_spec = {
-            "sz_type": "evpn",
-            "routing_policy_id": None,
-            "rt_policy": {
-                "import_RTs": None,
-                "export_RTs": None
-            },
-            "junos_evpn_irb_mode": "asymmetric",
-            "vrf_name": "vrf-x",
-            "vlan_id": 4010,
-            "vni_id": 504010,
-            "label": "vrf-x"        
-        }
-        temp_sz_result = bp.post_item('security-zones', temp_sz_spec)
-        logger.info(f"{temp_sz_result=}")
+        logger.info(f"Temporary VN {the_order.test_vn} not found. Creating...")
+        # starts 
+        # create a temporary VN in the same RZ of the original VN
+        vn_temp_spec = deep_copy(the_order.target_vn_spec)
+        vn_temp_spec['label'] = TEMP_VN_LABEL
+        vn_temp_spec['vn_id'] = TEMP_VN_ID
+        vn_temp_spec['ipv4_subnet'] = None
+        vn_temp_spec['virtual_gateway_ipv4'] = None
+        vn_temp_spec['virtual_gateway_ipv4_enabled'] = None
+        vn_temp_spec['ipv4_enabled'] = None
+        # change the bound_to VLAN to TEMP_VN_VLAN
+        for bound_to in vn_temp_spec['bound_to']:
+            bound_to['vlan_id'] = TEMP_VN_VLAN
+        del vn_temp_spec['id']
+        vn_temp_created = bp.post_item('virtual-networks', vn_temp_spec)
+        the_order.test_vn_id = vn_temp_created.json()['id']
+        the_order.test_vn_spec = vn_temp_spec
+        logger.info(f"Temporary VN {the_order.test_vn}:{the_order.test_vn_id=} created {vn_temp_created=}")
 
-    temp_vn_id = None
-    found_temp_vn_result = bp.get_item('virtual-networks')
-    found_temp_vn_list = [vn_data for vn_id, vn_data in found_temp_vn_result['virtual_networks'].items() if vn_data['label'] == TEMP_VN_LABEL]
-    if len(found_temp_vn_list):
-        temp_vn_id = found_temp_vn_list[0]['id']
-        logger.info(f"temp vn found: {temp_vn_id=}")
-        if found_temp_vn_list[0]['security_zone_id'] != temp_rz_id:
-            logger.error(f"Error: vn {TEMP_VN_LABEL} in a different Routing Zone")
-            return
-    else:
-        # temp vn not found. creating.
-        temp_vn_spec = {
-            "virtual_networks": [
-                {
-                    "virtual_gateway_ipv4_enabled": True,
-                    "vn_id": "203999",
-                    "vn_type": "vxlan",
-                    "svi_ips": [
-                    {
-                        "system_id": "2QKZLUzqCO0ZJ73Fb1I",
-                        "ipv4_mode": "enabled",
-                        "ipv4_addr": None,
-                        "ipv6_mode": "disabled",
-                        "ipv6_addr": None
-                    },
-                    {
-                        "system_id": "qCc9ps52vPppDp2b6rk",
-                        "ipv4_mode": "enabled",
-                        "ipv4_addr": None,
-                        "ipv6_mode": "disabled",
-                        "ipv6_addr": None
-                    }
-                    ],
-                    "virtual_gateway_ipv4": None,
-                    "ipv6_subnet": None,
-                    "bound_to": [
-                    {
-                        "system_id": "xwS1U1FnaNp41i0Haug",
-                        "access_switch_node_ids": [],
-                        "vlan_id": 3999
-                    }
-                    ],
-                    "vni_ids": [
-                        203999
-                    ],
-                    "reserved_vlan_id": None,
-                    "virtual_gateway_ipv6": None,
-                    "rt_policy": {
-                    "import_RTs": None,
-                    "export_RTs": None
-                    },
-                    "label": TEMP_VN_LABEL,
-                    "ipv4_enabled": None,
-                    "virtual_gateway_ipv6_enabled": None,
-                    "ipv6_enabled": None,
-                    "security_zone_id": temp_rz_id,
-                    "dhcp_service": "dhcpServiceDisabled"
-                }
-            ]        
-        }
-        temp_vn_result = bp.post_item('virtual-networks', temp_vn_spec)
-        logger.info(f"{temp_vn_result=}")
-        temp_vn_id = temp_vn_result['id']
+    logger.info(f"Ready execute: {the_order.summary()}")
 
-    # found the associated CT
-    found_ct_result = bp.query(f"node(id='{vn_old_id}').in_('vn_to_attach').node('ep_endpoint_policy', name='ep')")
-    found_ct_list = found_ct_result.ok_value
-    logger.info(f"{found_ct_list=}")
-    # found_ct = found_ct_result.ok_value
-    # if len(found_ct) == 0:
-    #     logger.info(f"CT not found")
-    #     return
-    # logger.info(f"CT found: {found_ct=}")
+    # replace CTs with test VN
+    for res in bp.swap_ct_vns(the_order.target_vn_id, the_order.test_vn_id):
+        logger.info(res)
 
+    # delete the original VN
+    deleted = bp.delete_item(f"virtual-networks/{the_order.target_vn_id}")
+    logger.info(f"VN {the_order.target_vn}:{the_order.target_vn_id} deleted: {deleted=}")
 
+    # create the original VN in the target RZ
+    the_order.target_vn_spec['security_zone_id'] = the_order.terget_rz_id
+    created = bp.post_item('virtual-networks', the_order.target_vn_spec)
+    the_order.target_vn_id = created.json()['id']
+    logger.info(f"VN {the_order.target_vn}:{the_order.target_vn_id} created: {created=} under RZ:{the_order.target_rz}")
 
+    # restore the CTs
+    logger.info(f"Restoring CTs with new VN {the_order.test_vn}:{the_order.test_vn_id}")
+    for res in bp.swap_ct_vns(the_order.test_vn_id, the_order.target_vn_id):
+        logger.info(res)
 
-    pass
+    # remove the temporary VN
+    deleted = bp.delete_item(f"virtual-networks/{the_order.test_vn_id}")
+    logger.info(f"Temporary VN {the_order.test_vn}:{the_order.test_vn_id} deleted: {deleted=}")
 
-
+    logger.info(f"Order completed: {the_order.summary()}")
+    session.logout()
 
 if __name__ == "__main__":
     cli()

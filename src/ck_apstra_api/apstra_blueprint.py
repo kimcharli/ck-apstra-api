@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from typing import List, Optional
+from typing import Generator, List, Optional
 import uuid
 from enum import StrEnum
 from functools import cache
@@ -9,7 +9,7 @@ from functools import cache
 from result import Err, Result, Ok
 
 from ck_apstra_api.apstra_session import CkApstraSession
-from ck_apstra_api.apstra_session import prep_logging
+from ck_apstra_api.apstra_session import prep_logging, deep_copy
 
 
 class CkEnum(StrEnum):
@@ -44,7 +44,8 @@ class CkApstraBlueprint:
         self.session = session
         self.label = label
         self.id = id
-        self.logger = logging.getLogger(f"CkApstraBlueprint({label})")
+        self.log_prefix = f"CkApstraBlueprint({label})"
+        self.logger = logging.getLogger(self.log_prefix)
         if id:
             this_blueprint = self.session.get_items(f"blueprints/{id}")
             self.label = this_blueprint['label']
@@ -376,6 +377,19 @@ class CkApstraBlueprint:
         Patch node data
         '''
         return self.session.session.patch(f"{self.url_prefix}/nodes/{node}", json=patch_spec, params=params)
+
+    def patch_item(self, item: str, patch_spec, params=None):
+        '''
+        Patch an item (generic)
+        '''
+        return self.session.session.patch(f"{self.url_prefix}/{item}", json=patch_spec, params=params)
+
+    def delete_item(self, item: str, params=None):
+        '''
+        Patch an item (generic)
+        '''
+        return self.session.session.delete(f"{self.url_prefix}/{item}", params=params)
+
 
     def patch_nodes(self, patch_spec, params=None):
         '''
@@ -720,3 +734,35 @@ class CkApstraBlueprint:
         items = self.session.get_items(f"blueprints/{self.id}/{item}")
         return items
 
+
+    def swap_ct_vns(self, from_vn_id, to_vn_id) -> Generator[any, None, None]:
+        '''
+        Swap the VLANs (VN) of the CT        
+        '''
+        log_prefix = f"{self.log_prefix}::swap_ct_vns({from_vn_id=}, {to_vn_id=})"
+        endpoint_policies = self.get_item('endpoint-policies')['endpoint_policies']
+        for ct in endpoint_policies:
+            attr = ct['attributes']
+            if ct['policy_type_name'] == 'AttachSingleVLAN':
+                if attr['vn_node_id'] == from_vn_id:
+                    modified_attributes = deep_copy(attr)
+                    modified_attributes['vn_node_id'] = to_vn_id
+                    patched = self.patch_item(f"endpoint-policies/{ct['id']}", {'attributes': modified_attributes})
+                    yield f"{log_prefix} patched: {ct['id']=} {attr=} {patched=}"
+
+                # logger.info(f"CT - not to process: {ct['id']=} {ct['policy_type_name']} {attr=}")
+            elif ct['policy_type_name'] == 'AttachMultipleVLAN':
+                if from_vn_id in attr['tagged_vn_node_ids']:
+                    modified_attributes = deep_copy(attr)
+                    modified_attributes['tagged_vn_node_ids'] = [x for x in attr['tagged_vn_node_ids'] if x != from_vn_id]
+                    modified_attributes['tagged_vn_node_ids'].append(to_vn_id)
+                    patched = self.patch_item(f"endpoint-policies/{ct['id']}", {'attributes': modified_attributes})
+                    yield f"{log_prefix} patched: {ct['id']=} {attr=} {patched=}"
+                elif from_vn_id == attr['untagged_vn_node_id']:
+                    modified_attributes = deep_copy(attr)
+                    modified_attributes['untagged_vn_node_id'] = to_vn_id
+                    patched = self.patch_item(f"endpoint-policies/{ct['id']}", {'attributes': modified_attributes})
+                    yield f"{log_prefix} patched: {ct['id']=} {attr=} {patched=}"
+                else:
+                    # yield f"{log_prefix} - not to process: {ct['id']=} {ct['policy_type_name']} {attr=}")
+                    pass

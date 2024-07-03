@@ -40,7 +40,7 @@ class CustomFormatter(logging.Formatter):
 def prep_logging(log_level: str = 'INFO', log_name: str = 'root'):
     '''Configure logging options'''
     timestamp = datetime.now().strftime("%Y%m%d-%H:%H:%S")
-    logger = logging.getLogger()
+    logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
 
     ch = logging.StreamHandler()
@@ -48,6 +48,14 @@ def prep_logging(log_level: str = 'INFO', log_name: str = 'root'):
     ch.setFormatter(CustomFormatter())
     logger.addHandler(ch)
     return logger
+
+def deep_copy(obj):
+    """Retun nested deep copy of an object"""
+    if type(obj) is dict:
+        return {k: deep_copy(v) for k, v in obj.items()}
+    if type(obj) is list:
+        return [deep_copy(v) for v in obj]
+    return obj
 
 
 # https client session to Apstra Controller
