@@ -329,7 +329,7 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
 
     from result import Ok, Err
 
-    logger = prep_logging('INFO', 'immigrate_vn()')
+    logger = prep_logging('INFO', 'relocate_vn()')
     logger.info(f"Took order {blueprint=} {virtual_network=} {routing_zone=}")
 
     # the temporary VN has prefix 'x-' and the same name as the original VN
@@ -398,6 +398,8 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
         vn_temp_spec['virtual_gateway_ipv4'] = None
         vn_temp_spec['virtual_gateway_ipv4_enabled'] = None
         vn_temp_spec['ipv4_enabled'] = None
+        if 'reserved_vlan_id' in vn_temp_spec:
+            vn_temp_spec['reserved_vlan_id'] = TEMP_VN_VLAN
         # change the bound_to VLAN to TEMP_VN_VLAN
         for bound_to in vn_temp_spec['bound_to']:
             bound_to['vlan_id'] = TEMP_VN_VLAN

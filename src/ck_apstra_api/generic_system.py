@@ -2,6 +2,7 @@
 import logging
 from pathlib import Path
 from dataclasses import dataclass, fields, field
+import time
 from types import GeneratorType
 from typing import Generator, List, Optional, Any, TypeVar, Annotated, Dict, ClassVar
 from collections import Counter, defaultdict
@@ -317,22 +318,26 @@ class LinkGroup(DataInit):
 
         if not self.lag_mode:
             # None or ''
-            yield Ok(f"{log_prefix} {self.ae=} is not for lag. Skipping")
+            yield Ok(f"{log_prefix} not for lag. Skipping")
             return
         
         if self.fetched_ae_id:
-            yield Ok(f"{log_prefix} {self.ae=} is already lag {self.fetched_ae_id}. Skipping")
+            yield Ok(f"{log_prefix} already lag {self.fetched_ae_id}. Skipping")
             return
 
         lag_spec = {
             'links': {x.fetched_link_id: {'group_label': self.ae, 'lag_mode': self.lag_mode} for x in self.members}
         }
+        if len(lag_spec['links']) == 0:
+            yield Err(f"{log_prefix} has no live links. Skipping {lag_spec=}")
+            return
         # update LACP
         lag_updated = self.bp.patch_leaf_server_link_labels(lag_spec)
         if lag_updated:
-            yield Err(f"Unexpected return: LACP updated for link group {self.ae} {self.lag_mode=} in blueprint {self.bp.label}: {lag_updated}")
+            # It is expected to be None
+            yield Err(f"Unexpected return: LACP updated {self.lag_mode=} in blueprint {self.bp.label}: {lag_updated}")
         else:
-            yield Err(f"{log_prefix} {self.ae=} has no ae_id. Skipping")
+            yield Ok(f"{log_prefix} done")
 
     @property
     def link_spec(self):
@@ -512,6 +517,7 @@ class GenericSystem(DataInit):
         if isinstance(generic_system_created_result, Err):
             yield Err(f"{log_prefix} failed to create {generic_system_created_result.err_value}")
             return
+        time.sleep(1)
         yield Ok(f"{log_prefix} created")
 
     def form_lacp(self):
