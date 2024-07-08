@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from typing import Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 import uuid
 from enum import StrEnum
 from functools import cache
@@ -766,3 +766,79 @@ class CkApstraBlueprint:
                 else:
                     # yield f"{log_prefix} - not to process: {ct['id']=} {ct['policy_type_name']} {attr=}")
                     pass
+
+    def get_temp_vn(self, virtual_network: str) -> Generator[Dict[str, Any], None, None]:
+        '''
+        Build and return the temporary virtual network from the source virtual network
+        '''
+        log_prefix = f"{self.log_prefix}::get_temp_vn({virtual_network=})"
+
+        temp_vni_id = 204094
+        temp_vlan_id = 4094
+        temp_vn_label = None
+        temp_vlan_label_index = 4094
+
+        found_vns_dict = self.get_item('virtual-networks')['virtual_networks']
+        found_szs_dict = self.get_item('security-zones')['items']
+
+        # pick the target VN data
+        target_vn_node = [vn for vn in found_vns_dict.values() if vn['label'] == virtual_network]    
+        if len(target_vn_node) == 0:
+            yield f"{log_prefix} - Virtual Network not found"
+            return
+
+        # select the temporary VNI ID
+        vnis = [int(vn['vn_id']) for vn in found_vns_dict.values()]
+        vni_in_szs = [sz['vni_id'] for sz in found_szs_dict.values()]
+        vnis = sum([vnis, vni_in_szs], [])
+        # yield f"{log_prefix} - {vnis=} {temp_vni_id=}"
+        while True:
+            # yield f"{log_prefix} - {temp_vni_id not in vnis=}"
+            if temp_vni_id not in vnis:
+                break
+            temp_vni_id -= 1 
+        else:
+            yield f"{log_prefix} - Failed to select Temporary VNI ID"
+            return
+        
+        # select the temporary VLAN ID
+        vlans = [vn.get('reserved_vlan_id') for vn in found_vns_dict.values()]
+        vlan_in_szs = [sz['vlan_id'] for sz in found_szs_dict.values()]
+        vlans = sum([vlans, vlan_in_szs], [])
+        while True:
+            if temp_vlan_id not in vlans:
+                break
+            temp_vlan_id -= 1
+        else:
+            yield f"{log_prefix} - Failed to select Temporary VLAN ID"
+            return
+
+        # select the temporary VLAN Label
+        vlan_names = [vn['label'] for vn in found_vns_dict.values()]
+        while True:
+            name = f"temp-vn-{temp_vlan_label_index}"
+            if name not in vlan_names:
+                temp_vn_label = name
+                break
+            temp_vlan_label_index -= 1
+        else:
+            yield f"{log_prefix} - Failed to select Temporary VLAN ID"
+            return
+        
+        temp_vn_spec = deep_copy(target_vn_node[0])
+        temp_vn_spec['label'] = temp_vn_label
+        temp_vn_spec['vn_id'] = str(temp_vni_id)
+        temp_vn_spec['ipv4_subnet'] = None
+        temp_vn_spec['virtual_gateway_ipv4'] = None
+        temp_vn_spec['virtual_gateway_ipv4_enabled'] = None
+        temp_vn_spec['ipv4_enabled'] = None
+        if 'reserved_vlan_id' in temp_vn_spec:
+            temp_vn_spec['reserved_vlan_id'] = temp_vlan_id
+        # change the bound_to VLAN to TEMP_VN_VLAN
+        for bound_to in temp_vn_spec['bound_to']:
+            bound_to['vlan_id'] = temp_vlan_id
+        del temp_vn_spec['id']
+        vn_temp_created = self.post_item('virtual-networks', temp_vn_spec)
+        temp_vn_spec['id'] = vn_temp_created.json()['id']
+        # yield f"{log_prefix} - {temp_vn_spec=} {vn_temp_created=} {vn_temp_created.content=} {vn_temp_created.json()=}"
+        yield temp_vn_spec

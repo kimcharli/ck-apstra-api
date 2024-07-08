@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.7 2024-07-08
+- revise relocate-vn with get_temp_vn
+
 ## 0.4.3 2024-07-01
 - fix prep_logging to return logger
 

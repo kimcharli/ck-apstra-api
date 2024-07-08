@@ -324,7 +324,7 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
     This CT handling trouble can be mitigated with a temporary VN to replace the original VN in the CT. Later, to be reversed later.
 
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging, deep_copy
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
     from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
 
     from result import Ok, Err
@@ -332,11 +332,6 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
     logger = prep_logging('INFO', 'relocate_vn()')
     logger.info(f"Took order {blueprint=} {virtual_network=} {routing_zone=}")
 
-    # the temporary VN has prefix 'x-' and the same name as the original VN
-    TEMP_VN_LABEL = f"x-{virtual_network}"[0:32]
-    TEMP_VN_ID = '203999'
-    TEMP_VN_VLAN = 3999
-    NODE_NAME_VN = 'vn'
     NODE_NAME_RZ = 'rz'
 
     host_ip = ctx.obj['HOST_IP']
@@ -352,7 +347,7 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
         target_vn: str = virtual_network
         target_vn_id: str = None
         target_vn_spec: dict = None
-        test_vn: str = TEMP_VN_LABEL
+        test_vn: str = None
         test_vn_id: str = None
         test_vn_spec: dict = None
         target_rz: str = routing_zone
@@ -381,35 +376,15 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
         logger.warning(f"Virtual Network {virtual_network} already in the target Routing Zone {routing_zone}")
         return
 
-    # pick the test VN data
-    test_vn_node = [vn for vn in found_vns_dict.values() if vn['label'] == the_order.test_vn]
-    if len(test_vn_node):
-        the_order.test_vn_spec = test_vn_node[0]
-        the_order.test_vn_id = the_order.test_vn_spec['id']
-        logger.info(f"Temporary VN {the_order.test_vn} found")
-    else:
-        logger.info(f"Temporary VN {the_order.test_vn} not found. Creating...")
-        # starts 
-        # create a temporary VN in the same RZ of the original VN
-        vn_temp_spec = deep_copy(the_order.target_vn_spec)
-        vn_temp_spec['label'] = TEMP_VN_LABEL
-        vn_temp_spec['vn_id'] = TEMP_VN_ID
-        vn_temp_spec['ipv4_subnet'] = None
-        vn_temp_spec['virtual_gateway_ipv4'] = None
-        vn_temp_spec['virtual_gateway_ipv4_enabled'] = None
-        vn_temp_spec['ipv4_enabled'] = None
-        if 'reserved_vlan_id' in vn_temp_spec:
-            vn_temp_spec['reserved_vlan_id'] = TEMP_VN_VLAN
-        # change the bound_to VLAN to TEMP_VN_VLAN
-        for bound_to in vn_temp_spec['bound_to']:
-            bound_to['vlan_id'] = TEMP_VN_VLAN
-        del vn_temp_spec['id']
-        vn_temp_created = bp.post_item('virtual-networks', vn_temp_spec)
-        the_order.test_vn_id = vn_temp_created.json()['id']
-        the_order.test_vn_spec = vn_temp_spec
-        logger.info(f"Temporary VN {the_order.test_vn}:{the_order.test_vn_id=} created {vn_temp_created=}")
+    for res in bp.get_temp_vn(the_order.target_vn):
+        if isinstance(res, dict):
+            the_order.test_vn_spec = res
+            the_order.test_vn_id = res['id']
+            the_order.test_vn = res['label']
+        else:
+            logger.info(res)
 
-    logger.info(f"Ready execute: {the_order.summary()}")
+    logger.info(f"Ready to relocate vn {virtual_network}: {the_order.summary()}")
 
     # replace CTs with test VN
     for res in bp.swap_ct_vns(the_order.target_vn_id, the_order.test_vn_id):
@@ -436,6 +411,34 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
 
     logger.info(f"Order completed: {the_order.summary()}")
     session.logout()
+
+
+@cli.command()
+@click.option('--virtual-network', type=str, required=True, help='Subject Virtual Network name')
+@click.option('--routing-zone', type=str, required=True, help='Destination Routing Zone name')
+@click.option('--blueprint', type=str, required=True, help='Blueprint name')
+@click.pass_context
+def test_get_temp_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
+    """
+    Test get_temp_vn
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+
+    logger = prep_logging('INFO', 'test_get_temp_vn()')
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    bp = CkApstraBlueprint(session, blueprint)
+
+    for res in bp.get_temp_vn(virtual_network):
+        if isinstance(res, dict):
+            temp_vn = res
+        else:
+            logger.info(res)
 
 if __name__ == "__main__":
     cli()

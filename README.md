@@ -25,7 +25,7 @@ ckim@ckim-mbp:test % source .venv/bin/activate
 
 ```
 (.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --version 
-ck_apstra_api, 0.4.4
+ck_apstra_api, 0.4.7
 (.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
 ```
 
@@ -49,6 +49,7 @@ Commands:
   export-generic-system  Export generic systems to a CSV file
   import-generic-system  Import generic systems from a CSV file
   relocate-vn            Move a Virtual Network to the target Routing Zone
+  test-get-temp-vn       Test get_temp_vn
 (.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
 ```
 
@@ -168,6 +169,27 @@ def import_generic_system(ctx, gs_csv_in: str):
 ## Move a Virtual Network to other Routing Zone
 Currenly only takes care of VLANs.
 
+### help
+```
+ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli relocate-vn --help                                                        
+Usage: ck-cli relocate-vn [OPTIONS]
+
+  Move a Virtual Network to the target Routing Zone
+
+  The virtual network move involves deleting and recreating the virtual
+  network in the target routing zone. To delete the virtual network, the
+  associated CT should be taken care of. Either deassign and delete them and
+  later do reverse. This CT handling trouble can be mitigated with a temporary
+  VN to replace the original VN in the CT. Later, to be reversed later.
+
+Options:
+  --virtual-network TEXT  Subject Virtual Network name  [required]
+  --routing-zone TEXT     Destination Routing Zone name  [required]
+  --blueprint TEXT        Blueprint name  [required]
+  --help                  Show this message and exit.
+ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+```
+
 ### run example
 ```
 (.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --host-ip 10.85.192.45 --host-password admin relocate-vn --virtual-network vn2222 --blueprint terra --routing-zone vrf
@@ -202,19 +224,14 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
     This CT handling trouble can be mitigated with a temporary VN to replace the original VN in the CT. Later, to be reversed later.
 
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging, deep_copy
+from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
     from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
 
     from result import Ok, Err
 
-    logger = prep_logging('INFO', 'immigrate_vn()')
+    logger = prep_logging('INFO', 'relocate_vn()')
     logger.info(f"Took order {blueprint=} {virtual_network=} {routing_zone=}")
 
-    # the temporary VN has prefix 'x-' and the same name as the original VN
-    TEMP_VN_LABEL = f"x-{virtual_network}"[0:32]
-    TEMP_VN_ID = '203999'
-    TEMP_VN_VLAN = 3999
-    NODE_NAME_VN = 'vn'
     NODE_NAME_RZ = 'rz'
 
     host_ip = ctx.obj['HOST_IP']
@@ -230,7 +247,7 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
         target_vn: str = virtual_network
         target_vn_id: str = None
         target_vn_spec: dict = None
-        test_vn: str = TEMP_VN_LABEL
+        test_vn: str = None
         test_vn_id: str = None
         test_vn_spec: dict = None
         target_rz: str = routing_zone
@@ -259,33 +276,15 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
         logger.warning(f"Virtual Network {virtual_network} already in the target Routing Zone {routing_zone}")
         return
 
-    # pick the test VN data
-    test_vn_node = [vn for vn in found_vns_dict.values() if vn['label'] == the_order.test_vn]
-    if len(test_vn_node):
-        the_order.test_vn_spec = test_vn_node[0]
-        the_order.test_vn_id = the_order.test_vn_spec['id']
-        logger.info(f"Temporary VN {the_order.test_vn} found")
-    else:
-        logger.info(f"Temporary VN {the_order.test_vn} not found. Creating...")
-        # starts 
-        # create a temporary VN in the same RZ of the original VN
-        vn_temp_spec = deep_copy(the_order.target_vn_spec)
-        vn_temp_spec['label'] = TEMP_VN_LABEL
-        vn_temp_spec['vn_id'] = TEMP_VN_ID
-        vn_temp_spec['ipv4_subnet'] = None
-        vn_temp_spec['virtual_gateway_ipv4'] = None
-        vn_temp_spec['virtual_gateway_ipv4_enabled'] = None
-        vn_temp_spec['ipv4_enabled'] = None
-        # change the bound_to VLAN to TEMP_VN_VLAN
-        for bound_to in vn_temp_spec['bound_to']:
-            bound_to['vlan_id'] = TEMP_VN_VLAN
-        del vn_temp_spec['id']
-        vn_temp_created = bp.post_item('virtual-networks', vn_temp_spec)
-        the_order.test_vn_id = vn_temp_created.json()['id']
-        the_order.test_vn_spec = vn_temp_spec
-        logger.info(f"Temporary VN {the_order.test_vn}:{the_order.test_vn_id=} created {vn_temp_created=}")
+    for res in bp.get_temp_vn(the_order.target_vn):
+        if isinstance(res, dict):
+            the_order.test_vn_spec = res
+            the_order.test_vn_id = res['id']
+            the_order.test_vn = res['label']
+        else:
+            logger.info(res)
 
-    logger.info(f"Ready execute: {the_order.summary()}")
+    logger.info(f"Ready to relocate vn {virtual_network}: {the_order.summary()}")
 
     # replace CTs with test VN
     for res in bp.swap_ct_vns(the_order.target_vn_id, the_order.test_vn_id):
