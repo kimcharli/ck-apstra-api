@@ -314,6 +314,25 @@ from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
 
 ```
 
+## list systems
+
+```
+(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % python src/ck_apstra_api/cli.py export-systems --help
+Usage: cli.py export-systems [OPTIONS]
+
+  Export systems of a blueprint to a CSV file
+
+  The CSV file will have below columns: system, asn, lo0, rack, device_profile
+
+Options:
+  --bp-name TEXT      Blueprint name
+  --systems-csv TEXT  The CSV file path to create  [required]
+  --help              Show this message and exit.
+(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % python src/ck_apstra_api/cli.py export-systems --systems-csv ~/Downloads/system.csv
+2024-07-09 19:27:19,866 - INFO     - export_systems() - systems_csv_path='/Users/ckim/Downloads/system.csv' writing to /Users/ckim/Downloads/system.csv (cli.py:276)
+(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+```
+
 
 ## Misc
 

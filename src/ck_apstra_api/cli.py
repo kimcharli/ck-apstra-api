@@ -1,5 +1,5 @@
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict, fields
 from functools import cache
 from pathlib import Path
 import click
@@ -230,6 +230,82 @@ def check_blueprint(ctx, bp_name: str):
         logger.warning(f"Blueprint {bp_name} not found")
         
     session.logout()
+
+
+
+@dataclass
+class SystemsData:
+    system: str
+    asn: str
+    lo0: str
+    rack: str
+    device_profile: str
+
+    def __init__(self, system_input: dict):
+        self.system = system_input['system']['label']
+        self.asn = system_input['domain']['domain_id'] if system_input['domain'] else None
+        self.lo0 = system_input['loopback']['ipv4_addr'] if system_input['loopback'] else None
+        self.rack = system_input['rack']['label'] if system_input['rack'] else None
+        self.device_profile = system_input['interface_map']['device_profile_id'] if system_input['interface_map'] else None
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--systems-csv', type=str, required=True, help='The CSV file path to create')
+@click.pass_context
+def export_systems(ctx, bp_name, systems_csv):
+    """
+    Export systems of a blueprint to a CSV file
+
+    The CSV file will have below columns:
+    system, asn, lo0, rack, device_profile
+    
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+    logger = prep_logging('DEBUG', 'export_systems()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    bp = CkApstraBlueprint(session, bp_name)
+    systems_csv_path = os.path.expanduser(systems_csv)
+    logger.info(f"{systems_csv_path=} writing to {systems_csv_path}")
+    """
+    TODO: implement tags
+        optional(
+            node(name='system').in_('tag').node(name='tag')
+            )
+    """
+    systems_query = """match(
+        node('system', name='system'),
+        optional(
+            node(name='system').in_('composed_of_systems').node('domain', name='domain')
+        ),
+        optional(
+            node(name='system').out('hosted_interfaces').node('interface', if_name='lo0.0', name='loopback')
+            ),
+        optional(
+            node(name='system').out('part_of_rack').node('rack', name='rack')
+            ),
+        optional(
+            node(name='system').out('interface_map').node('interface_map', name='interface_map')
+            )
+    )"""
+    systems_rest = bp.query(systems_query)
+    systems = systems_rest.ok_value
+    with open(systems_csv_path, 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([field.name for field in fields(SystemsData)])
+        for system in systems:
+            system_data = SystemsData(system)
+            # logger.info(f"{system_data}")    
+            writer.writerow(asdict(system_data).values())
+
+
 
 
 
