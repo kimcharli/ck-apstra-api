@@ -802,8 +802,17 @@ class CkApstraBlueprint:
             return
         
         # select the temporary VLAN ID
-        vlans = [vn.get('reserved_vlan_id') for vn in found_vns_dict.values()]
-        vlan_in_szs = [sz['vlan_id'] for sz in found_szs_dict.values()]
+        vlans = []
+        for vn in found_vns_dict.values():
+            if vn.get('reserved_vlan_id', None):
+                vlans.append(vn['reserved_vlan_id'])
+                continue
+            # 'reserved_vlan_id' is not set. append the vlan_id within bound_to
+            for bound_to in vn['bound_to']:
+                if (vlan_id := bound_to['vlan_id']):
+                    if vlan_id not in vlans:
+                        vlans.append(bound_to['vlan_id'])
+        vlan_in_szs = [sz['vlan_id'] for sz in found_szs_dict.values() if sz['vlan_id']]
         vlans = sum([vlans, vlan_in_szs], [])
         while True:
             if temp_vlan_id not in vlans:
