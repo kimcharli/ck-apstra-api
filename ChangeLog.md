@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.9 2024-07-09
+- import-generic-system sync system tags and links tags
+
 ## 0.4.8 2024-07-09
 - get_temp_vn now retrieve all the vlan_id within bound_to in addition to reserved_vlan_id
 

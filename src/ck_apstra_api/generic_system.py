@@ -174,6 +174,13 @@ class LinkMember(DataInit):
             self.fetched_switch_id = switch.id
             self.fetched_switch_intf_id = switch.interface_id(self.switch_ifname)
             # yield Ok(f"{log_prefix} link absent - switch({self.switch}:{self.fetched_switch_id}) {self.switch_ifname}:{self.fetched_switch_intf_id} {self.fetched_server_ifname=}")
+
+        # get the tags for the link
+        tags_result = self.bp.query(f"node(id='{self.fetched_link_id}').in_('tag').node('tag', name='tag')")
+        if isinstance(tags_result, Err):
+            yield Err(f"{log_prefix} Error: {tags_result.err_value}")
+        else:
+            self.fetched_tags_link = [tag['tag']['label'] for tag in tags_result.ok_value]
         yield Ok(f"{log_prefix} done {self}")
 
     @property
@@ -228,6 +235,16 @@ class LinkMember(DataInit):
         else:
             return None
 
+    def fix_tags(self):
+        """
+        Fix the tags for the link member
+        """
+        log_prefix = f"{self.log_prefix}::fix_tags()"
+        tags_to_add = [x for x in self.tags_link if x not in self.fetched_tags_link]
+        tags_to_remove = [x for x in self.fetched_tags_link if x not in self.tags_link]
+        if len(tags_to_add) or len(tags_to_remove):
+            patched = self.bp.post_tagging(self.fetched_link_id, tags_to_add, tags_to_remove)
+        yield Ok(f"{log_prefix} done - tags {self.tags_link}: added {tags_to_add}, removed {tags_to_remove}")
 @dataclass
 class LinkGroup(DataInit):
     """
@@ -381,6 +398,16 @@ class LinkGroup(DataInit):
                 'id': self.fetched_ae_id,
                 'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': False} for x in vlans_to_remove]
             }
+    
+    def fix_tags(self):
+        """
+        Fix the tags for the link group, and the link
+
+        Nothing in the link group to fix. Only the links
+        """        
+        for member in self.members:
+            for res in member.fix_tags():
+                yield res
 
 @dataclass
 class GenericSystem(DataInit):
@@ -449,6 +476,13 @@ class GenericSystem(DataInit):
                 yield Err(f"{log_prefix} Error: {tag_result.err_value}")
             tags = tag_result.ok_value
             self.fetched_server_tags = [tag['system_tag']['label'] for tag in tags]
+        # pull tags of the server
+        tags_result = apstra_bp.query(f"node(id='{self.gs_id}').in_('tag').node('tag', name='tag')")
+        if isinstance(tags_result, Err):
+            yield Err(f"{log_prefix} Error: {tags_result.err_value}")
+        else:
+             self.fetched_server_tags = [tag['tag']['label'] for tag in tags_result.ok_value]
+             yield Ok(f"{log_prefix} {self.fetched_server_tags=}")
 
         yield f"{log_prefix} done {self}"
 
@@ -552,6 +586,20 @@ class GenericSystem(DataInit):
             ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
         yield Ok(f"{self.log_prefix} done - {len(vlan_spec['application_points'])} vlans")
 
+
+    def fix_tags(self):
+        """
+        Fix the tags for the generic system, link group, and the link
+        """
+        tags_to_add = [x for x in self.tags_server if x not in self.fetched_server_tags]
+        tags_to_remove = [x for x in self.fetched_server_tags if x not in self.tags_server]
+        if len(tags_to_add) or len(tags_to_remove):
+            patched = self.bp.post_tagging(self.gs_id, tags_to_add, tags_to_remove)
+        for lg in self.link_groups:
+            for res in lg.fix_tags():
+                yield res
+        
+
 @dataclass
 class ServerBlueprint(DataInit):
     """
@@ -642,55 +690,13 @@ class ServerBlueprint(DataInit):
             for res in generic_system.add_vlans():
                 yield res
 
-
-# def add_tags(job_env: CkJobEnv, generic_system_label: str, generic_system_links_list: list):
-#     bp = job_env.main_bp
-def add_tags(apstra_bp, generic_system_label: str, generic_system_links_list: list) -> Result[str, str]:
-    bp = apstra_bp
-    link_id_num = 0
-    generic_system_node_result = bp.get_system_node_from_label(generic_system_label)
-    if isinstance(generic_system_node_result, Err):
-        logging.warning(f"add_tags skipping: {generic_system_node_result.err_value}")
-        return Err(f"add_tags {generic_system_label} not found in blueprint {bp.label}")
-    generic_system_node = generic_system_node_result.ok_value
-    if not generic_system_node:
-        return Err(f"add_tags {generic_system_label} not found in blueprint {bp.label}")
-    generic_system_id = generic_system_node['id']
-    for link in generic_system_links_list:
-        link_id_num += 1
-        group_label = f"link{link_id_num}"
-        gs_tags = link['gs_tags']
-        if len(gs_tags) > 0:
-            bp.post_tagging(generic_system_id, tags_to_add=gs_tags)            
-        # iterate over the 4 member interfaces        
-        for member_number in range(4):
-            member_number += 1
-            # take care of old one like label1, label2, label3, label4
-            sw_label = link[f"label{member_number}"] if f"label{member_number}" in link else link[f"switch{member_number}"]
-            sw_ifname = link[f"ifname{member_number}"] if f"ifname{member_number}" in link else link[f"switch_intf{member_number}"]
-            gs_ifname = link[f"gs_ifname{member_number}"] if f"gs_ifname{member_number}" in link else link[f"server_intf{member_number}"]
-            member_tags = link[f"tags{member_number}"]  if f"tags{member_number}" in link else [] # list of string(tag)
-            # the switch label and the interface should be defined. If not, skip
-            if not sw_label or not sw_ifname:
-                continue
-            # the switch interface name should be legit
-            if sw_ifname[:2] not in ['et', 'xe', 'ge']:
-                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface name {sw_ifname}")
-                continue
-            switch_link_nodes_result = bp.get_switch_interface_nodes(sw_label, sw_ifname)
-            if isinstance(switch_link_nodes_result, Err):
-                return Err(f"add_tags Err: {sw_label}:{sw_ifname} not found in blueprint {bp.label}")
-            switch_link_nodes = switch_link_nodes_result.ok_value
-            if switch_link_nodes is None or len(switch_link_nodes) == 0:
-                logging.warning(f"Skipping: Generic system {generic_system_label} has invalid interface {sw_label}:{sw_ifname}")
-                continue
-            link_node_id = switch_link_nodes[0][CkEnum.LINK]['id']
-            # logging.debug(f"{member_tags=}")
-            if len(member_tags) > 0:
-                logging.debug(f"{member_tags=}")
-                bp.post_tagging(link_node_id, tags_to_add=member_tags)
-                
-    return Ok('done')
+    def fix_tags(self):
+        """
+        Fix the tags for the generic system, link group, and the link
+        """
+        for generic_system in self.servers.values():
+            for res in generic_system.fix_tags():
+                yield res
 
 
 def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: list) -> Generator[Result[str, str], Any, Any]:
@@ -757,6 +763,11 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
             yield res
     yield Ok(f"{func_name} vlans added {ServerBlueprint._bps=}")
 
+    # fix the tags
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for res in sbp.fix_tags():
+            yield res
+    yield Ok(f"{func_name} tags fixed {ServerBlueprint._bps=}")
 
 
 def get_generic_systems(apstra_session: CkApstraSession, out_csv: str ) -> Generator[Result[str, str], Any, Any]:

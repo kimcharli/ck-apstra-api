@@ -194,7 +194,7 @@ class CkApstraBlueprint:
                 node('tag', name='{CkEnum.TAG}').out().node(name='{CkEnum.LINK}')
             )
         )"""
-        # self.logger.warning(f"get_server_interface_nodes() {system_label=} {interface_query=}")
+        # self.logger.warning(f"get_server_interface_nodes() {generic_system_label=} {interface_query=}")
         # query_result = self.query(interface_query)
         return self.query(interface_query)
 
