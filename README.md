@@ -12,11 +12,11 @@ python3.11 or higher
 ## prepare venv
 
 ```
-ckim@ckim-mbp:sandbox % mkdir test                                                                                                 
+ckim@ckim-mbp:sandbox % mkdir test
 ckim@ckim-mbp:sandbox % cd test             
 ckim@ckim-mbp:test % python -m venv .venv                      
 ckim@ckim-mbp:test % source .venv/bin/activate
-(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.4.2
+(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.4.11
 ...                                                                                             
 (.venv) ckim@ckim-mbp:test % 
 ```
@@ -24,13 +24,13 @@ ckim@ckim-mbp:test % source .venv/bin/activate
 ## help commands
 
 ```
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --version 
-ck_apstra_api, 0.4.7
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --version
+ck_apstra_api, 0.4.11
+(.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 
 ```
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli          
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --help                                                                                                                
 Usage: ck-cli [OPTIONS] COMMAND [ARGS]...
 
   A CLI tool for interacting with ck-apstra-api
@@ -46,11 +46,13 @@ Options:
 Commands:
   check-apstra           Test the connectivity to the server
   check-blueprint        Test the connectivity to the blueprint
+  export-blueprint       Export a blueprint into a json file The...
   export-generic-system  Export generic systems to a CSV file
+  export-systems         Export systems of a blueprint to a CSV file
   import-generic-system  Import generic systems from a CSV file
   relocate-vn            Move a Virtual Network to the target Routing Zone
   test-get-temp-vn       Test get_temp_vn
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api %  
 ```
 
 ## build generic system
@@ -69,7 +71,7 @@ Commands:
 ### run example
 
 ```
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --host-ip 10.85.192.45 --host-password admin import-generic-system --gs-csv-in ~/Downloads/gs_sample.csv
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --host-ip 10.85.192.45 --host-password admin import-generic-system --gs-csv-in ~/Downloads/gs_sample.csv
 2024-06-29 17:51:43,445 - INFO     - import_generic_system - add_generic_systems ServerBlueprint._bps={'terra': ServerBlueprint(blueprint='terra')} (cli.py:246)
 2024-06-29 17:51:43,445 - INFO     - import_generic_system - ServerBlueprint:fetch_apstra() self.blueprint='terra' (cli.py:246)
 2024-06-29 17:51:43,956 - INFO     - import_generic_system - LinkMember(server_1:xe-0/0/11:eth0)::fetch_apstra() done LinkMember(line='1', speed='10G', ifname='eth0', switch='server_1', switch_ifname='xe-0/0/11', tags_link=[], comment='', fetched_server_ifname=None, fetched_server_intf_id=None, fetched_switch_id='2QKZLUzqCO0ZJ73Fb1I', fetched_switch_intf_id=None, fetched_tags_link=None, fetched_link_id=None) (cli.py:246)
@@ -114,7 +116,7 @@ Commands:
 2024-06-29 17:51:59,267 - INFO     - import_generic_system - GenericSystem(single-home-1) done - 1 vlans (cli.py:246)
 2024-06-29 17:51:59,524 - INFO     - import_generic_system - GenericSystem(dual-home-1) done - 1 vlans (cli.py:246)
 2024-06-29 17:51:59,524 - INFO     - import_generic_system - add_generic_systems vlans added ServerBlueprint._bps={'terra': ServerBlueprint(blueprint='terra')} (cli.py:246)
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 
 ### code example
@@ -171,7 +173,7 @@ Currenly only takes care of VLANs.
 
 ### help
 ```
-ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli relocate-vn --help                                                        
+ckim@ckim-mbp:ck-apstra-api % ck-cli relocate-vn --help                                                        
 Usage: ck-cli relocate-vn [OPTIONS]
 
   Move a Virtual Network to the target Routing Zone
@@ -187,12 +189,12 @@ Options:
   --routing-zone TEXT     Destination Routing Zone name  [required]
   --blueprint TEXT        Blueprint name  [required]
   --help                  Show this message and exit.
-ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+ckim@ckim-mbp:ck-apstra-api % 
 ```
 
 ### run example
 ```
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % ck-cli --host-ip 10.85.192.45 --host-password admin relocate-vn --virtual-network vn2222 --blueprint terra --routing-zone vrf
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --host-ip 10.85.192.45 --host-password admin relocate-vn --virtual-network vn2222 --blueprint terra --routing-zone vrf
 2024-07-03 18:47:07,957 - INFO     - immigrate_vn() - Took order blueprint='terra' virtual_network='vn2222' routing_zone='vrf' (cli.py:333)
 2024-07-03 18:47:09,195 - INFO     - immigrate_vn() - Temporary VN x-vn2222 not found. Creating... (cli.py:391)
 2024-07-03 18:47:10,208 - INFO     - immigrate_vn() - Temporary VN x-vn2222:the_order.test_vn_id='mTlYxQM-bvG1oP6mhZQ' created vn_temp_created=<Response [201]> (cli.py:408)
@@ -204,7 +206,7 @@ ck-apstra-apickim@ckim-mbp:ck-apstra-api %
 2024-07-03 18:47:16,414 - INFO     - immigrate_vn() - CkApstraBlueprint(terra)::swap_ct_vns(from_vn_id='mTlYxQM-bvG1oP6mhZQ', to_vn_id='tzPJy0Myr5_b2pP9x1M') patched: ct['id']='1604b264-fa4a-46ec-a47f-1d237b2c5a3f' attr={'tag_type': 'vlan_tagged', 'vn_node_id': 'mTlYxQM-bvG1oP6mhZQ'} patched=<Response [204]> (cli.py:429)
 2024-07-03 18:47:17,538 - INFO     - immigrate_vn() - Temporary VN x-vn2222:mTlYxQM-bvG1oP6mhZQ deleted: deleted=<Response [204]> (cli.py:433)
 2024-07-03 18:47:17,538 - INFO     - immigrate_vn() - Order completed: Order: self.target_vn='vn2222' self.target_vn_id='tzPJy0Myr5_b2pP9x1M' self.test_vn='x-vn2222' self.test_vn_id='mTlYxQM-bvG1oP6mhZQ' self.target_rz='vrf' self.terget_rz_id='S2WY6qMrf9J6cvoZfeY' (cli.py:435)
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 
 
@@ -317,7 +319,7 @@ from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
 ## list systems
 
 ```
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % python src/ck_apstra_api/cli.py export-systems --help
+(.venv) ckim@ckim-mbp:ck-apstra-api % python src/ck_apstra_api/cli.py export-systems --help
 Usage: cli.py export-systems [OPTIONS]
 
   Export systems of a blueprint to a CSV file
@@ -328,10 +330,29 @@ Options:
   --bp-name TEXT      Blueprint name
   --systems-csv TEXT  The CSV file path to create  [required]
   --help              Show this message and exit.
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % python src/ck_apstra_api/cli.py export-systems --systems-csv ~/Downloads/system.csv
+(.venv) ckim@ckim-mbp:ck-apstra-api % python src/ck_apstra_api/cli.py export-systems --systems-csv ~/Downloads/system.csv
 2024-07-09 19:27:19,866 - INFO     - export_systems() - systems_csv_path='/Users/ckim/Downloads/system.csv' writing to /Users/ckim/Downloads/system.csv (cli.py:276)
-(.venv) ck-apstra-apickim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
+
+## export blueprint
+```
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli export-blueprint --help                                      
+Usage: ck-cli export-blueprint [OPTIONS]
+
+  Export a blueprint into a json file The blueprint label -
+  job_env.main_blueprint_name The json file - job_env.bp_json_file
+
+Options:
+  --bp-name TEXT    Blueprint name
+  --json-file TEXT  Blueprint name
+  --help            Show this message and exit.
+(.venv) ckim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli export-blueprint --json-file ~/Downloads/dh.json --bp-name dh 
+2024-07-17 18:18:29,465 - INFO     - export_blueprint() - bp_name='dh' json_file='/Users/ckim/Downloads/dh.json' (cli.py:191)
+(.venv) ckim@ckim-mbp:ck-apstra-api %
+```
+
 
 
 ## Misc

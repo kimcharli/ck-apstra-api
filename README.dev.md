@@ -12,12 +12,9 @@ poetry export --without-hashes --format=requirements.txt > requirements.txt
 ```
 
 
-## in case of uv venv
-
 ```
-uv venv
-source .venv/bin/activate
-uv pip install ck-apstra-api
+poetry init
+poetry add ck-apstra-api
 ```
 
 
@@ -32,6 +29,7 @@ poetry env info
 poetry lock  
 poetry install
 poetry run pytest
+poetry run ck-cli
 ```
 
 

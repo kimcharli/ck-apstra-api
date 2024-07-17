@@ -66,26 +66,6 @@ def add_bp_from_json(host_ip, host_port, host_user, host_password, bp_name, bp_j
 
 
 
-def get_bp_into_json(host_ip, host_port, host_user, host_password, bp_name, json_path):
-    """
-    Create a blueprint into a json file
-    The blueprint label - job_env.main_blueprint_name
-    The json file - job_env.bp_json_file
-    """
-    return
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-
-    the_bp_name = bp_name
-    the_json_path = json_path
-    logging.info(f"{the_bp_name=} {the_json_path=}")
-
-    # TODO: fix - load bp data
-    the_blueprint_data = bp_name
-    logging.info(f"{the_blueprint_data.keys()=}")
-    with open(the_json_path, 'w') as f:
-        f.write(json.dumps(the_blueprint_data, indent=2))
-
-    return
 
 
 
@@ -179,6 +159,43 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
     ctx.obj['HOST_USER'] = host_user
     ctx.obj['HOST_PASSWORD'] = host_password
     pass
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--json-file', type=str, help='Blueprint name')
+@click.pass_context
+def export_blueprint(ctx, bp_name: str, json_file: str = None):
+    """
+    Export a blueprint into a json file
+    The blueprint label - job_env.main_blueprint_name
+    The json file - job_env.bp_json_file
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'export_blueprint()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    # bp_name = ctx.obj['BP_NAME']
+    bp = CkApstraBlueprint(session, bp_name)
+    if not json_file:
+        json_file = f"{bp_name}.json"
+    
+    logger.info(f"{bp_name=} {json_file=}")
+
+    # TODO: fix - load bp data
+    the_blueprint_data = bp.dump()
+    logging.info(f"{the_blueprint_data.keys()=}")
+    with open(json_file, 'w') as f:
+        f.write(json.dumps(the_blueprint_data, indent=2))
+
 
 
 @cli.command()
