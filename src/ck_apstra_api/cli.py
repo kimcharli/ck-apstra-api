@@ -162,43 +162,6 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
-@click.option('--json-file', type=str, help='Blueprint name')
-@click.pass_context
-def export_blueprint(ctx, bp_name: str, json_file: str = None):
-    """
-    Export a blueprint into a json file
-    The blueprint label - job_env.main_blueprint_name
-    The json file - job_env.bp_json_file
-    """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
-    from result import Ok, Err
-
-    logger = prep_logging('DEBUG', 'export_blueprint()')
-
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-
-    # bp_name = ctx.obj['BP_NAME']
-    bp = CkApstraBlueprint(session, bp_name)
-    if not json_file:
-        json_file = f"{bp_name}.json"
-    
-    logger.info(f"{bp_name=} {json_file=}")
-
-    # TODO: fix - load bp data
-    the_blueprint_data = bp.dump()
-    logging.info(f"{the_blueprint_data.keys()=}")
-    with open(json_file, 'w') as f:
-        f.write(json.dumps(the_blueprint_data, indent=2))
-
-
-
-@cli.command()
 @click.pass_context
 def check_apstra(ctx):
     """
@@ -247,6 +210,124 @@ def check_blueprint(ctx, bp_name: str):
         logger.warning(f"Blueprint {bp_name} not found")
         
     session.logout()
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--json-file', type=str, help='Json file name to export')
+@click.pass_context
+def export_blueprint(ctx, bp_name: str, json_file: str = None):
+    """
+    Export a blueprint into a json file
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'export_blueprint()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    # bp_name = ctx.obj['BP_NAME']
+    bp = CkApstraBlueprint(session, bp_name)
+    if not json_file:
+        json_file = f"{bp_name}.json"
+    
+    logger.info(f"{bp_name=} {json_file=}")
+
+    # TODO: fix - load bp data
+    the_blueprint_data = bp.dump()
+    logging.info(f"{the_blueprint_data.keys()=}")
+    with open(json_file, 'w') as f:
+        f.write(json.dumps(the_blueprint_data, indent=2))
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--out-folder', type=str, default='~/Downloads/devices', help='Folder name to export')
+@click.pass_context
+def export_device_configs(ctx, bp_name: str, out_folder: str):
+    """
+    Export a device configurations into multiple files
+
+    The folder for each device will be created with the device name.
+    0_load_override_pristine.txt (if the device is managed)
+    0_load_override_freeform.txt (if case of freeform)
+    1_load_merge_intended.txt
+    2_load_merge_configlet.txt (if applicable)
+    3_load_set_configlet-set.txt (if applicable)
+    """
+    from pathlib import Path
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'export_device_configs()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    # bp_name = ctx.obj['BP_NAME']
+    bp = CkApstraBlueprint(session, bp_name)
+    
+    logger.info(f"{bp_name=} {out_folder=}")
+    bp_folder_path = os.path.expanduser(f"{out_folder}/{bp_name}")
+    # bp_folder = f"{out_folder}/{bp_name}"
+    Path(bp_folder_path).mkdir(parents=True, exist_ok=True)
+
+
+    def write_to_file(file_name, content):
+        MIN_SIZE = 2  # might have one \n
+        if len(content) > MIN_SIZE:
+            with open(file_name, 'w') as f:
+                f.write(content)
+            logger.info(f"write_to_file(): {os.path.basename(file_name)}")
+
+
+    # switch for reference architecture, internal for freeform
+    for switch in [x['switch'] for x in bp.query("node('system', system_type=is_in(['switch', 'internal']), name='switch')").ok_value]:
+        system_label = switch['label']
+        system_id = switch['id']
+        system_serial = switch['system_id']
+        system_dir = f"{bp_folder_path}/{system_label}"
+        Path(system_dir).mkdir(exist_ok=True)
+        logger.info(f"{system_label=}")
+
+        if system_serial:
+            pristine_config = session.get_items(f"systems/{system_serial}/pristine-config")['pristine_data'][0]['content']
+            write_to_file(f"{system_dir}/0_load_override_pristine.txt", pristine_config)
+
+        rendered_confg = bp.get_item(f"nodes/{system_id}/config-rendering")['config']
+        write_to_file(f"{system_dir}/rendered.txt", rendered_confg)
+
+        begin_configlet = '------BEGIN SECTION CONFIGLETS------'
+        begin_set = '------BEGIN SECTION SET AND DELETE BASED CONFIGLETS------'
+
+        config_string = rendered_confg.split(begin_configlet)
+        if bp.design == 'freeform':
+            write_to_file(f"{system_dir}/0_load_override_freeform.txt", config_string[0])
+        else:
+            write_to_file(f"{system_dir}/1_load_merge_intended.txt", config_string[0])
+        if len(config_string) < 2:
+            # no configlet. skip
+            continue
+
+        configlet_string = config_string[1].split(begin_set)
+        write_to_file(f"{system_dir}/2_load_merge_configlet.txt", configlet_string[0])
+        if len(configlet_string) < 2:
+            # no configlet in set type. skip
+            continue
+
+        write_to_file(f"{system_dir}/3_load_set_configlet-set.txt", configlet_string[1])
+
+
 
 
 

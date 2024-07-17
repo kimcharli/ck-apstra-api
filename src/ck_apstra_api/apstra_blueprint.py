@@ -69,6 +69,7 @@ class CkApstraBlueprint:
         bp = [x for x in self.session.get_items('blueprints')['items'] if x['label'] == self.label]
         if bp:
             self.id = bp[0]['id']
+            self.design = bp[0]['design']
         return self.id
         
 

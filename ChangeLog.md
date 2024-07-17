@@ -1,5 +1,7 @@
 # Change Log
 
+## 0.4.12 2024-07-17
+- implement export-device-configs
 
 ## 0.4.11 2024-07-17
 - implement export-blueprint
