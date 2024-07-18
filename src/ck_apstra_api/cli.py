@@ -1,23 +1,12 @@
-import copy
 from dataclasses import dataclass, asdict, fields
-from functools import cache
 from pathlib import Path
 import click
 import os
 import logging
 import time
 import json
-from datetime import datetime
 from pprint import pprint
 import csv
-
-# from ck_apstra_api.apstra_session import CkApstraSession, CustomFormatter
-
-# ch = logging.StreamHandler()
-# ch.setLevel(logging.DEBUG)
-# ch.setFormatter(CustomFormatter())
-
-
 
 
 def import_routing_zones(host_ip, host_port, host_user, host_password, input_file_path_string: str = None, sheet_name: str = 'routing_zones'):
@@ -76,21 +65,6 @@ def import_virtual_networks(host_ip, host_port, host_user, host_password, input_
     imported = bp.patch_virtual_networks_csv_bulk(df.to_csv(index=False))
     logging.debug(f"{imported=} {imported.text=}")
 
-
-
-def get_lldp_data(host_ip, host_port, host_user, host_password, bp_name: str = 'terra'):
-    return
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-
-    bp = job_env.main_bp
-    lldp_data = bp.get_lldp_data()
-    for link in lldp_data['links']:
-        logging.info(f"{link['id']=} {link['endpoints'][0]['system']['label']}:{link['endpoints'][0]['interface']['if_name']} {link['endpoints'][1]['system']['label']}:{link['endpoints'][1]['interface']['if_name']}")
-    
-    server_hostnames = bp.get_items('server-hostnames-lldp')
-    pprint(server_hostnames)
-    
-    return lldp_data
 
 
 @click.group()
@@ -286,12 +260,10 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
 
-    # bp_name = ctx.obj['BP_NAME']
     bp = CkApstraBlueprint(session, bp_name)
     
     logger.info(f"{bp_name=} {out_folder=}")
     bp_folder_path = os.path.expanduser(f"{out_folder}/{bp_name}")
-    # bp_folder = f"{out_folder}/{bp_name}"
     Path(bp_folder_path).mkdir(parents=True, exist_ok=True)
 
 
@@ -339,6 +311,89 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
 
         write_to_file(f"{system_dir}/3_load_set_configlet-set.txt", configlet_string[1])
 
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--vn-csv', type=str, required=True, help='The CSV file path of virtual networks to import from')
+@click.pass_context
+def import_virtual_networks(ctx, bp_name, vn_csv: str):
+    """
+    Import virtual networks from a CSV file
+    """
+    from pathlib import Path
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+    import io
+
+    logger = prep_logging('DEBUG', 'export_device_configs()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    bp = CkApstraBlueprint(session, bp_name)
+    logger.info(f"{bp_name=} {vn_csv=}")
+
+    # get the list of dictionaries per each virtual network from the Apstra
+    vn_csv_string = bp.get_item('virtual-networks-csv-bulk')['csv_bulk']
+    csv_reader = csv.DictReader(io.StringIO(vn_csv_string))
+    current_vn_dict = [row for row in csv_reader]
+    # logger.info(f"{vn_csv_dict=}")
+    # pprint(vn_csv_dict)
+    return
+
+    vn_csv_path = os.path.expanduser(vn_csv)
+    # input_vn_dict = []
+    with open(vn_csv_path, 'r') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        input_vn_dict = [row for row in csv_reader]
+
+    for header in current_vn_dict[0].keys():
+        if header not in input_vn_dict[0].keys():
+            raise ValueError(f"Header {header} not found in the input CSV file")
+
+        for row in csv_reader:
+            links_to_add.append(dict(zip(headers, row)))
+    imported = bp.patch_virtual_networks_csv_bulk(df.to_csv(index=False))
+
+
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.pass_context
+def print_lldp_data(ctx, bp_name: str = 'terra'):
+    """
+    Print the LLDP data of the blueprint
+    """
+    from pathlib import Path
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'export_device_configs()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    bp = CkApstraBlueprint(session, bp_name)
+    logger.info(f"{bp_name=}")
+
+    lldp_data = bp.get_lldp_data()
+    for link in lldp_data['links']:
+        logger.info(f"{link['id']=} {link['endpoints'][0]['system']['label']}:{link['endpoints'][0]['interface']['if_name']} {link['endpoints'][1]['system']['label']}:{link['endpoints'][1]['interface']['if_name']}")
+    
+    # server_hostnames = session.get_items('server-hostnames-lldp')
+    # pprint(server_hostnames)
+    
+    return lldp_data
 
 
 
