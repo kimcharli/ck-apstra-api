@@ -2,24 +2,43 @@
 
 https://github.com/kimcharli/ck-apstra-api
 
-## prerequisit
+# prerequisit
 
-python3.11 or higher
+## python3.11 or higher
 
 [ChangeLog](./ChangeLog.md)
 
+### Windows environment
+install python3.11: https://www.python.org/downloads/windows/
 
-## prepare venv
+
+## git
+
+### Windows environment
+https://git-scm.com/download/win
+
+
+# prepare venv
 
 ```
 ckim@ckim-mbp:sandbox % mkdir test
 ckim@ckim-mbp:sandbox % cd test             
 ckim@ckim-mbp:test % python -m venv .venv                      
 ckim@ckim-mbp:test % source .venv/bin/activate
-(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.4.11
+(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.4.13
 ...                                                                                             
 (.venv) ckim@ckim-mbp:test % 
 ```
+
+## Windows environment
+
+```
+cd test
+py -m venv .venv
+.venv\Scripts\activate
+pip install ck-apstra-api==0.4.13
+```
+
 
 ## help commands
 
@@ -30,7 +49,7 @@ ck_apstra_api, 0.4.12
 ```
 
 ```
-(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli          
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --help   
 Usage: ck-cli [OPTIONS] COMMAND [ARGS]...
 
   A CLI tool for interacting with ck-apstra-api
@@ -50,6 +69,7 @@ Commands:
   export-device-configs  Export a device configurations into multiple files
   export-generic-system  Export generic systems to a CSV file
   export-systems         Export systems of a blueprint to a CSV file
+  import-blueprint       Import a blueprint from a json file
   import-generic-system  Import generic systems from a CSV file
   relocate-vn            Move a Virtual Network to the target Routing Zone
   test-get-temp-vn       Test get_temp_vn

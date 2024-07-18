@@ -18,55 +18,6 @@ import csv
 # ch.setFormatter(CustomFormatter())
 
 
-def add_bp_from_json(host_ip, host_port, host_user, host_password, bp_name, bp_json_file: str = None, new_bp_name: str = None):
-    """
-    Add a blueprint from a json file
-    The json file - job_env.bp_json_file
-    The blueprint label - job_env.main_blueprint_name
-
-    """
-    return
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    logging.info(f"{bp_json_file=}")
-    with open(bp_json_file, 'r') as f:
-        bp_json = f.read()
-    bp_dict = json.loads(bp_json)
-    node_list = []
-    for node_id, node_dict in bp_dict['nodes'].items():
-        if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
-            node_dict['system_id'] = None
-            # node_dict['deploy_mode'] = 'undeploy'
-        if node_dict['type'] == 'metadata':
-            node_dict['label'] = bp_name     
-        for k, v in node_dict.items():
-            if k == 'tags':
-                if v is None or v == "['null']":
-                    node_dict[k] = []
-            elif k == 'property_set' and v is None:
-                node_dict.update({
-                    k: {}
-                })
-        node_list.append(node_dict)        
-
-    bp_dict['label'] = new_bp_name or bp_name
-
-    relationship_list = [
-        rel_dict for rel_id, rel_dict in bp_dict['relationships'].items()
-    ]
-
-    bp_spec = { 
-        'design': bp_dict['design'], 
-        'label': bp_dict['label'], 
-        'init_type': 'explicit', 
-        'nodes': node_list,
-        'relationships': relationship_list
-    }
-    bp_created = session.post('blueprints', data=bp_spec)
-    logging.info(f"push_bp_from_json() BP bp_created = {bp_created}")
-
-
-
-
 
 
 def import_routing_zones(host_ip, host_port, host_user, host_password, input_file_path_string: str = None, sheet_name: str = 'routing_zones'):
@@ -214,7 +165,7 @@ def check_blueprint(ctx, bp_name: str):
 
 @cli.command()
 @click.option('--bp-name', type=str, default='terra', help='Blueprint name')
-@click.option('--json-file', type=str, help='Json file name to export')
+@click.option('--json-file', type=str, help='Json file name to export to')
 @click.pass_context
 def export_blueprint(ctx, bp_name: str, json_file: str = None):
     """
@@ -232,18 +183,79 @@ def export_blueprint(ctx, bp_name: str, json_file: str = None):
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
 
-    # bp_name = ctx.obj['BP_NAME']
     bp = CkApstraBlueprint(session, bp_name)
-    if not json_file:
-        json_file = f"{bp_name}.json"
-    
     logger.info(f"{bp_name=} {json_file=}")
 
-    # TODO: fix - load bp data
+    if not json_file:
+        json_file = f"{bp_name}.json"
+    json_path = os.path.expanduser(json_file)
+
     the_blueprint_data = bp.dump()
-    logging.info(f"{the_blueprint_data.keys()=}")
-    with open(json_file, 'w') as f:
+    with open(json_path, 'w') as f:
         f.write(json.dumps(the_blueprint_data, indent=2))
+
+    logger.info(f"blueprint {bp_name} exported to {json_file}")
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name to create')
+@click.option('--json-file', type=str, help='Json file name to import from')
+@click.pass_context
+def import_blueprint(ctx, bp_name: str, json_file: str = None):
+    """
+    Import a blueprint from a json file
+    """
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'import_blueprint()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    logger.info(f"{bp_name=} {json_file=}")
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    json_path = os.path.expanduser(json_file)
+    with open(json_path, 'r') as f:
+        bp_json = f.read()
+    bp_dict = json.loads(bp_json)
+    node_list = []
+    for node_dict in bp_dict['nodes'].values():
+        # remove system_id for switches
+        if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
+            node_dict['system_id'] = None
+            node_dict['deploy_mode'] = 'undeploy'
+        if node_dict['type'] == 'metadata':
+            node_dict['label'] = bp_name     
+        for k, v in node_dict.items():
+            if k == 'tags':
+                if v is None or v == "['null']":
+                    node_dict[k] = []
+            elif k == 'property_set' and v is None:
+                node_dict.update({
+                    k: {}
+                })
+        node_list.append(node_dict)        
+
+    bp_dict['label'] = bp_name
+
+    # TODO: just reference copy
+    relationship_list = [rel_dict for rel_dict in bp_dict['relationships'].values()]
+
+    bp_spec = { 
+        'design': bp_dict['design'], 
+        'label': bp_dict['label'], 
+        'init_type': 'explicit', 
+        'nodes': node_list,
+        'relationships': relationship_list
+    }
+    bp_created = session.post('blueprints', data=bp_spec)
+    logger.info(f"blueprint {bp_name} created: {bp_created}")
 
 
 @cli.command()

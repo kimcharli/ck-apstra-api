@@ -1,0 +1,55 @@
+{#
+Configure sflow on the activive interfaces on leaf switches.
+  The spine bound interfaces are excluded.
+  Every leaf should have FIS routing zone. As such, a VN of FIS needs to be on every leaf. 
+Example property set:
+  sflow_collector: 10.3.33.33
+  sflow_rz: FIS
+  sflow_port: 6343
+  sflow_community: sflow-collector
+
+#}
+{% if role == 'leaf' %}
+routing-options {
+    static {
+        route {{sflow_collector}}/32 next-table {{sflow_rz}}.inet.0;
+    }
+}
+protocols {
+    sflow {
+        polling-interval 10;
+        sample-rate {
+            ingress 1024;
+            egress 1024;
+        }
+        source-ip {{security_zones[sflow_rz]['loopback_ip']}};
+        collector {{sflow_collector}} {
+            udp-port {{sflow_port}};
+        }
+    {% for intf_name in interface.values() 
+        | rejectattr('switch_port_mode', 'equalto', 'subinterface') 
+        | rejectattr('is_port_channel') 
+        | selectattr('role', 'in', '["l2edge", "l3edge"]') 
+        | map(attribute='intfName') 
+        | list %}
+        interfaces {{ intf_name }};
+    {% endfor %}
+    }
+}
+snmp {
+    view mib-2 {
+        oid .1.3.6.1.2.1;
+    }
+    client-list {{sflow_community}} {
+        {{sflow_collector}}/32;
+    }
+    community sFlow-collector {
+        view mib-2;
+        authorization read-only;
+        routing-instance {{sflow_rz}} {
+            client-list-name {{sflow_community}};
+        }
+    }
+    routing-instance-access;
+}
+{% endif %}
