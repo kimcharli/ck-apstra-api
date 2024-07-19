@@ -53,20 +53,6 @@ def import_routing_zones(host_ip, host_port, host_user, host_password, input_fil
 
 
 
-def import_virtual_networks(host_ip, host_port, host_user, host_password, input_file_path_string: str = None, sheet_name: str = 'virtual_networks'):
-    return
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-
-    bp = job_env.main_bp
-    excel_file_sting = input_file_path_string or os.getenv('excel_input_file')
-    input_file_path = Path(excel_file_sting) 
-    df = pd.read_excel(input_file_path, sheet_name=sheet_name)
-    logging.debug(f"{df.to_csv(index=False)=}")
-    imported = bp.patch_virtual_networks_csv_bulk(df.to_csv(index=False))
-    logging.debug(f"{imported=} {imported.text=}")
-
-
-
 @click.group()
 @click.option('--host-ip', type=str, default='10.85.192.45', help='Host IP address')
 @click.option('--host-port', type=int, default=443, help='Host port')
@@ -317,7 +303,7 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
 @click.option('--bp-name', type=str, default='terra', help='Blueprint name')
 @click.option('--vn-csv', type=str, required=True, help='The CSV file path of virtual networks to import from')
 @click.pass_context
-def import_virtual_networks(ctx, bp_name, vn_csv: str):
+def import_virtual_network(ctx, bp_name, vn_csv: str):
     """
     Import virtual networks from a CSV file
     """
@@ -327,7 +313,7 @@ def import_virtual_networks(ctx, bp_name, vn_csv: str):
     from result import Ok, Err
     import io
 
-    logger = prep_logging('DEBUG', 'export_device_configs()')
+    logger = prep_logging('DEBUG', 'import_virtual_network()')
 
     host_ip = ctx.obj['HOST_IP']
     host_port = ctx.obj['HOST_PORT']
@@ -338,28 +324,55 @@ def import_virtual_networks(ctx, bp_name, vn_csv: str):
     bp = CkApstraBlueprint(session, bp_name)
     logger.info(f"{bp_name=} {vn_csv=}")
 
-    # get the list of dictionaries per each virtual network from the Apstra
-    vn_csv_string = bp.get_item('virtual-networks-csv-bulk')['csv_bulk']
-    csv_reader = csv.DictReader(io.StringIO(vn_csv_string))
-    current_vn_dict = [row for row in csv_reader]
-    # logger.info(f"{vn_csv_dict=}")
-    # pprint(vn_csv_dict)
-    return
+    vn_csv_path = os.path.expanduser(vn_csv)
+
+    # # get the list of dictionaries per each virtual network from the Apstra
+    # vn_csv_string = bp.get_item('virtual-networks-csv-bulk')['csv_bulk']
+    # csv_reader = csv.DictReader(io.StringIO(vn_csv_string))
+    # current_vn_dict = [row for row in csv_reader]
+
+    links_to_add = []
+    with open(vn_csv_path, 'r') as csvfile:        
+        # csv_reader = csv.reader(csvfile)
+        # input_vn_dict = [row for row in csv_reader]
+
+        # for row in csv_reader:
+        #     links_to_add.append(dict(zip(headers, row)))
+        csv_string = csvfile.read()
+        imported = bp.patch_virtual_networks_csv_bulk(csv_string)
+        logger.info(f"Virtual Networks of blueprint {bp_name} imported from {vn_csv_path}")
+
+
+@cli.command()
+@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--vn-csv', type=str, required=True, help='The CSV file path of virtual networks to export to')
+@click.pass_context
+def export_virtual_network(ctx, bp_name, vn_csv: str):
+    """
+    Import virtual networks from a CSV file
+    """
+    from pathlib import Path
+    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from result import Ok, Err
+    import io
+
+    logger = prep_logging('DEBUG', 'export_virtual_network()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']    
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+
+    bp = CkApstraBlueprint(session, bp_name)
+    logger.info(f"{bp_name=} {vn_csv=}")
 
     vn_csv_path = os.path.expanduser(vn_csv)
-    # input_vn_dict = []
-    with open(vn_csv_path, 'r') as csvfile:
-        csv_reader = csv.reader(csvfile)
-        input_vn_dict = [row for row in csv_reader]
-
-    for header in current_vn_dict[0].keys():
-        if header not in input_vn_dict[0].keys():
-            raise ValueError(f"Header {header} not found in the input CSV file")
-
-        for row in csv_reader:
-            links_to_add.append(dict(zip(headers, row)))
-    imported = bp.patch_virtual_networks_csv_bulk(df.to_csv(index=False))
-
+    csv_string = bp.get_item('virtual-networks-csv-bulk')['csv_bulk']
+    with open(vn_csv_path, 'w') as csvfile:
+        csvfile.write(csv_string)
+    logger.info(f"Virtual Networks of blueprint {bp_name} exported to {vn_csv_path}")
 
 
 
