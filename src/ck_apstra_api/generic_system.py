@@ -357,7 +357,7 @@ class LinkGroup(DataInit):
             yield Ok(f"{log_prefix} done")
 
     @property
-    def link_spec(self):
+    def link_spec(self) -> List[Dict[str, Any]]:
         """
         Return the link spec for the link group gathered from the links
         """
@@ -367,10 +367,10 @@ class LinkGroup(DataInit):
         return data
     
     @property
-    def speed_count(self):
+    def speed_count(self) -> List[str]:
         return [x.speed for x in self.members]
 
-    def rename_interfaces(self):
+    def rename_interfaces(self) -> Generator[Result[str, str], Any, Any]:
         log_prefix = f"{self.log_prefix}::rename_interfaces()"
         rename_spec = {'links': [member.rename_spec for member in self.members if member.rename_spec]}
         # for member in self.members:
@@ -383,15 +383,39 @@ class LinkGroup(DataInit):
             else:
                 yield Ok(f"{self.log_prefix} {self.ae=} rename done")
 
-    def add_vlans(self):
+    def _get_ct_ids(self, vn_name_list: list) -> Generator[Result, Any, Any]:
+        """
+        Get the CT ids for the given CT names
+        """
+        log_prefix = f"{self.log_prefix}::_get_ct_ids()"
+        ct_ids = []
+        for vn_name in vn_name_list:
+            ct_id = self.bp.get_ct_ids(vn_name)
+            if ct_id:
+                ct_ids.append(ct_id[0])
+            else:
+                yield Err(f"{log_prefix} CT '{vn_name}' not found in blueprint {self.bp.label}")
+        yield Ok(ct_ids)
+
+    def add_vlans(self) -> Generator[Result[dict, str], Any, Any]:
+        """
+        Reconcilate (add or remove) the vlans to the link group
+        """
         log_prefix = f"{self.log_prefix}::add_vlans()"
-        # logging.warning(f"{log_prefix} {self.ct_names=} {self.fetched_ct_names=}")
         vlans_to_add = [x for x in self.ct_names if x not in self.fetched_ct_names]
         vlans_to_remove = [x for x in self.fetched_ct_names if x not in self.ct_names]
-        if len(vlans_to_add):
+        yield Ok(f"{log_prefix} DEBUGGING {self.ae=} {vlans_to_add=} {vlans_to_remove=}")
+        ct_ids_to_add = []
+        for res in self._get_ct_ids(vlans_to_add):
+            if isinstance(res, Err):
+                yield res
+            elif len(res.ok_value):
+                ct_ids_to_add.extend(res.ok_value)
+                yield Ok(f"{log_prefix} {ct_ids_to_add=}")
+        if ct_ids_to_add:
             yield {
                 'id': self.fetched_ae_id,
-                'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': True} for x in vlans_to_add]
+                'policies': [{'policy': x, 'used': True} for x in ct_ids_to_add]
             }
         if len(vlans_to_remove):
             yield {
@@ -570,7 +594,7 @@ class GenericSystem(DataInit):
             for res in lg.rename_interfaces():
                 yield res
 
-    def add_vlans(self):
+    def add_vlans(self) -> Generator[Result[str, str], Any, Any]:
         """
         Add the vlans to the generic system
         """
@@ -578,16 +602,18 @@ class GenericSystem(DataInit):
             'application_points': []
         }
         for lg in self.link_groups:
-            vlan_piece = [x for x in lg.add_vlans()]
-            if vlan_piece:
-                vlan_spec['application_points'].append(vlan_piece[0])
-        # TODO: implement Result to catch error
+            for x in lg.add_vlans():
+                if isinstance(x, dict):
+                    vlan_spec['application_points'].append(x)
+                else:
+                    yield x
+        yield Ok(f"{self.log_prefix} {vlan_spec=}")
         if len(vlan_spec['application_points']):
             ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
-        yield Ok(f"{self.log_prefix} done - {len(vlan_spec['application_points'])} vlans")
+            yield Ok(f"{self.log_prefix} done - {len(vlan_spec['application_points'])} vlans. {ct_assign_updated=}")
 
 
-    def fix_tags(self):
+    def fix_tags(self) -> Generator[Result[str, str], Any, Any]:
         """
         Fix the tags for the generic system, link group, and the link
         """
