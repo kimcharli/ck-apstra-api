@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.15 2024-07-30
+- add error log for generic_system add_vlan 
+
 ## 0.4.15 2024-07-26
 - enhance error handling for missing CT
  

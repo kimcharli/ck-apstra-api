@@ -610,7 +610,26 @@ class GenericSystem(DataInit):
         yield Ok(f"{self.log_prefix} {vlan_spec=}")
         if len(vlan_spec['application_points']):
             ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
-            yield Ok(f"{self.log_prefix} done - {len(vlan_spec['application_points'])} vlans. {ct_assign_updated=}")
+            task_id = ct_assign_updated['task_id']
+            for i in range(5):
+                task_status = self.bp.get_item(f"tasks/{task_id}")
+                match task_status['status']:
+                    case 'succeeded':
+                        yield Ok(f"{self.log_prefix} done - {len(vlan_spec['application_points'])} vlans. {ct_assign_updated=}")
+                        return
+                    case 'init':
+                        yield Ok(f"{self.log_prefix} the task in init {task_id}")
+                        time.sleep(1)
+                        continue
+                    case 'in_progress':
+                        yield Ok(f"{self.log_prefix} the task in in_progress {task_id}")
+                        time.sleep(1)
+                        continue
+                    case 'failed':
+                        yield Err(f"{self.log_prefix} failed: {task_status['detailed_status']}")
+                        return
+                    case _:
+                        yield Err(f"{self.log_prefix} some other {task_id} to complete. {task_status}")
 
 
     def fix_tags(self) -> Generator[Result[str, str], Any, Any]:
