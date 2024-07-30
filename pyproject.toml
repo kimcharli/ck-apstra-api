@@ -1,6 +1,6 @@
 [project]
 name = "ck-apstra-api"
-version = "0.4.16"
+version = "0.4.17"
 description = "An implementation to use Apstra API"
 license = {text = "MIT License"}
 authors = [ { name = "Charlie Kim", email = "kimcharli@gmail.com" } ]
@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.poetry]
 name = "ck-apstra-api"
-version = "0.4.16"
+version = "0.4.17"
 description = "An implementation to use Apstra API"
 authors = [ "Charlie Kim <ckim@juniper.net>" ]
 license = "MIT"
