@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.17 2024-07-30
+- use __init__.py to simplify import
+
 ## 0.4.16 2024-07-30
 - add error log for generic_system add_vlan 
 

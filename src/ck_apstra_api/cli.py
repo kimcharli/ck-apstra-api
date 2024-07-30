@@ -78,7 +78,7 @@ def check_apstra(ctx):
     """
     Test the connectivity to the server
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api import CkApstraSession, prep_logging
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'check_apstra()')
@@ -100,8 +100,7 @@ def check_blueprint(ctx, bp_name: str):
     """
     Test the connectivity to the blueprint
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'check_blueprint()')
@@ -131,8 +130,7 @@ def export_blueprint(ctx, bp_name: str, json_file: str = None):
     """
     Export a blueprint into a json file
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'export_blueprint()')
@@ -165,8 +163,7 @@ def import_blueprint(ctx, bp_name: str, json_file: str = None):
     """
     Import a blueprint from a json file
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'import_blueprint()')
@@ -234,8 +231,7 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
     3_load_set_configlet-set.txt (if applicable)
     """
     from pathlib import Path
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'export_device_configs()')
@@ -308,8 +304,7 @@ def import_virtual_network(ctx, bp_name, vn_csv: str):
     Import virtual networks from a CSV file
     """
     from pathlib import Path
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
     import io
 
@@ -352,8 +347,7 @@ def export_virtual_network(ctx, bp_name, vn_csv: str):
     Import virtual networks from a CSV file
     """
     from pathlib import Path
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
     import io
 
@@ -384,8 +378,7 @@ def print_lldp_data(ctx, bp_name: str = 'terra'):
     Print the LLDP data of the blueprint
     """
     from pathlib import Path
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'export_device_configs()')
@@ -438,8 +431,7 @@ def export_systems(ctx, bp_name, systems_csv):
     system, asn, lo0, rack, device_profile
     
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
     logger = prep_logging('DEBUG', 'export_systems()')
 
@@ -494,8 +486,7 @@ def import_generic_system(ctx, gs_csv_in: str):
     """
     Import generic systems from a CSV file
     """
-    from ck_apstra_api.generic_system import GsCsvKeys, add_generic_systems
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api import GsCsvKeys, add_generic_systems, CkApstraSession, prep_logging
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'import_generic_system()')
@@ -538,8 +529,7 @@ def export_generic_system(ctx, gs_csv_out: str):
     """
     Export generic systems to a CSV file
     """
-    from ck_apstra_api.generic_system import get_generic_systems
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
+    from ck_apstra_api import get_generic_systems, CkApstraSession, prep_logging
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'export_generic_system()')
@@ -578,9 +568,7 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
     This CT handling trouble can be mitigated with a temporary VN to replace the original VN in the CT. Later, to be reversed later.
 
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
-
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
     from result import Ok, Err
 
     logger = prep_logging('INFO', 'relocate_vn()')
@@ -676,8 +664,7 @@ def test_get_temp_vn(ctx, blueprint: str, virtual_network: str, routing_zone: st
     """
     Test get_temp_vn
     """
-    from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
-    from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
 
     logger = prep_logging('INFO', 'test_get_temp_vn()')
     host_ip = ctx.obj['HOST_IP']

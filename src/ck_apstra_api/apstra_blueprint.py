@@ -8,8 +8,7 @@ from functools import cache
 
 from result import Err, Result, Ok
 
-from ck_apstra_api.apstra_session import CkApstraSession
-from ck_apstra_api.apstra_session import prep_logging, deep_copy
+from ck_apstra_api import CkApstraSession, deep_copy
 
 
 class CkEnum(StrEnum):
