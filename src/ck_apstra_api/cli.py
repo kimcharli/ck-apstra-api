@@ -89,6 +89,9 @@ def check_apstra(ctx):
     host_password = ctx.obj['HOST_PASSWORD']
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
     logger.info(f"version {session.version=} {session.token=}")
     session.logout()
 
@@ -110,9 +113,15 @@ def check_blueprint(ctx, bp_name: str):
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
 
     # bp_name = ctx.obj['BP_NAME']
     bp = CkApstraBlueprint(session, bp_name)
+    if not bp.id:
+        logger.error(f"Blueprint {bp_name} not found")
+        return
     logger.info(f"{bp_name=}, {bp.id=}")
     if bp.id:
         logger.info(f"Blueprint {bp_name} found")
@@ -140,8 +149,14 @@ def export_blueprint(ctx, bp_name: str, json_file: str = None):
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
 
     bp = CkApstraBlueprint(session, bp_name)
+    if not bp.id:
+        logger.error(f"Blueprint {bp_name} not found")
+        return
     logger.info(f"{bp_name=} {json_file=}")
 
     if not json_file:
@@ -173,6 +188,9 @@ def import_blueprint(ctx, bp_name: str, json_file: str = None):
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
 
     logger.info(f"{bp_name=} {json_file=}")
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
@@ -241,8 +259,14 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
 
     bp = CkApstraBlueprint(session, bp_name)
+    if not bp.id:
+        logger.error(f"Blueprint {bp_name} not found")
+        return
     
     logger.info(f"{bp_name=} {out_folder=}")
     bp_folder_path = os.path.expanduser(f"{out_folder}/{bp_name}")
@@ -315,8 +339,14 @@ def import_virtual_network(ctx, bp_name, vn_csv: str):
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
 
     bp = CkApstraBlueprint(session, bp_name)
+    if not bp.id:
+        logger.error(f"Blueprint {bp_name} not found")
+        return
     logger.info(f"{bp_name=} {vn_csv=}")
 
     vn_csv_path = os.path.expanduser(vn_csv)
@@ -358,8 +388,14 @@ def export_virtual_network(ctx, bp_name, vn_csv: str):
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
 
     bp = CkApstraBlueprint(session, bp_name)
+    if not bp.id:
+        logger.error(f"Blueprint {bp_name} not found")
+        return
     logger.info(f"{bp_name=} {vn_csv=}")
 
     vn_csv_path = os.path.expanduser(vn_csv)
@@ -388,8 +424,14 @@ def print_lldp_data(ctx, bp_name: str = 'terra'):
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']    
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
 
     bp = CkApstraBlueprint(session, bp_name)
+    if not bp.id:
+        logger.error(f"Blueprint {bp_name} not found")
+        return
     logger.info(f"{bp_name=}")
 
     lldp_data = bp.get_lldp_data()
@@ -441,7 +483,13 @@ def export_systems(ctx, bp_name, systems_csv):
     host_password = ctx.obj['HOST_PASSWORD']
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
     bp = CkApstraBlueprint(session, bp_name)
+    if not bp.id:
+        logger.error(f"Blueprint {bp_name} not found")
+        return
     systems_csv_path = os.path.expanduser(systems_csv)
     logger.info(f"{systems_csv_path=} writing to {systems_csv_path}")
     """
@@ -500,6 +548,9 @@ def import_generic_system(ctx, gs_csv_in: str):
     # logger.info(f"{ctx.obj=}")
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
     gs_csv_path = os.path.expanduser(gs_csv_in)
 
     links_to_add = []
@@ -543,6 +594,9 @@ def export_generic_system(ctx, gs_csv_out: str):
     # logger.info(f"{ctx.obj=}")
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
     gs_csv_path = os.path.expanduser(gs_csv_out)
 
     for res in get_generic_systems(session, gs_csv_path):
@@ -582,7 +636,13 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
     host_password = ctx.obj['HOST_PASSWORD']
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
     bp = CkApstraBlueprint(session, blueprint)
+    if not bp.id:
+        logger.error(f"Blueprint {blueprint} not found")
+        return
 
     @dataclass
     class Order(object):
@@ -673,13 +733,80 @@ def test_get_temp_vn(ctx, blueprint: str, virtual_network: str, routing_zone: st
     host_password = ctx.obj['HOST_PASSWORD']
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
     bp = CkApstraBlueprint(session, blueprint)
+    if not bp.id:
+        logger.error(f"Blueprint {blueprint} not found")
+        return
 
     for res in bp.get_temp_vn(virtual_network):
         if isinstance(res, dict):
             temp_vn = res
         else:
             logger.info(res)
+
+@cli.command()
+@click.option('--virtual-network', type=str, default='ESX-Replication', help='Subject Virtual Network name')
+@click.option('--bound-to', type=str, default='CHA08P25LP01', help='The leaf pair label to bound to')
+@click.option('--blueprint', type=str, default='DH50-Colo1', help='Blueprint name')
+@click.pass_context
+def test_vn_patch_bount_to(ctx, blueprint: str, virtual_network: str, bound_to: str):
+    """
+    Test to patch vn for the bound_to
+    """
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
+
+    logger = prep_logging('INFO', 'test_vn_patch_bount_to()')
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
+    bp = CkApstraBlueprint(session, blueprint)
+    if not bp.id:
+        logger.error(f"Blueprint {blueprint} not found")
+        return
+    logger.info(f"Bound to {blueprint}:{virtual_network} to {bound_to}")
+
+    vns = bp.query(f"node('virtual_network', label='{virtual_network}', name='vn')").ok_value
+    logger.info(f"{vns=}")
+    vn_id = vns[0]['vn']['id']
+    vn_data = bp.get_item(f"virtual-networks/{vn_id}")
+    if 'reserved_vlan_id' in vn_data and vn_data['reserved_vlan_id']:
+        vlan_id = vn_data['reserved_vlan_id']
+    else:
+        vlan_id = vn_data['bound_to'][0]['vlan_id']
+
+    logger.info(f"{vn_data=}")
+    system = bp.query(f"node('redundancy_group', label='{bound_to}', name='system')").ok_value
+    system_id = system[0]['system']['id']
+    logger.info(f"{system=}")
+    bound_to = [x for x in vn_data['bound_to'] if x['system_id'] == system_id]
+    if len(bound_to) > 0:
+        logger.info(f"Already bound to {bound_to}")
+        return
+    vn_patch_spec = {
+        'bound_to': vn_data['bound_to']
+    }
+    vn_patch_spec['bound_to'].append({
+        'system_id': system[0]['system']['id'],
+        'vlan_id': vlan_id
+    })  
+    vn_patched = bp.patch_item(f"virtual-networks/{vn_id}", vn_patch_spec)
+    logger.info(f"{vn_patched=} {vn_patched.text=}")
+
+
+    # for res in bp.get_temp_vn(virtual_network):
+    #     if isinstance(res, dict):
+    #         temp_vn = res
+    #     else:
+    #         logger.info(res)
 
 if __name__ == "__main__":
     cli()

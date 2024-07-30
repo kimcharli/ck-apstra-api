@@ -49,6 +49,7 @@ class CkApstraBlueprint:
             this_blueprint = self.session.get_items(f"blueprints/{id}")
             self.label = this_blueprint['label']
             self.design = this_blueprint['design']
+            self.url_prefix = f"{self.session.url_prefix}/blueprints/{self.id}"
         else:
             self.get_id()
             if self.id:

@@ -97,7 +97,12 @@ class CkApstraSession:
             The version of the Apstra controller.
         """
         url = f"{self.url_prefix}/versions/server"
-        response = self.session.get(url)
+        try:
+            response = self.session.get(url)
+        except Exception as e:
+            self.last_error = str(e)
+            self.logger.error(f"get_version failed: {self.last_error}")
+            return None
         version = response.json()["version"]
         self.version = version
         return self.version
@@ -111,7 +116,12 @@ class CkApstraSession:
             "username": self.username,
             "password": self.password
         }
-        response = self.session.post(url, json=payload)
+        try:
+            response = self.session.post(url, json=payload)
+        except Exception as e:
+            self.last_error = str(e)
+            self.logger.error(f"login failed: {self.last_error}")
+            return
         # the status code is 201 if the login is successful
         if response.status_code == 201:
             self.token = response.json()["token"]
