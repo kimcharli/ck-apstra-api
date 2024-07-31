@@ -752,13 +752,13 @@ def test_get_temp_vn(ctx, blueprint: str, virtual_network: str, routing_zone: st
 @click.option('--bound-to', type=str, default='CHA08P25LP01', help='The leaf pair label to bound to')
 @click.option('--blueprint', type=str, default='DH50-Colo1', help='Blueprint name')
 @click.pass_context
-def test_vn_patch_bount_to(ctx, blueprint: str, virtual_network: str, bound_to: str):
+def assign_vn_to_leaf(ctx, blueprint: str, virtual_network: str, bound_to: str):
     """
     Test to patch vn for the bound_to
     """
     from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
 
-    logger = prep_logging('INFO', 'test_vn_patch_bount_to()')
+    logger = prep_logging('INFO', 'assign_vn_to_leaf()')
     host_ip = ctx.obj['HOST_IP']
     host_port = ctx.obj['HOST_PORT']
     host_user = ctx.obj['HOST_USER']

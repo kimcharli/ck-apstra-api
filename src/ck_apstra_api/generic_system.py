@@ -393,14 +393,26 @@ class LinkGroup(DataInit):
                 yield Err(f"{log_prefix} CT '{vn_name}' not found in blueprint {self.bp.label}")
         yield Ok(ct_ids)
 
+    def remove_vlans(self) -> Generator[Result[dict, str], Any, Any]:
+        """
+        Remove the vlans from the link group if they exists while they are not in the request information
+        """
+        log_prefix = f"{self.log_prefix}::remove_vlans()"
+        vlans_to_remove = [x for x in self.fetched_ct_names if x not in self.ct_names]
+        yield Ok(f"{log_prefix} {self.ae=} {vlans_to_remove=}")
+        if len(vlans_to_remove):
+            yield {
+                'id': self.fetched_ae_id,
+                'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': False} for x in vlans_to_remove]
+            }
+
     def add_vlans(self) -> Generator[Result[dict, str], Any, Any]:
         """
-        Reconcilate (add or remove) the vlans to the link group
+        Add the vlans to the link group
         """
         log_prefix = f"{self.log_prefix}::add_vlans()"
         vlans_to_add = [x for x in self.ct_names if x not in self.fetched_ct_names]
-        vlans_to_remove = [x for x in self.fetched_ct_names if x not in self.ct_names]
-        yield Ok(f"{log_prefix} DEBUGGING {self.ae=} {vlans_to_add=} {vlans_to_remove=}")
+        yield Ok(f"{log_prefix} {self.ae=} {vlans_to_add=}")
         ct_ids_to_add = []
         for res in self._get_ct_ids(vlans_to_add):
             if isinstance(res, Err):
@@ -412,11 +424,6 @@ class LinkGroup(DataInit):
             yield {
                 'id': self.fetched_ae_id,
                 'policies': [{'policy': x, 'used': True} for x in ct_ids_to_add]
-            }
-        if len(vlans_to_remove):
-            yield {
-                'id': self.fetched_ae_id,
-                'policies': [{'policy': self.bp.get_ct_ids(x)[0], 'used': False} for x in vlans_to_remove]
             }
     
     def fix_tags(self):
@@ -590,42 +597,64 @@ class GenericSystem(DataInit):
             for res in lg.rename_interfaces():
                 yield res
 
+    def patch_vlans(self, vlan_spec: Dict) -> Generator[Result[str, str], Any, Any]:
+        """
+        Patch the vlans for the generic system
+        """
+        log_prefix = f"{self.log_prefix}::patch_vlans()"
+        yield Ok(f"{log_prefix} {vlan_spec=}")
+        if len(vlan_spec['application_points']):
+            ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
+            task_id = ct_assign_updated['task_id']
+            # task may take time to complete
+            for i in range(10):
+                task_status = self.bp.get_item(f"tasks/{task_id}")
+                match task_status['status']:
+                    case 'succeeded':
+                        yield Ok(f"{log_prefix} done - {len(vlan_spec['application_points'])} vlans. {ct_assign_updated=}")
+                        return
+                    case 'init':
+                        yield Ok(f"{log_prefix} the task in init {task_id}")
+                        time.sleep(1)
+                        continue
+                    case 'in_progress':
+                        yield Ok(f"{log_prefix} the task in in_progress {task_id}")
+                        time.sleep(1)
+                        continue
+                    case 'failed':
+                        yield Err(f"{log_prefix} failed: {task_status['detailed_status']}")
+                        return
+                    case _:
+                        yield Err(f"{log_prefix} some other {task_id} to complete. {task_status}")
+
     def add_vlans(self) -> Generator[Result[str, str], Any, Any]:
         """
-        Add the vlans to the generic system
+        Remove then add the vlans to the generic system
         """
-        vlan_spec = {
+        remove_spec = {
+            'application_points': []
+        }
+        for lg in self.link_groups:
+            for x in lg.remove_vlans():
+                if isinstance(x, dict):
+                    remove_spec['application_points'].append(x)
+                else:
+                    yield x        
+        for res in self.patch_vlans(remove_spec):
+            yield res
+        
+        add_spec = {
             'application_points': []
         }
         for lg in self.link_groups:
             for x in lg.add_vlans():
                 if isinstance(x, dict):
-                    vlan_spec['application_points'].append(x)
+                    add_spec['application_points'].append(x)
                 else:
-                    yield x
-        yield Ok(f"{self.log_prefix} {vlan_spec=}")
-        if len(vlan_spec['application_points']):
-            ct_assign_updated = self.bp.patch_obj_policy_batch_apply(vlan_spec, params={'async': 'full'})
-            task_id = ct_assign_updated['task_id']
-            for i in range(5):
-                task_status = self.bp.get_item(f"tasks/{task_id}")
-                match task_status['status']:
-                    case 'succeeded':
-                        yield Ok(f"{self.log_prefix} done - {len(vlan_spec['application_points'])} vlans. {ct_assign_updated=}")
-                        return
-                    case 'init':
-                        yield Ok(f"{self.log_prefix} the task in init {task_id}")
-                        time.sleep(1)
-                        continue
-                    case 'in_progress':
-                        yield Ok(f"{self.log_prefix} the task in in_progress {task_id}")
-                        time.sleep(1)
-                        continue
-                    case 'failed':
-                        yield Err(f"{self.log_prefix} failed: {task_status['detailed_status']}")
-                        return
-                    case _:
-                        yield Err(f"{self.log_prefix} some other {task_id} to complete. {task_status}")
+                    yield x        
+        for res in self.patch_vlans(add_spec):
+            yield res
+        
 
 
     def fix_tags(self) -> Generator[Result[str, str], Any, Any]:
