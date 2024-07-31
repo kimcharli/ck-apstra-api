@@ -386,6 +386,8 @@ class LinkGroup(DataInit):
         log_prefix = f"{self.log_prefix}::_get_ct_ids()"
         ct_ids = []
         for vn_name in vn_name_list:
+            if vn_name.lower() == 'na':
+                continue
             ct_id = self.bp.get_ct_ids(vn_name)
             if ct_id:
                 ct_ids.append(ct_id[0])

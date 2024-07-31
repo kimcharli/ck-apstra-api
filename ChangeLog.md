@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.18 2024-07-31
+- ignore ct name 'na'
+
 ## 0.4.17 2024-07-31
 - use __init__.py to simplify import 
 - generic_system add_vlan remove first to avoid duplicate
