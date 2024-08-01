@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.19 2024-08-01
+- strip ifname in generic_system
+
 ## 0.4.18 2024-07-31
 - ignore ct name 'na'
 

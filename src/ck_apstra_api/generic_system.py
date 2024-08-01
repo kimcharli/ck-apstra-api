@@ -134,6 +134,7 @@ class LinkMember(DataInit):
             self.tags_link = self.tags_link.split(',')
         elif self.tags_link == '':
             self.tags_link = []
+        self.ifname = self.ifname.strip()
         self.speed = self.speed.upper()
         self.log_prefix = f"LinkMember({self.switch}:{self.switch_ifname}:{self.ifname})"
 
