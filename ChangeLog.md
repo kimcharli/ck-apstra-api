@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.20 2024-08-02
+- unhide error for rename interface
+
 ## 0.4.19 2024-08-01
 - strip ifname in generic_system
 

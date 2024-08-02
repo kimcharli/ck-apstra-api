@@ -370,15 +370,13 @@ class LinkGroup(DataInit):
     def rename_interfaces(self) -> Generator[Result[str, str], Any, Any]:
         log_prefix = f"{self.log_prefix}::rename_interfaces()"
         rename_spec = {'links': [member.rename_spec for member in self.members if member.rename_spec]}
-        # for member in self.members:
-        #     rename_spec.append(member.rename_spec)
-        yield Ok(f"{log_prefix} {self.ae=} {rename_spec=}")
         if rename_spec['links']:
+            yield Ok(f"{log_prefix} about to rename: {self.ae=} {rename_spec=}")
             rename_updated = self.bp.patch_cable_map(rename_spec)
-            if rename_updated:
-                yield Err(f"Unexpected return: Interface renamed for link group {self.ae} in blueprint {self.bp.label}: {rename_updated}")
+            if isinstance(rename_updated, Err):
+                yield Err(f"{log_prefix} Error for {self.ae} in blueprint {self.bp.label}: {rename_updated.err_value}")
             else:
-                yield Ok(f"{self.log_prefix} {self.ae=} rename done")
+                yield Ok(f"{log_prefix} {self.ae=} rename done")
 
     def _get_ct_ids(self, vn_name_list: list) -> Generator[Result, Any, Any]:
         """
@@ -790,27 +788,28 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
     # build data classes for the server blueprints, the generic systems and the links
     for row in generic_system_rows:
         _ = ServerBlueprint(row)
-    yield Ok(f"{func_name} {ServerBlueprint._bps=}")
+    blueprints_string = f"blueprints {list(ServerBlueprint._bps.keys())}"
+    yield Ok(f"{func_name} {blueprints_string}")
 
     # fetch the blueprints from the apstra server and store them in the data classes
     for bp_label, sbp in ServerBlueprint._bps.items():
         # yield Ok(f"{func_name} fetching {bp_label=} {sbp=}")
         for res in sbp.fetch_apstra(apstra_session):
             yield res
-    yield Ok(f"{func_name} fetched {ServerBlueprint._bps=}")
+    yield Ok(f"{func_name} fetched {blueprints_string}")
 
     # create the generic systems and the links
     for bp_label, sbp in ServerBlueprint._bps.items():
         # yield Ok(f"{func_name} fetching {bp_label=} {sbp=}")
         for res in sbp.add_generic_systems():
             yield res
-    yield Ok(f"{func_name} generic_systems added {ServerBlueprint._bps=}")
+    yield Ok(f"{func_name} generic_systems added {blueprints_string}")
 
     # AGAIN, fetch the blueprints from the apstra server and store them in the data classes
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.fetch_apstra(apstra_session):
             yield res
-    yield Ok(f"{func_name} after generic system creation - fetched {ServerBlueprint._bps=}")
+    yield Ok(f"{func_name} after generic system creation - fetched {blueprints_string}")
 
     # form LACP for the generic systems
     for bp_label, sbp in ServerBlueprint._bps.items():
@@ -828,7 +827,7 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.rename_interfaces():
             yield res
-    yield Ok(f"{func_name} interfaces renamed {ServerBlueprint._bps=}")
+    yield Ok(f"{func_name} interfaces renamed for blueprints {blueprints_string}")
 
     # fix the connectivity templates
     for bp_label, sbp in ServerBlueprint._bps.items():

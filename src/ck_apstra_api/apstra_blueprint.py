@@ -661,7 +661,7 @@ class CkApstraBlueprint:
         url = f"{self.url_prefix}/cabling-maps"
         return self.session.session.get(url).json()
 
-    def patch_cable_map(self, cable_map_spec):
+    def patch_cable_map(self, cable_map_spec) -> Result[None, str]:
         '''
         Set the cabling map
         '''
@@ -669,8 +669,8 @@ class CkApstraBlueprint:
         patched = self.session.session.patch(url, json=cable_map_spec, params={'comment': 'cabling-map-update'})
         if patched.status_code == 204:
             # No Content: a request has succeeded, but that the client doesn't need to navigate away from its current page.
-            return None
-        return patched
+            return Ok(None)
+        return Err(patched.text)
 
     def patch_security_zones_csv_bulk(self, csv_bulk: str, params: dict = {'async': 'full'}):
         '''
