@@ -2,12 +2,19 @@
 Configure sflow on the activive interfaces on leaf switches.
   The spine bound interfaces are excluded.
   Every leaf should have FIS routing zone. As such, a VN of FIS needs to be on every leaf. 
-Example property set:
-  sflow_collector: 10.3.33.33
-  sflow_rz: FIS
-  sflow_port: 6343
-  sflow_community: sflow-collector
 
+Example property set:
+    sflow_collector: 10.3.33.33
+    sflow_port: 6343
+    sflow_rz: FIS
+    snmp_version: 3
+    v3_auth_key: $9$ayJjHq.5T36f5Qn/CB1-Vbs2aiHmF39mP0BIEyrvWLx7V4aZUHqJZ/CAu1IwY2gUj5QF6/tQz6ApuEh4aJUDk.mTQ36HkAp0OcSwY2oaUP5QF69wYmfTz6/Lx7-s2goJiHmM8GDHkTQcyrlLxYgoji.X7jHkqf5Fn/CO1IEclvWOBdbs2GUp0OIyl
+    v3_priv_key: $9$juq5QFn/uBI9CORcyW8aZGjHmFn/9tu6/Lx7-ws5QzF9A0BISlKEhyKWLN-P5TQ/CtpBcSe0OdbsgJZUjHkfT/9p0ORk.
+    v2_community: sFlow-collector
+
+Test command example:
+    snmpwalk -v3  -l authNoPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv 10.85.192.16 .1.3.6.1.2.1.2.1
+    snmpwalk -v3  -l authPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv  -x AES-128 -X vfr43edcxsw21qaz -e 80000a4c039c8acbe5d580 10.85.192.16 .1.3.6.1.2.1
 #}
 {% if role == 'leaf' %}
 routing-options {
@@ -37,18 +44,48 @@ protocols {
     }
 }
 snmp {
+{% if snmp_version == 3 %}
+    v3 {
+        usm {
+            local-engine {
+                user sflow-v3 {
+                    authentication-sha256 {
+                        authentication-key "{{v3_auth_key}}"; ## SECRET-DATA
+                    }
+                    privacy-none;
+                }
+            }
+        }
+        vacm {
+            security-to-group {
+                security-model usm {
+                    security-name sflow-v3 {
+                        group sflow;
+                    }
+                }
+            }
+            access {
+                group sflow {
+                    default-context-prefix {
+                        security-model usm {
+                            security-level authentication {
+                                read-view mib-2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    engine-id {
+        use-mac-address;
+    }
+{% endif %}
     view mib-2 {
         oid .1.3.6.1.2.1;
     }
-    client-list {{sflow_community}} {
+    client-list sFlow-collector {
         {{sflow_collector}}/32;
-    }
-    community sFlow-collector {
-        view mib-2;
-        authorization read-only;
-        routing-instance {{sflow_rz}} {
-            client-list-name {{sflow_community}};
-        }
     }
     routing-instance-access;
 }
