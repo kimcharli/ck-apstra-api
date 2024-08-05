@@ -2,6 +2,8 @@
 Configure sflow on the activive interfaces on leaf switches.
   The spine bound interfaces are excluded.
   Every leaf should have FIS routing zone. As such, a VN of FIS needs to be on every leaf. 
+  The engine-id is set to 8888. This is to use the same authentication and privacy key.
+  
 Example property set:
     sflow_collector: 10.3.33.33
     sflow_port: 6343
@@ -9,11 +11,12 @@ Example property set:
     snmp_versin: 3     ## 2 or 3
     v2_community: sFlow-collector
     v3_user: sflow-v3
-    v3_auth_key: $9$ayJjHq.5T36f5Qn/CB1-Vbs2aiHmF39mP0BIEyrvWLx7V4aZUHqJZ/CAu1IwY2gUj5QF6/tQz6ApuEh4aJUDk.mTQ36HkAp0OcSwY2oaUP5QF69wYmfTz6/Lx7-s2goJiHmM8GDHkTQcyrlLxYgoji.X7jHkqf5Fn/CO1IEclvWOBdbs2GUp0OIyl
-
+    v3_auth_key: $9$NW-24ZUjfQF-VTzF6At8Xx-s2DikQ36ji.5Qz6/lKvWLNVb2ZDiVbP5zF/9X7Nd24UjH.fTNdwgaJDjtu0BhSrlM8LNhcdbw2aJik.PfztuOIRSCAORhcvM4aJUk.5T3AtOQzCuO1hcvWL7wYZUjq.5-V.P5T3nWLX7-woJGDjqLxHqf5F39ApBcy
+    v3_priv_key: $9$6Hwe9uOhclMWxKvDikqQzcyrKX7Vb2aGD-dwgoaUDApuB1hKM8Vs2MW7Vs2aJ36/ApBlKM8xNKvjHkqf5n/CuRhKvL7dbp0
+    
 Test command example:
     snmpwalk -v3  -l authNoPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv 10.85.192.16 .1.3.6.1.2.1.2.1
-    snmpwalk -v3  -l authPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv  -x AES-128 -X vfr43edcxsw21qaz -e 80000a4c039c8acbe5d580 10.85.192.16 .1.3.6.1.2.1
+    snmpwalk -v3  -l authPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv -x AES-128 -X vfr43edcxsw21qaz 10.85.192.16 .1.3.6.1.2.1
 
 /etc/juniper/flowcoll.yml example
 #EF_PROCESSOR_ENRICH_NETIF_SNMP_COMMUNITIES: sFlow-collector
@@ -23,7 +26,7 @@ EF_PROCESSOR_ENRICH_NETIF_SNMP_TIMEOUT: 2
 EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_AUTHENTICATION_PASSPHRASE: "zaq12wsxcde34rfv"
 EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_AUTHENTICATION_PROTOCOL: "sha256"
 EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_PRIVACY_PASSPHRASE: "vfr43edcxsw21qaz"
-EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_PRIVACY_PROTOCOL: "nopriv"
+EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_PRIVACY_PROTOCOL: "aes128"
 EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_USERNAME: "sflow-v3"
 EF_PROCESSOR_ENRICH_NETIF_SNMP_VERSION: 3
 
@@ -64,7 +67,9 @@ snmp {
                     authentication-sha256 {
                         authentication-key "{{v3_auth_key}}"; ## SECRET-DATA
                     }
-                    privacy-none;
+                    privacy-aes128 {
+                        privacy-key "{{v3_priv_key}}"; ## SECRET-DATA
+                    }
                 }
             }
         }
@@ -90,7 +95,7 @@ snmp {
         }
     }
     engine-id {
-        use-mac-address;
+        local 8888;
     }
 {% elif snmp_version == 2 %}
     community {{v2_community}} {
