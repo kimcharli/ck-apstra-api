@@ -433,6 +433,21 @@ Options:
 ```
 
 
+## import iplink ct
+```
+ck-apstra-api-py3.11ckim@ckim-mbp:ck-apstra-api % ck-cli import-iplink-ct --help
+Usage: ck-cli import-iplink-ct [OPTIONS]
+
+  Import IpLink CT from a CSV file
+
+Options:
+  --csv-in TEXT  Path to the CSV file for iplink CT
+  --help         Show this message and exit.
+ck-apstra-api-py3.11ckim@ckim-mbp:ck-apstra-api % 
+```
+
+[Example csv file](./tests/fixtures/iplink_ct_sample.csv)
+
 
 ## Misc
 

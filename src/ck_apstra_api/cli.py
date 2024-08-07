@@ -558,8 +558,8 @@ def import_generic_system(ctx, gs_csv_in: str):
         csv_reader = csv.reader(csvfile)
         headers = next(csv_reader)  # Read the header row
         expected_headers = [header.value for header in GsCsvKeys]
-        if headers != expected_headers:
-            raise ValueError("CSV header mismatch. Expected headers: " + ', '.join(expected_headers))
+        if sorted(headers) != sorted(expected_headers):
+            raise ValueError(f"CSV header {headers} mismatch.\n    Expected headers: {expected_headers}")
 
         for row in csv_reader:
             links_to_add.append(dict(zip(headers, row)))
@@ -802,11 +802,54 @@ def assign_vn_to_leaf(ctx, blueprint: str, virtual_network: str, bound_to: str):
     logger.info(f"{vn_patched=} {vn_patched.text=}")
 
 
-    # for res in bp.get_temp_vn(virtual_network):
-    #     if isinstance(res, dict):
-    #         temp_vn = res
-    #     else:
-    #         logger.info(res)
+
+@cli.command()
+@click.option('--csv-in', type=str, default='~/Downloads/iplink_ct.csv', help='Path to the CSV file for iplink CT')
+@click.pass_context
+def import_iplink_ct(ctx, csv_in: str):
+    """
+    Import IpLink CT from a CSV file
+    """
+    from ck_apstra_api import CtCsvKeys, add_generic_systems, CkApstraSession, prep_logging, import_ip_link_ct
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'import_iplink_ct()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
+    csv_path = os.path.expanduser(csv_in)
+
+    cts_to_add = []
+    with open(csv_path, 'r') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        headers = next(csv_reader)  # Read the header row
+        expected_headers = [header.value for header in CtCsvKeys]
+        if sorted(headers) != sorted(expected_headers):
+            raise ValueError(f"CSV header {headers} mismatch.\n    Expected headers: {expected_headers}")
+        for row in csv_reader:
+            in_dict = dict(zip(headers, row))
+            in_dict['interface_type'] = 'tagged' if in_dict[CtCsvKeys.TAGGED] == 'yes' else 'untagged'
+            del in_dict[CtCsvKeys.TAGGED]
+            in_dict['ipv4_addressing_type'] = 'numbered' if in_dict[CtCsvKeys.IPV4] == 'yes' else 'none'
+            del in_dict[CtCsvKeys.IPV4]
+            in_dict['ipv6_addressing_type'] = 'numbered' if in_dict[CtCsvKeys.IPV6] == 'yes' else 'none'
+            del in_dict[CtCsvKeys.IPV6]
+            cts_to_add.append(in_dict)
+
+    for res in import_ip_link_ct(session, cts_to_add):
+        if isinstance(res, Ok):
+            logger.info(res.ok_value)
+        elif isinstance(res, Err):
+            logger.warning(res.err_value)
+
+
 
 if __name__ == "__main__":
     cli()

@@ -1,0 +1,3 @@
+blueprint,label,security_zone,tagged,vlan_id,l3_mtu,ipv4,ipv6,description
+terra,iplink-11,dh50,yes,33,9100,yes,none,
+terra,iplink-12,dh50,yes,12,9100,yes,none,
