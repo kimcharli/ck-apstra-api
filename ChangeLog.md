@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.22 2024-08-07
+- implement file logging with ck_apstra_api_<timestame>
+
 ## 0.4.21 2024-08-07
 - implement import-iplink-ct
 
