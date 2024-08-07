@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.4.23 2024-08-07
+- fix logfile error in Windows
+- fix generic system import failing on brand new switch
+
 ## 0.4.22 2024-08-07
 - implement file logging with ck_apstra_api_<timestame>
 

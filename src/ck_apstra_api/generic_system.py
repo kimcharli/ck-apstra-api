@@ -52,13 +52,14 @@ class DataInit:
 class LeafSwitch:
     """The class to hold the switch data"""
     switch_label: str
-    # id: str = None
+    id: str = None
     nodes: List[Dict[str, Any]] = field(default_factory=list)  # store the node data of the switch
     interfaces: Dict[str, Any] = field(default_factory=dict)  # store the interface data of the switch
     bp: CkApstraBlueprint = None
     log_prefix: str = None
     # class variable to store the switch data
     _switches: ClassVar[Dict[str, Any]] = {}  # Dict[switch name, LeafSwitch]
+    last_error: str = None
 
     def __new__(cls, switch_label: str, bp: CkApstraBlueprint):        
         if switch_label in cls._switches:
@@ -74,25 +75,29 @@ class LeafSwitch:
         """
         self.log_prefix = f"LeafSwitch({switch_label})"
         self.switch_label = switch_label
-        # log_prefix = f"{self.log_prefix}::init()"
         self.bp = bp
         
         switch_interfaces_nodes_result = self.bp.get_switch_interface_nodes(self.switch_label)
-        # logging.warning(f"{self.log_prefix} {switch_interfaces_nodes_result=}")
         if isinstance(switch_interfaces_nodes_result, Err):
+            self.last_error = switch_interfaces_nodes_result.err_value
             return Err(f"LeafSwitch::__init__ {self.switch_label=} not found in blueprint {self.bp.label}")
         self.nodes = switch_interfaces_nodes_result.ok_value
-        # self.id = self.nodes[0][CkEnum.MEMBER_SWITCH]['id']
-        # logging.warning(f"{self.log_prefix} {self.switch_label=} {self.nodes=}")
-        self.interfaces = {x[CkEnum.MEMBER_INTERFACE]['if_name']: x[CkEnum.MEMBER_INTERFACE] for x in self.nodes}
-
-    @property
-    def id(self):
-        return self.nodes[0][CkEnum.MEMBER_SWITCH]['id']
+        # the leaf switch has existing interfaces
+        if self.nodes:
+            self.id = self.nodes[0][CkEnum.MEMBER_SWITCH]['id']
+            self.interfaces = {x[CkEnum.MEMBER_INTERFACE]['if_name']: x[CkEnum.MEMBER_INTERFACE] for x in self.nodes}
+        # the leaf switch is totally empty
+        else:
+            leaf_switch_query = f"node('system', name='system', label='{self.switch_label}', role='leaf')"
+            switch_node_result = self.bp.query(leaf_switch_query)
+            if isinstance(switch_node_result, Err):
+                self.last_error = switch_node_result.err_value
+                return Err(f"LeafSwitch::__init__ {self.switch_label=} not found in blueprint {self.bp.label}")
+            self.id = switch_node_result.ok_value[0]['system']['id']
+            self.interfaces = []
     
     # might not be needed
     def interface_id(self, if_name: str) -> str:
-        # logging.warning(f"{self.log_prefix} {if_name=} {self.interfaces=}")
         if if_name in self.interfaces:
             return self.interfaces[if_name]['id']
         else:
