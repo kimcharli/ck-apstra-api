@@ -35,7 +35,7 @@ def prep_logging(log_level: str = 'INFO', log_name: str = 'root'):
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
 
-    fh = logging.FileHandler(f'ck_apstra_api_{timestamp}.log')
+    fh = logging.FileHandler(f'ck_apstra_api_{timestamp.replace(":", "")}.log')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(CustomFormatter())
     ch = logging.StreamHandler()
