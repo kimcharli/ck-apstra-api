@@ -11,9 +11,9 @@ Example property set:
     snmp_versin: 3     ## 2 or 3
     v2_community: sFlow-collector
     v3_user: sflow-v3
-    v3_auth_key: $9$NW-24ZUjfQF-VTzF6At8Xx-s2DikQ36ji.5Qz6/lKvWLNVb2ZDiVbP5zF/9X7Nd24UjH.fTNdwgaJDjtu0BhSrlM8LNhcdbw2aJik.PfztuOIRSCAORhcvM4aJUk.5T3AtOQzCuO1hcvWL7wYZUjq.5-V.P5T3nWLX7-woJGDjqLxHqf5F39ApBcy
-    v3_priv_key: $9$6Hwe9uOhclMWxKvDikqQzcyrKX7Vb2aGD-dwgoaUDApuB1hKM8Vs2MW7Vs2aJ36/ApBlKM8xNKvjHkqf5n/CuRhKvL7dbp0
-    
+    v3_auth_key: $9$ayJjHq.5T36f5Qn/CB1-Vbs2aiHmF39mP0BIEyrvWLx7V4aZUHqJZ/CAu1IwY2gUj5QF6/tQz6ApuEh4aJUDk.mTQ36HkAp0OcSwY2oaUP5QF69wYmfTz6/Lx7-s2goJiHmM8GDHkTQcyrlLxYgoji.X7jHkqf5Fn/CO1IEclvWOBdbs2GUp0OIyl
+    v3_priv_key: $9$DKkfTz36pO1/90IhSMWoJZDi.z36/Apn68XxNbwfTQz/CuO1creRESeM87Nmf5T69AtOhclu0-Vw2aJGDiHP56/tu0IHq
+
 Test command example:
     snmpwalk -v3  -l authNoPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv 10.85.192.16 .1.3.6.1.2.1.2.1
     snmpwalk -v3  -l authPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv -x AES-128 -X vfr43edcxsw21qaz 10.85.192.16 .1.3.6.1.2.1
@@ -44,7 +44,11 @@ protocols {
             ingress 1024;
             egress 1024;
         }
+{% if sflow_rz != 'mgmt_junos' %}
         source-ip {{security_zones[sflow_rz]['loopback_ip']}};
+{% else %}
+        source-ip {{management_ip}};
+{% endif %}
         collector {{sflow_collector}} {
             udp-port {{sflow_port}};
         }
