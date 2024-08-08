@@ -808,7 +808,10 @@ def assign_vn_to_leaf(ctx, blueprint: str, virtual_network: str, bound_to: str):
 @click.pass_context
 def import_iplink_ct(ctx, csv_in: str):
     """
-    Import IpLink CT from a CSV file
+    Import IpLink Connectivity Template from a CSV file
+
+    Use label 'Default routing zone' for the default routing zone.
+    Find the example CSV file in https://raw.githubusercontent.com/kimcharli/ck-apstra-api/main/tests/fixtures/iplink_ct_sample.csv
     """
     from ck_apstra_api import CtCsvKeys, add_generic_systems, CkApstraSession, prep_logging, import_ip_link_ct
     from result import Ok, Err
