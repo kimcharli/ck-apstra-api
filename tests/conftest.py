@@ -1,12 +1,9 @@
 import pytest
-import csv
 import logging
-import os
+from ck_apstra_api import CkApstraSession
 
 logger = logging.getLogger(__name__)
 
-
-from ck_apstra_api.apstra_session import CkApstraSession
 
 
 class Data:

@@ -11,7 +11,7 @@ from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
 
 def test_12_main_blueprint(session, main_bp):
     bp = CkApstraBlueprint(session, main_bp)
-    bp_id = bp.get_id()
+    _ = bp.get_id()
     assert True
 
 

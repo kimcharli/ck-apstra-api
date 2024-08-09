@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-import json
-import urllib3
 import click
-import getpass
 
 from ck_apstra_api.cli import CkJobEnv
 
@@ -50,14 +47,17 @@ def order_pull_configurations(order: CkJobEnv):
             continue
 
         configlet_string = config_string[1].split(begin_set)
-        write_to_file(f"{blueprint_dir}/{system_label}-configlet.txt", configlet_string[0])
+        write_to_file(f"{blueprint_dir}/{system_label}-configlet.txt",
+                      configlet_string[0])
         if len(configlet_string) < 2:
             # no configlet in set type. skip
             continue
 
-        write_to_file(f"{blueprint_dir}/{system_label}-configlet-set.txt", configlet_string[1])
+        write_to_file(f"{blueprint_dir}/{system_label}-configlet-set.txt",
+                      configlet_string[1])
 
-@click.command(name='pull-device-configurations', help='pull produced configurations from Apstra')
+@click.command(name='pull-device-configurations',
+               help='pull produced configurations from Apstra')
 def click_pull_configurations():
     order = CkJobEnv()
     order_pull_configurations(order)

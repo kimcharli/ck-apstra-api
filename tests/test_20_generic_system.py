@@ -2,8 +2,7 @@ import logging
 import pytest
 import csv
 
-from ck_apstra_api.apstra_blueprint import CkApstraBlueprint
-from ck_apstra_api.generic_system import add_generic_systems, GsCsvKeys
+from ck_apstra_api import add_generic_systems, GsCsvKeys
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,9 @@ def load_gs_csv_file(gs_csv) -> list[dict]:
         headers = next(csv_reader)  # Read the header row
         expected_headers = [header.value for header in GsCsvKeys]
         if headers != expected_headers:
-            raise ValueError("CSV header mismatch. Expected headers: " + ', '.join(expected_headers))
+            raise ValueError(
+                "CSV header mismatch. Expected headers: "
+                    + ', '.join(expected_headers))
 
         for row in csv_reader:
             data.append(dict(zip(headers, row)))

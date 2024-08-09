@@ -311,7 +311,8 @@ def add_ip_endpoints(jobEnv: CkJobEnv, prefix_list_collection: PrefixListCollect
         logging.debug(f"{prefix_name=} Created")
 
 @click.command(name='add-ip-endpoints')
-@click.option('--set-file', required=True, help='The name of the junos configuration in set format')
+@click.option('--set-file', required=True,
+              help='The name of the junos configuration in set format')
 def click_add_ip_endpoints(set_file: str):
     job_env = CkJobEnv()
     prefix_list_collection = PrefixListCollection(job_env.main_bp)

@@ -1,6 +1,7 @@
 from datetime import datetime
 import logging
 
+logging_format = "%(asctime)s - %(levelname)8s - %(name)s - %(message)s (%(filename)s:%(lineno)d)"
 class CustomFormatter(logging.Formatter):
     black = "\x1b[30;21m"
     grey = "\x1b[38;21m"
@@ -11,19 +12,16 @@ class CustomFormatter(logging.Formatter):
     red = "\x1b[31;21m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s (%(filename)s:%(lineno)d)"
 
     FORMATS = {
-        logging.DEBUG: white + format + reset,
-        logging.INFO: dark_gray + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset
+        logging.DEBUG: white + logging_format + reset,
+        logging.INFO: dark_gray + logging_format + reset,
+        logging.WARNING: yellow + logging_format + reset,
+        logging.ERROR: red + logging_format + reset,
+        logging.CRITICAL: bold_red + logging_format + reset
     }
 
     def format(self, record):
-        levelname = record.levelname.ljust(8)  # Set the level name to a fixed width (e.g., 8 characters)
-        record.levelname = levelname
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
@@ -37,7 +35,7 @@ def prep_logging(log_level: str = 'INFO', log_name: str = 'root'):
 
     fh = logging.FileHandler(f'ck_apstra_api_{timestamp.replace(":", "")}.log')
     fh.setLevel(logging.DEBUG)
-    fh.setFormatter(CustomFormatter())
+    fh.setFormatter(logging.Formatter(logging_format))
     ch = logging.StreamHandler()
     ch.setLevel(log_level)
     ch.setFormatter(CustomFormatter())
