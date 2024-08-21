@@ -450,7 +450,7 @@ class GenericSystem(DataInit):
     """
     server: str
     ext: Optional[bool]  # TBD: the external flag for the generic system
-    deploy_mode: Optional[bool]  # the deploy flag for the generic system
+    deploy_mode: Optional[str] # the deploy flag for the generic system
     tags_server: Optional[List[str]]
     # child
     link_groups: Optional[List[LinkGroup]] = field(default=None, repr=False)  # optional only during initial creation
@@ -476,6 +476,10 @@ class GenericSystem(DataInit):
         self.log_prefix = f"GenericSystem({self.server})"
         self.link_groups = []
         self.ext = True if self.ext == 'True' else False
+        # it may have training space 
+        if self.deploy_mode:
+            self.deploy_mode = self.deploy_mode.strip().lower()
+        # it should be None if not present
         if not self.deploy_mode:
             self.deploy_mode = None
     
@@ -693,7 +697,7 @@ class GenericSystem(DataInit):
             if patched.status_code == 202:
                 yield Ok(f"{log_prefix} patched {patch_spec} result: {patched}")
             else:
-                yield Err(f"{log_prefix} failed for {patch_spec} result: {patched['errors']}")
+                yield Err(f"{log_prefix} failed for {patch_spec} result: {patched.text}")
 
 
 
