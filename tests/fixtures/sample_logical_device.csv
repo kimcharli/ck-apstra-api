@@ -1,0 +1,3 @@
+name,panel,port_groups,roles,count,speed
+c-5120,1,1,generic,48,10G
+c-5120,1,2,"generic, peer, spine",8,100G

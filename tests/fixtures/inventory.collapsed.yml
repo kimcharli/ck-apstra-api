@@ -1,0 +1,123 @@
+collapsed_core_1:
+  hosts:
+    ex4600-1:
+      ansible_host: 10.85.156.172
+      peer: ex4600-2
+      hostname: ex4600-1
+    ex4600-2:
+      ansible_host: 10.85.156.171
+      peer: ex4600-1
+      hostname: ex4600-2
+  vars:
+    model: ex4600
+    root_encrypted_password: "$1$u0szc6EF$XbsAoAH1t7nU4crY44IE5/"
+    root_ssh_rsa: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDPL78MoahulNonlvUSG4F0GHXRTp4lrFdynZO1ufdXHBSGc0SuZTiJAPbPGJidMxWpWoIHEVpp8x3u5jNMVoo4UCEiMrQc4Cqz5NlxCNM2Y5mn/LO7no3LijlMV8QW72eo79LZFjPwwnFeclvEaqCazZ7QCjpLA9dadLa4+dG9AgZQ9p6AsbY4iNIBVyvRZO1zrE2qOUBdeYy1nBMy8iDdquZGityhLBABEaXHi7TcLP5evCCQ/PkVWtmwO7V5d6fniFhWAlAFo7sKm25RTYffcA1wCnGFOGqbtzkYgW8LSZKe4DKtRmp/NrhoG59rqXf+y+zzZayQtIlbyML7Q9Ot ckim@ckim-mbp"
+    user: root
+    # ssh_private_key_file: /Users/ckim/.ssh/id_rsa
+    passwd: Juniper
+    port: 22
+    vxlan_vrf_target_default: target:65100:1
+    bgp_authentication_key: $9$WOBL-Vs24ZDiY2z3/Cu0-VbwaZ
+    mgmt_prefix_length: 25
+    mgmt_gateway: 10.85.156.129
+    lo0_ip:
+      ex4600-1: 192.168.206.1
+      ex4600-2: 192.168.206.2
+    ae0_ip:
+      ex4600-1: 10.0.1.0
+      ex4600-2: 10.0.1.1
+    bgp_as:
+      ex4600-1: 65101
+      ex4600-2: 65102
+    vlans:
+      1:
+        name: default
+        # l3_interface: irb.0
+        vni: 10001
+      3503:
+        name: WAPMgmt
+      3536:
+        name: WAPMgmt
+        # l3_interface: irb.3536
+      3532:
+        name: Wired-Data1
+        # l3_interface: irb.3532
+      3540:
+        name: Wireless-Data1
+        # subnet: 10.128.40.11/24
+        # vip: 10.128.40.1
+      3541:
+        name: pcn-voice
+        # l3_interface: irb.3541
+      990:
+        name: Enterprise-990
+      21:
+        name: Guest-21
+      3010:
+        name: Infra-mgmt-3010
+      555:
+        name: IoT
+      556:
+        name: V556
+    interfaces:
+      xe-0/0/1:
+        description: MDF Server Room Stack SW031 - Enterprise
+        ae: 31
+      xe-0/0/3:
+        description: MDF Server Room Stack SW031 - 41
+        ae: 41
+      xe-0/0/40:
+        description: Firewall ae1 Uplink to MOS04FW001
+        ae: 1
+    ae_interfaces:
+      1:
+        description: Firewall ae1 Uplink to MOS04FW001
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      11:
+        description: Firewall ae11 Uplink to MOS04FW002
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      21:
+        description: ae21 Uplink to server switches SW021 and SW022
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      31:
+        description: MDF Server Room Stack SW031 - Enterprise
+        esi: True
+        native_vlan_id: 3010
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      41:
+        description: MDF Server Room Stack SW031 - 41
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+        - V556
+        
+
+
+    

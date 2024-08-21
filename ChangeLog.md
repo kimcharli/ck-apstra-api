@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.24 2024-08-21
+- implement deploy_mode in import_generic_system
+
 ## 0.4.23 2024-08-07
 - fix logfile error in Windows
 - fix generic system import failing on brand new switch

@@ -17,6 +17,7 @@ class GsCsvKeys(StrEnum):
     BLUEPRINT = auto()
     SERVER = auto()
     EXT = auto()
+    DEPLOY_MODE = auto()
     """Designates if the generic system is external"""
     TAGS_SERVER = auto()
     """Tags for the generic system itself"""
@@ -54,7 +55,7 @@ class LeafSwitch:
     switch_label: str
     id: str = None
     nodes: List[Dict[str, Any]] = field(default_factory=list)  # store the node data of the switch
-    interfaces: Dict[str, Any] = field(default_factory=dict)  # store the interface data of the switch
+    interfaces: Optional[Dict[str, Any]] = field(default_factory=dict)  # store the interface data of the switch
     bp: CkApstraBlueprint = None
     log_prefix: str = None
     # class variable to store the switch data
@@ -93,8 +94,8 @@ class LeafSwitch:
             if isinstance(switch_node_result, Err):
                 self.last_error = switch_node_result.err_value
                 return Err(f"LeafSwitch::__init__ {self.switch_label=} not found in blueprint {self.bp.label}")
-            self.id = switch_node_result.ok_value[0]['system']['id']
             self.interfaces = []
+            self.id = switch_node_result.ok_value[0]['system']['id']
     
     # might not be needed
     def interface_id(self, if_name: str) -> str:
@@ -449,12 +450,15 @@ class GenericSystem(DataInit):
     """
     server: str
     ext: Optional[bool]  # TBD: the external flag for the generic system
+    deploy_mode: Optional[bool]  # the deploy flag for the generic system
     tags_server: Optional[List[str]]
     # child
     link_groups: Optional[List[LinkGroup]] = field(default=None, repr=False)  # optional only during initial creation
     # fetched
     gs_id: Optional[str] = None # generic system node id to be fetched from the blueprint
     fetched_server_tags: Optional[List[str]] = None  # the fetched tags from the apstra controller
+    fetched_external_flag: Optional[bool] = None  # the fetched external flag from the apstra controller
+    fetched_deploy_mode: Optional[bool] = None  # the fetched deploy flag from the apstra controller
     bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
 
     log_prefix: str = field(default='', repr=False)  # not to print in __repr__
@@ -471,6 +475,9 @@ class GenericSystem(DataInit):
             self.tags_server = self.tags_server.split(',')
         self.log_prefix = f"GenericSystem({self.server})"
         self.link_groups = []
+        self.ext = True if self.ext == 'True' else False
+        if not self.deploy_mode:
+            self.deploy_mode = None
     
     def load_link_group(self, data):
         """
@@ -503,6 +510,8 @@ class GenericSystem(DataInit):
             # yield Ok(f"{log_prefix} present in blueprint {apstra_bp.label}")
             self.gs_id = server_links[0][CkEnum.GENERIC_SYSTEM]['id']
             self.fetched_server_tags = server_links[0][CkEnum.GENERIC_SYSTEM]['tags']  # TODO: fix
+            self.fetched_external_flag = server_links[0][CkEnum.GENERIC_SYSTEM]['external']
+            self.fetched_deploy_flag = server_links[0][CkEnum.GENERIC_SYSTEM]['deploy_mode']
             #
             tag_result = apstra_bp.query(f"node('system', name='system', label='{self.server}', role='generic').in_('tag').node('tag', name='system_tag')")
             if isinstance(tag_result, Err):
@@ -662,11 +671,11 @@ class GenericSystem(DataInit):
             yield res
         
 
-
     def fix_tags(self) -> Generator[Result[str, str], Any, Any]:
         """
-        Fix the tags for the generic system, link group, and the link
+        Fix the tags for the generic system, link group, and the link, and update deploy_mode and external flag
         """
+        log_prefix = f"{self.log_prefix}::fix_tags()"
         tags_to_add = [x for x in self.tags_server if x not in self.fetched_server_tags]
         tags_to_remove = [x for x in self.fetched_server_tags if x not in self.tags_server]
         if len(tags_to_add) or len(tags_to_remove):
@@ -674,7 +683,20 @@ class GenericSystem(DataInit):
         for lg in self.link_groups:
             for res in lg.fix_tags():
                 yield res
-        
+        patch_spec = {}
+        if self.deploy_mode != self.fetched_deploy_mode:
+            patch_spec['deploy_mode'] = self.deploy_mode
+        if self.ext != self.fetched_external_flag:
+            patch_spec['external'] = self.ext
+        if patch_spec:
+            patched = self.bp.patch_item(f"nodes/{self.gs_id}", patch_spec)
+            if patched.status_code == 202:
+                yield Ok(f"{log_prefix} patched {patch_spec} result: {patched}")
+            else:
+                yield Err(f"{log_prefix} failed for {patch_spec} result: {patched['errors']}")
+
+
+
 
 @dataclass
 class ServerBlueprint(DataInit):

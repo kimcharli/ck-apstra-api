@@ -1,0 +1,77 @@
+system {
+    host-name {{ hostname }};
+    root-authentication {
+        encrypted-password {{ root_encrypted_password }};
+        ssh-rsa "{{ root_ssh_rsa }}";
+    }
+    login {
+        user aosadmin {
+            class super-user;
+            authentication {
+                encrypted-password "$1$vqJOfwrJ$pvWLh0z9FVLjzEDWBCqP4/"; ## SECRET-DATA
+            }
+        }
+    }
+    services {
+        ssh {
+            root-login allow;
+            protocol-version v2;
+        }
+        netconf {
+            ssh;
+        }
+    }
+    management-instance;
+    syslog {
+        user * {
+            any emergency;
+        }
+        file escript.log {
+            archive size 2m files 5;
+        }
+        file interactive-commands {
+            interactive-commands any;
+            archive size 2m files 5;
+        }
+        file messages {
+            any notice;
+            authorization any;
+            archive size 2m files 5;
+        }
+        file op-script.log {
+            archive size 2m files 5;
+        }
+        file snapshot {
+            archive size 2m files 5;
+        }
+    }
+}
+interfaces {
+    em0 {
+        unit 0 {
+            family inet {
+                address {{ ansible_host }}/{{ mgmt_prefix_length }};
+            }
+        }
+    }
+}
+routing-instances {
+    mgmt_junos {
+        routing-options {
+            static {
+                route 0.0.0.0/0 next-hop {{ mgmt_gateway }};
+            }
+        }
+    }
+}
+protocols {
+    lldp {
+        port-id-subtype interface-name;
+        port-description-type interface-description;
+        neighbour-port-info-display port-id;
+        interface all;
+    }
+    lldp-med {
+        interface all;
+    }                           
+} 

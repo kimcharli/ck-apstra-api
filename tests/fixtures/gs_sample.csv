@@ -1,4 +1,4 @@
-line,blueprint,server,ext,tags_server,ae,lag_mode,ct_names,tags_ae,speed,ifname,switch,switch_ifname,tags_link,comment
-1,terra,single-home-1,,single,,, vn20 ,single,10g,eth0,server_1,xe-0/0/11,,
-2,terra,dual-home-1,,dual,ae101,lacp_active,"vn20 , vn101",dual,10g,eth0,server_1,xe-0/0/12,forceup,
-3,terra,dual-home-1,,dual,ae101,lacp_active,"vn20,vn101",dual,10g,eth1,server_2,xe-0/0/12,,
+line,blueprint,server,deploy_mode,ext,tags_server,ae,lag_mode,ct_names,tags_ae,speed,ifname,switch,switch_ifname,tags_link,comment
+1,terra,single-home-1,deploy,,single,,, vn20 ,single,10g,eth0,server_1,xe-0/0/11,,
+2,terra,dual-home-1,,,dual,ae101,lacp_active,"vn20 , vn101",dual,10g,eth0,server_1,xe-0/0/12,forceup,
+3,terra,dual-home-1,,,dual,ae101,lacp_active,"vn20,vn101",dual,10g,eth1,server_2,xe-0/0/12,,

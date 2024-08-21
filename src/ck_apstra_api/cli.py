@@ -564,13 +564,14 @@ def import_generic_system(ctx, gs_csv_in: str):
         for row in csv_reader:
             links_to_add.append(dict(zip(headers, row)))
 
+    logger.info(f"Importing generic systems {links_to_add=}")
     for res in add_generic_systems(session, links_to_add):
         if isinstance(res, Ok):
             logger.info(res.ok_value)
         elif isinstance(res, Err):
             logger.warning(res.err_value)
         else:
-            logger.info(f"text {res}")
+            logger.info(res)
 
 
 @cli.command()
