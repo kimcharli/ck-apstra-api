@@ -1,0 +1,46 @@
+---
+- name: Get Device Facts
+  hosts: all
+  connection: local
+  # connection: juniper.device.pyez
+  gather_facts: no
+  collections:
+    - juniper.device
+
+  vars:
+    host: "{{ ansible_host }}"
+    user: "{{ admin_user }}"
+    passwd: "{{ admin_password }}"
+    ansible_ssh_pass: "{{ passwd }}"
+    local_lo0_ip: "{{ lo0_ip[inventory_hostname] }}"
+    peer_lo0_ip: "{{ lo0_ip[peer] }}"
+    local_ae0_ip: "{{ ae0_ip[inventory_hostname] }}"
+    peer_ae0_ip: "{{ ae0_ip[peer] }}"
+    local_bgp_as: "{{ bgp_as[inventory_hostname] }}"
+    peer_bgp_as: "{{ bgp_as[peer] }}"
+    out_folder: "../../temp"
+
+  tasks:
+    - debug:
+        var: ansible_host
+        
+    # - name: Create pristine configurations
+    #   ansible.builtin.template:
+    #     src: "../template.pristine.conf.j2"
+    #     dest: "{{ out_folder }}/{{ inventory_hostname }}.pristine.conf"
+
+    - name: Create configurations
+      ansible.builtin.template:
+        src: "../template.conf.j2"
+        dest: "{{ out_folder }}/{{ inventory_hostname }}.conf"
+
+    - name: Load override configuration
+      config:
+        load: 'override'
+        src: "{{ out_folder }}/{{ inventory_hostname }}.conf"
+        timeout: 60
+      register: response
+
+    - name: Print the response
+      debug:
+        var: response

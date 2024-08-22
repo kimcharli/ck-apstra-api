@@ -1,0 +1,358 @@
+system {
+    host-name {{ hostname }};
+    root-authentication {
+        encrypted-password "{{ root_encrypted_password }}";
+{%- if  root_ssh_rsa is defined %}
+        ssh-rsa "{{ root_ssh_rsa }}";
+{%- endif %}
+    }
+{%- if admin_user != 'root' or login_message|default('') %}
+    login {
+{%- if admin_user != 'root' %}
+        user {{ admin_user }} {
+            class super-user;
+            authentication {
+                encrypted-password "{{ admin_encrypted_password }}"; ## SECRET-DATA
+            }
+        }
+    }
+{%- endif %}
+{%- if login_message|default('') %}
+        message "{{ login_message }}";
+{%- endif %}
+    }
+{%- endif %}
+    services {
+        ssh {
+            root-login allow;
+            protocol-version v2;
+        }
+        netconf {
+            ssh;
+        }
+    }
+{%- if model.startswith('ex') %}
+    auto-snapshot;
+{%- endif %}
+{%- if domain_search|default([]) %}
+    domain-search [ {{ domain_search|join(" ") }} ];
+{%- endif %}
+{% if time_zone|default('') %}
+    time-zone {{ time_zone }};
+{%- endif %}
+    management-instance;
+{%- if name_servers|default([]) %}
+    name-server {
+{%- for ns in name_servers %}
+        {{ ns }};
+{%- endfor %}
+    }
+{%- endif %}    
+    syslog {
+        user * {
+            any emergency;
+        }
+        file interactive-commands {
+            interactive-commands any;
+        }
+        file messages {
+            any notice;
+            authorization any;
+        }
+    }
+{%- if ntp_servers|default([]) %}
+    ntp {
+{%- for ns in ntp_servers %}
+        server {{ ns }};
+{%- endfor %}
+    }
+{%- endif %}    
+}
+chassis {
+    aggregated-devices {
+        ethernet {
+            device-count {{ 1 + ae_interfaces|length }};
+        }
+    }
+    alarm {
+        management-ethernet {
+            link-down ignore;
+        }
+    }
+}
+interfaces {
+{%- for if_name, if_data in interfaces.items() %}
+    {{ if_name }} {
+        description "{{ if_data.description }}";
+{%- if if_data.get('ae', '') %}
+        hold-time up {{ hold_time_up }} down 0;
+        ether-options {
+            802.3ad ae{{ if_data.ae }};
+        }
+{%- else %}
+        mtu {{ default_mtu }};
+{%- endif %}
+{%- if if_data.get('native_vlan_id', 0) %}
+        native-vlan-id {{ if_data.get('native_vlan_id', 0) }};
+{%- endif %}
+{%- if if_data['vlans'] %}
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk;
+                vlan {
+                    members [ {{ if_data['vlans']|join(" ") }} ];
+                }
+            }
+        }
+{%- endif %}
+    }
+{%- endfor %}
+    et-0/0/24 {
+        description "to.{{ peer }}:et-0/0/24";
+        hold-time up {{ hold_time_up }} down 0;       
+        ether-options {
+            802.3ad ae0;
+        }
+    }
+    et-0/0/25 {
+        description "to.{{ peer }}:et-0/0/25";
+        hold-time up {{ hold_time_up }} down 0;       
+        ether-options {
+            802.3ad ae0;
+        }
+    }
+    ae0 {
+        description "to.{{ peer }}:ae0";
+        mtu {{ default_mtu }};
+        aggregated-ether-options {
+            lacp {
+                active;
+            }
+        }
+        unit 0 {
+            family inet {
+                address {{ local_ae0_ip }}/31;
+            }
+        }
+    }
+{%- for ae_id, ae in ae_interfaces.items() %}
+    ae{{ ae_id }} {
+        description "{{ ae['description'] }}";
+{%- if ae.get('esi', False) %}
+        esi {
+            auto-derive {
+                lacp;
+            }
+            all-active;
+        }
+{%- endif %}
+        aggregated-ether-options {
+            lacp {
+                active;
+{%- set ae_id_hex = '{:04x}'.format(ae_id) %}
+{%- set system_id_tail = ae_id_hex[:2] + ':' + ae_id_hex[2:] %}
+                system-id 02:00:00:00:{{system_id_tail}};
+            }
+        }
+{%- if ae['vlans'] %}
+        mtu {{ default_mtu }};
+{%- if ae.get('native_vlan_id', 0) %}
+        native-vlan-id {{ ae.get('native_vlan_id', 0) }};
+{%- endif %}
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk;
+                vlan {
+                    members [ {{ ae['vlans']|join(" ") }} ];
+                }
+            }
+        }
+    }
+{%- endif %}
+{%- endfor %}
+{%- if model in ['qfx5130'] %}
+    re0:mgmt-0 {
+{%- else %}
+    em0 {
+{%- endif %}
+        unit 0 {
+            family inet {
+                address {{ ansible_host }}/{{ mgmt_prefix_length }};
+            }
+        }
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address {{ local_lo0_ip }}/32;
+            }
+        }
+    }
+}
+{%- if snmp_contact|default('') or snmp_community_ro|default('') or snmp_community_rw|default('') %}
+snmp {
+{%- if snmp_contact|default('') %}
+    contact "{{ snmp_contact }}";
+{%- endif %}
+{%- if snmp_community_ro|default('') %}
+    community {{ snmp_community_ro }} {
+        authorization read-only;
+    }
+{%- endif %}
+{%- if snmp_community_rw|default('') %}
+    community {{ snmp_community_rw }} {
+        authorization read-write;
+    }
+{%- endif %}
+}
+{%- endif %}
+forwarding-options {
+    storm-control-profiles default {
+        all;
+    }
+}
+policy-options {                        
+    policy-statement ecmp_policy {      
+        then {                          
+            load-balance per-packet;    
+            accept;                     
+        }                               
+    }                                   
+    policy-statement underlay_export {
+        term 01-loopback {              
+            from {
+                interface lo0.0;
+            }                           
+            then accept;                
+        }                               
+        term 02-default {               
+            then reject;                
+        }                               
+    }                                   
+}  
+routing-instances {
+    mgmt_junos {
+        routing-options {
+            static {
+                route 0.0.0.0/0 next-hop {{ mgmt_gateway }};
+            }
+        }
+    }
+}
+routing-options {                       
+    router-id {{ local_lo0_ip }};            
+    autonomous-system {{ bgp_as_common }};
+    forwarding-table {                  
+        export ecmp_policy;             
+        ecmp-fast-reroute;              
+        chained-composite-next-hop {    
+            ingress {                   
+                evpn;                   
+            }                           
+        }                               
+    }                                   
+}  
+protocols {
+    bgp {
+        group evpn_underlay {
+            local-address {{ local_ae0_ip }};
+            family inet {
+                unicast;
+            }
+            export underlay_export;
+            bfd-liveness-detection {
+                minimum-interval 350;
+                multiplier 3;
+            }
+            neighbor {{ peer_ae0_ip }};
+        }
+        group evpn_overlay {
+            multihop {
+                ttl 2;
+            }
+            local-address {{ local_lo0_ip }};
+            family evpn {
+                signaling {
+                    loops 2;
+                }
+            }
+            bfd-liveness-detection {
+                minimum-interval 1000;  
+                multiplier 3;
+                session-mode automatic;
+            }
+            neighbor {{ peer_lo0_ip }};
+        }
+        multipath {
+            multiple-as;
+        }
+        local-as {{ local_bgp_as }};
+        peer-as {{ peer_bgp_as }};
+        log-updown;
+        graceful-restart;
+        vpn-apply-export;
+    }
+    evpn {
+        no-core-isolation;
+        encapsulation vxlan;
+        extended-vni-list all;
+    }
+    lldp {
+        port-id-subtype interface-name;
+        port-description-type interface-description;
+        neighbour-port-info-display port-id;
+        interface all;
+    }
+    lldp-med {
+        interface all;
+    }
+    rstp {
+        bridge-priority 0;
+        bpdu-block-on-edge;
+    }
+    loop-detect {                       
+        enhanced {                  
+{%- for if_name, if_data in interfaces.items() %}
+{%- if if_data['vlans'] %}
+            interface {{ if_name }} {            
+                loop-detect-action interface-down;
+                transmit-interval 1s;   
+                revert-interval 60;     
+            }                           
+{%- endif %}
+{%- endfor %}
+
+{%- for ae_id, ae in ae_interfaces.items() %}
+{%- if ae['vlans'] %}
+            interface ae{{ ae_id }} {            
+                loop-detect-action interface-down;
+                transmit-interval 1s;   
+                revert-interval 60;     
+            }                           
+{%- endif %}
+{%- endfor %}
+        }                               
+    }                                   
+} 
+switch-options {                        
+    vtep-source-interface lo0.0;        
+    route-distinguisher {{ local_lo0_ip }}:65534;
+    vrf-target {                        
+        {{ vxlan_vrf_target_default }};                 
+        auto;                           
+    }                                   
+} 
+vlans {
+{%- for vlan_id, vlan in vlans.items() %}
+    {{ vlan['name'] }} {
+        vlan-id {{ vlan_id }};
+{%- if vlan.get('l3_interface', '') %}
+        l3-interface irb.{{ vlan_id }};
+{%- endif %}
+        vxlan {
+            vni {{ 10000 + vlan_id }};
+        }
+    }
+{%- endfor %}
+}
+
