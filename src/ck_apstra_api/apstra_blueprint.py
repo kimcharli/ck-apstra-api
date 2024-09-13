@@ -90,7 +90,6 @@ class CkApstraBlueprint:
         """
         return self.session.get_items(f"blueprints/{self.id}")
 
-    # def query(self, query_string: str, print_prefix: str = None, multiline: bool = False) -> list:
     def query(self, query_string: str) -> Result[List, str]:
         """
         Query the Apstra API.
@@ -150,7 +149,7 @@ class CkApstraBlueprint:
         query = f"node('system', label='{system_label}', name='system')"
         system_query_result = self.query(query)
         if isinstance(system_query_result, Err):
-            return Err(f"{system_label} not found for {query}: from query: {error}")
+            return Err(f"{system_label} not found for {query}: from query: {query}")
         # self.logger.warning(f"{system_label=} {system_query_result=}")
         if len(system_query_result.ok_value) == 0:
             return Ok({})
@@ -329,7 +328,7 @@ class CkApstraBlueprint:
         speed = speed.upper()
         system_im_result = self.get_system_with_im(system_label)
         if isinstance(system_im_result, Err):
-            return Err(f"{system_label=} {intf_name=} {speed=}\n\tError get_system_with_im {error=}")
+            return Err(f"{system_label=} {intf_name=} {speed=}\n\tError get_system_with_im {system_im_result=}")
         system_im = system_im_result.ok_value
         device_profile_result = self.session.get_device_profile(system_im['im']['device_profile_id'])
         if isinstance(device_profile_result, Err):
@@ -853,3 +852,50 @@ class CkApstraBlueprint:
         temp_vn_spec['id'] = vn_temp_created.json()['id']
         # yield f"{log_prefix} - {temp_vn_spec=} {vn_temp_created=} {vn_temp_created.content=} {vn_temp_created.json()=}"
         yield temp_vn_spec
+
+    def export_iplink(self) -> Result[dict, str]:
+        '''
+        Export the IP link
+
+        Returns:
+            Error message or the result of the export
+            Ok
+                List of Dict: {
+                    'interface': 'ae1.1998',
+                    'ipv4_addr 
+                    'iplinks': [
+                        {
+                            'switch': 'switch_label',
+                            'interface': 'ifl_label'
+                            'server': 'server_label'
+                            'ipv4_1': 'switch_ipv4',
+                            'ipv4_2': 'server_ipv4'
+                        }
+                    ]
+                }
+        '''
+        LABEL_SWITCH = 'switch'
+        LABEL_IFL = 'ifl'
+        LABEL_GS_IFL = 'gs_ifl'
+        LABEL_SERVER = 'server'
+        iplink_query = f"""
+            node('system', system_type='switch', name='{LABEL_SWITCH}')
+                .out('hosted_interfaces').node('interface')
+                .out('composed_of').node('interface', if_type='subinterface', name='{LABEL_IFL}')
+                .out('link').node('link')
+                .in_('link').node('interface', if_type='subinterface', name='{LABEL_GS_IFL}')
+                .in_('composed_of').node('interface')
+                .in_('hosted_interfaces').node('system', system_type='server', name='{LABEL_SERVER}')
+        """
+        iplink_result = self.query(iplink_query)
+        if isinstance(iplink_result, Err):
+            return Err(f"Error: {iplink_result.err_value=}")
+        iplink_list = [{
+            'switch': x[LABEL_SWITCH]['label'],
+            'interface': x[LABEL_IFL]['label'],
+            'server': x[LABEL_SERVER]['label'],
+            'ipv4_1': x[LABEL_IFL]['ipv4_addr'],
+            'ipv4_2': x[LABEL_GS_IFL]['ipv4_addr']
+            } for x in iplink_result.ok_value]
+        return Ok(iplink_list)
+    

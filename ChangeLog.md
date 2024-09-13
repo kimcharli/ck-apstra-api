@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.4.27 2024-09-13
+- implement export-iplink
+
 ## 0.4.25 2024-08-21
 - implement deploy_mode in import_generic_system
 

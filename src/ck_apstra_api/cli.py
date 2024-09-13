@@ -54,7 +54,8 @@ def import_routing_zones(host_ip, host_port, host_user, host_password, input_fil
 
 
 @click.group()
-@click.option('--host-ip', type=str, default='10.85.192.45', help='Host IP address')
+# @click.option('--host-ip', type=str, default='10.85.192.45', help='Host IP address')
+@click.option('--host-ip', type=str, default='10.85.192.43', help='Host IP address')
 @click.option('--host-port', type=int, default=443, help='Host port')
 @click.option('--host-user', type=str, default='admin', help='Host username')
 @click.option('--host-password', type=str, default='admin', help='Host password')
@@ -854,6 +855,60 @@ def import_iplink_ct(ctx, csv_in: str):
             logger.warning(res.err_value)
 
 
+
+
+@cli.command()
+@click.option('--csv-out', type=str, default='iplink-out.csv', help='CSV file name to create')
+@click.pass_context
+def export_iplink(ctx, csv_out: str = None):
+    """
+    Export the IP Links into a CSV file
+    The headers:
+        line, blueprint, switch, ifl, ipv4_1, ipv4_2, server
+    """
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'export_iplink()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
+
+    iplinks = []
+    lines = 0
+    blueprint_ids = session.list_blueprint_ids()
+    for bp_id in blueprint_ids:
+        bp = CkApstraBlueprint(session, label=None, id=bp_id)
+        if not bp.id:
+            logger.error(f"Blueprint {bp_id} not found")
+            continue
+        bp_label = bp.label
+        logger.info(f"{bp_label=}")
+
+        iplinks_in_bp = bp.export_iplink()
+        if isinstance(iplinks_in_bp, Err):
+            logger.error(iplinks.err_value)
+            return
+        logger.info(f"{iplinks_in_bp.ok_value=}")
+        for iplink in iplinks_in_bp.ok_value:
+            iplink['line'] = lines
+            lines += 1
+            iplink['blueprint'] = bp_label
+            iplinks.append(iplink)
+            logger.info(f"{iplink=}")
+
+    csv_path = os.path.expanduser(f"{csv_out}")
+    with open(csv_path, 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=iplinks[0].keys())
+        writer.writeheader()
+        writer.writerows(iplinks)
+    logger.info(f"IP Links of blueprint {bp_id} exported to {csv_path}")
 
 if __name__ == "__main__":
     cli()
