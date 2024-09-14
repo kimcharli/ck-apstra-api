@@ -26,6 +26,23 @@ class CkEnum(StrEnum):
     AE_INTERFACE = 'ae'
 
 
+class IpLinkEnum(StrEnum):
+    '''
+    Enum for the IP link
+    '''
+    LABEL_SWITCH = 'switch'
+    LABEL_IFL = 'ifl'
+    LABEL_GS_IFL = 'gs_ifl'
+    LABEL_SERVER = 'server'
+
+    HEADER_LINE = 'line'
+    HEADER_BLUEPRINT = 'blueprint'
+    HEADER_SWITCH = 'switch'
+    HEADER_INTERFACE = 'interface'
+    HEADER_SERVER = 'server'
+    HEADER_IPV4_SWITCH = 'ipv4_switch'
+    HEADER_IPV4_SERVER = 'ipv4_server'
+
 class CkApstraBlueprint:
     # __slots__ = ['session', 'label', 'design', 'id', 'logger', 'url_prefix']
 
@@ -853,6 +870,7 @@ class CkApstraBlueprint:
         # yield f"{log_prefix} - {temp_vn_spec=} {vn_temp_created=} {vn_temp_created.content=} {vn_temp_created.json()=}"
         yield temp_vn_spec
 
+
     def export_iplink(self) -> Result[dict, str]:
         '''
         Export the IP link
@@ -865,37 +883,37 @@ class CkApstraBlueprint:
                     'ipv4_addr 
                     'iplinks': [
                         {
+                            'line': 0,
+                            'blueprint': 'blueprint_label',
                             'switch': 'switch_label',
                             'interface': 'ifl_label'
                             'server': 'server_label'
-                            'ipv4_1': 'switch_ipv4',
-                            'ipv4_2': 'server_ipv4'
+                            'ipv4_switch': 'switch_ipv4',
+                            'ipv4_server': 'server_ipv4'
                         }
                     ]
                 }
         '''
-        LABEL_SWITCH = 'switch'
-        LABEL_IFL = 'ifl'
-        LABEL_GS_IFL = 'gs_ifl'
-        LABEL_SERVER = 'server'
         iplink_query = f"""
-            node('system', system_type='switch', name='{LABEL_SWITCH}')
+            node('system', system_type='switch', name='{IpLinkEnum.LABEL_SWITCH}')
                 .out('hosted_interfaces').node('interface')
-                .out('composed_of').node('interface', if_type='subinterface', name='{LABEL_IFL}')
+                .out('composed_of').node('interface', if_type='subinterface', name='{IpLinkEnum.LABEL_IFL}')
                 .out('link').node('link')
-                .in_('link').node('interface', if_type='subinterface', name='{LABEL_GS_IFL}')
+                .in_('link').node('interface', if_type='subinterface', name='{IpLinkEnum.LABEL_GS_IFL}')
                 .in_('composed_of').node('interface')
-                .in_('hosted_interfaces').node('system', system_type='server', name='{LABEL_SERVER}')
+                .in_('hosted_interfaces').node('system', system_type='server', name='{IpLinkEnum.LABEL_SERVER}')
         """
         iplink_result = self.query(iplink_query)
         if isinstance(iplink_result, Err):
             return Err(f"Error: {iplink_result.err_value=}")
         iplink_list = [{
-            'switch': x[LABEL_SWITCH]['label'],
-            'interface': x[LABEL_IFL]['label'],
-            'server': x[LABEL_SERVER]['label'],
-            'ipv4_1': x[LABEL_IFL]['ipv4_addr'],
-            'ipv4_2': x[LABEL_GS_IFL]['ipv4_addr']
+            IpLinkEnum.HEADER_LINE.value: 0,
+            IpLinkEnum.HEADER_BLUEPRINT.value: self.label,
+            IpLinkEnum.HEADER_SWITCH.value: x[IpLinkEnum.LABEL_SWITCH]['label'],
+            IpLinkEnum.HEADER_INTERFACE.value: x[IpLinkEnum.LABEL_IFL]['if_name'],
+            IpLinkEnum.HEADER_SERVER.value: x[IpLinkEnum.LABEL_SERVER]['label'],
+            IpLinkEnum.HEADER_IPV4_SWITCH.value: x[IpLinkEnum.LABEL_IFL]['ipv4_addr'],
+            IpLinkEnum.HEADER_IPV4_SERVER.value: x[IpLinkEnum.LABEL_GS_IFL]['ipv4_addr']
             } for x in iplink_result.ok_value]
         return Ok(iplink_list)
     
