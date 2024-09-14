@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict, fields
+from functools import cache
 from pathlib import Path
 import click
 import os
@@ -534,6 +535,9 @@ def export_systems(ctx, bp_name, systems_csv):
 def import_generic_system(ctx, gs_csv_in: str):
     """
     Import generic systems from a CSV file
+
+    \b
+    Sample CSV file: https://github.com/kimcharli/ck-apstra-api/blob/main/tests/fixtures/gs_sample.csv
     """
     from ck_apstra_api import GsCsvKeys, add_generic_systems, CkApstraSession, prep_logging
     from result import Ok, Err
@@ -544,9 +548,6 @@ def import_generic_system(ctx, gs_csv_in: str):
     host_port = ctx.obj['HOST_PORT']
     host_user = ctx.obj['HOST_USER']
     host_password = ctx.obj['HOST_PASSWORD']
-
-    # uncomment below for debugging purpose. It prints the username and password
-    # logger.info(f"{ctx.obj=}")
 
     session = CkApstraSession(host_ip, host_port, host_user, host_password)
     if session.last_error:
@@ -812,10 +813,11 @@ def import_iplink_ct(ctx, csv_in: str):
     """
     Import IpLink Connectivity Template from a CSV file
 
+    \b
     Use label 'Default routing zone' for the default routing zone.
-    Find the example CSV file in https://raw.githubusercontent.com/kimcharli/ck-apstra-api/main/tests/fixtures/iplink_ct_sample.csv
+    Sample CSV file: https://raw.githubusercontent.com/kimcharli/ck-apstra-api/main/tests/fixtures/iplink_ct_sample.csv
     """
-    from ck_apstra_api import CtCsvKeys, add_generic_systems, CkApstraSession, prep_logging, import_ip_link_ct
+    from ck_apstra_api import CtCsvKeys, CkApstraSession, prep_logging, import_ip_link_ct
     from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'import_iplink_ct()')
@@ -864,7 +866,7 @@ def export_iplink(ctx, csv_out: str = None):
     """
     Export the IP Links into a CSV file
     The headers:
-        line, blueprint, switch, ifl, ipv4_1, ipv4_2, server
+        line, blueprint, switch, interface, ipv4_switch, ipv4_server, server
     """
     from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint, IpLinkEnum
     from result import Ok, Err
@@ -908,6 +910,65 @@ def export_iplink(ctx, csv_out: str = None):
         writer.writeheader()
         writer.writerows(iplinks)
     logger.info(f"IP Links exported to {csv_path}")
+
+@cache
+def get_blueprint(session, bp_name):
+    from ck_apstra_api import CkApstraBlueprint
+    bp = CkApstraBlueprint(session, bp_name)
+    return bp
+
+
+@cli.command()
+@click.option('--csv-in', type=str, default='iplink-in.csv', help='CSV file name to read IpLinks')
+@click.pass_context
+def import_iplink(ctx, csv_in: str = None):
+    """
+    Import the IP Links from a CSV file.
+
+    \b
+    Sample CSV file: https://github.com/kimcharli/ck-apstra-api/blob/main/tests/fixtures/iplink_sample.csv
+    The CSV file from export_iplink can be used as the sample as well.
+    The headers:
+        line, blueprint, switch, interface, ipv4_switch, ipv4_server, server
+    """
+    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint, IpLinkEnum
+    from result import Ok, Err
+
+    logger = prep_logging('DEBUG', 'import_iplink()')
+
+    host_ip = ctx.obj['HOST_IP']
+    host_port = ctx.obj['HOST_PORT']
+    host_user = ctx.obj['HOST_USER']
+    host_password = ctx.obj['HOST_PASSWORD']
+    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if session.last_error:
+        logger.error(f"Session error: {session.last_error}")
+        return
+
+    ip_links_to_add = []
+    with open(csv_in, 'r') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        headers = next(csv_reader)  # Read the header row
+        expected_headers = [header.value for header in IpLinkEnum]
+        if sorted(headers) != sorted(expected_headers):
+            raise ValueError(f"CSV header {headers} mismatch.\n    Expected headers: {expected_headers}")
+
+        for row in csv_reader:
+            dict_to_add = dict(zip(headers, row))
+            ip_links_to_add.append(dict_to_add)
+            # logger.info(f"{dict_to_add=}")
+            blueprint_label = dict_to_add[IpLinkEnum.HEADER_BLUEPRINT]
+            bp = get_blueprint(session, blueprint_label)
+            if not bp.id:
+                logger.error(f"Blueprint {blueprint_label} not found")
+                continue
+            patched = bp.import_iplink(dict_to_add)
+            if isinstance(patched, Err):
+                logger.error(patched.err_value)
+                continue
+            logger.info(f"{patched.ok_value}")
+
+
 
 if __name__ == "__main__":
     cli()

@@ -30,11 +30,6 @@ class IpLinkEnum(StrEnum):
     '''
     Enum for the IP link
     '''
-    LABEL_SWITCH = 'switch'
-    LABEL_IFL = 'ifl'
-    LABEL_GS_IFL = 'gs_ifl'
-    LABEL_SERVER = 'server'
-
     HEADER_LINE = 'line'
     HEADER_BLUEPRINT = 'blueprint'
     HEADER_SWITCH = 'switch'
@@ -871,6 +866,65 @@ class CkApstraBlueprint:
         yield temp_vn_spec
 
 
+    def import_iplink(self, ip_links_in: dict) -> Result[dict, str]:
+        '''
+        Import the IP link
+
+        Args:
+            ip_links_in: The IP link data # the data returned by export_iplink
+
+        Returns:
+            Error message or the result of the export
+            Ok
+        '''
+        LABEL_SWITCH = 'switch'
+        LABEL_IFL = 'ifl'
+        LABEL_GS_IFL = 'gs_ifl'
+        LABEL_SERVER = 'server'
+
+        switch_label = ip_links_in[IpLinkEnum.HEADER_SWITCH.value]
+        switch_ifl = ip_links_in[IpLinkEnum.HEADER_INTERFACE.value]
+        ipv4_switch = ip_links_in[IpLinkEnum.HEADER_IPV4_SWITCH.value]
+        ipv4_server = ip_links_in[IpLinkEnum.HEADER_IPV4_SERVER.value]
+
+        iplink_query = f"""
+            node('system', system_type='switch', label='{switch_label}', name='{LABEL_SWITCH}')
+                .out('hosted_interfaces').node('interface')
+                .out('composed_of').node('interface', if_name='{switch_ifl}', name='{LABEL_IFL}')
+                .out('link').node('link')
+                .in_('link').node('interface', if_type='subinterface', name='{LABEL_GS_IFL}')
+                .in_('composed_of').node('interface')
+                .in_('hosted_interfaces').node('system', system_type='server', name='{LABEL_SERVER}')
+        """
+        iplink_result = self.query(iplink_query)
+        if isinstance(iplink_result, Err):
+            return Err(f"Error: {iplink_result.err_value=}")
+        if len(iplink_result.ok_value) == 0:
+            return Err(f"Error: {iplink_result.ok_value=}")
+        fetched_ipv4_switch = iplink_result.ok_value[0][LABEL_IFL]['ipv4_addr']
+        fetched_ipv4_server = iplink_result.ok_value[0][LABEL_GS_IFL]['ipv4_addr']
+        fetched_ifl_id = iplink_result.ok_value[0][LABEL_IFL]['id']
+        fetched_gs_ifl_id = iplink_result.ok_value[0][LABEL_GS_IFL]['id']
+        if fetched_ipv4_switch == ipv4_switch and fetched_ipv4_server == ipv4_server:
+            return Ok(f"Skipping - no change: {ip_links_in=}")
+        iplink_patch_spec = {
+            'subinterfaces': {
+                fetched_ifl_id: {
+                    'ipv4_addr': ipv4_switch,
+                    'ipv4_addr_type': 'numbered'
+                },
+                fetched_gs_ifl_id: {
+                    'ipv4_addr': ipv4_server,
+                    'ipv4_addr_type': 'numbered'
+                }
+            }
+        }
+        iplink_patch_result = self.patch_item('subinterfaces', iplink_patch_spec)
+        if iplink_patch_result.status_code != 204:
+            return Err(f"Error: {iplink_patch_result.text=} {ip_links_in=}")
+        return Ok(f"patched successfully: {ip_links_in=}")
+
+
     def export_iplink(self) -> Result[dict, str]:
         '''
         Export the IP link
@@ -894,14 +948,19 @@ class CkApstraBlueprint:
                     ]
                 }
         '''
+        LABEL_SWITCH = 'switch'
+        LABEL_IFL = 'ifl'
+        LABEL_GS_IFL = 'gs_ifl'
+        LABEL_SERVER = 'server'
+
         iplink_query = f"""
-            node('system', system_type='switch', name='{IpLinkEnum.LABEL_SWITCH}')
+            node('system', system_type='switch', name='{LABEL_SWITCH}')
                 .out('hosted_interfaces').node('interface')
-                .out('composed_of').node('interface', if_type='subinterface', name='{IpLinkEnum.LABEL_IFL}')
+                .out('composed_of').node('interface', if_type='subinterface', name='{LABEL_IFL}')
                 .out('link').node('link')
-                .in_('link').node('interface', if_type='subinterface', name='{IpLinkEnum.LABEL_GS_IFL}')
+                .in_('link').node('interface', if_type='subinterface', name='{LABEL_GS_IFL}')
                 .in_('composed_of').node('interface')
-                .in_('hosted_interfaces').node('system', system_type='server', name='{IpLinkEnum.LABEL_SERVER}')
+                .in_('hosted_interfaces').node('system', system_type='server', name='{LABEL_SERVER}')
         """
         iplink_result = self.query(iplink_query)
         if isinstance(iplink_result, Err):
@@ -909,11 +968,11 @@ class CkApstraBlueprint:
         iplink_list = [{
             IpLinkEnum.HEADER_LINE.value: 0,
             IpLinkEnum.HEADER_BLUEPRINT.value: self.label,
-            IpLinkEnum.HEADER_SWITCH.value: x[IpLinkEnum.LABEL_SWITCH]['label'],
-            IpLinkEnum.HEADER_INTERFACE.value: x[IpLinkEnum.LABEL_IFL]['if_name'],
-            IpLinkEnum.HEADER_SERVER.value: x[IpLinkEnum.LABEL_SERVER]['label'],
-            IpLinkEnum.HEADER_IPV4_SWITCH.value: x[IpLinkEnum.LABEL_IFL]['ipv4_addr'],
-            IpLinkEnum.HEADER_IPV4_SERVER.value: x[IpLinkEnum.LABEL_GS_IFL]['ipv4_addr']
+            IpLinkEnum.HEADER_SWITCH.value: x[LABEL_SWITCH]['label'],
+            IpLinkEnum.HEADER_INTERFACE.value: x[LABEL_IFL]['if_name'],
+            IpLinkEnum.HEADER_SERVER.value: x[LABEL_SERVER]['label'],
+            IpLinkEnum.HEADER_IPV4_SWITCH.value: x[LABEL_IFL]['ipv4_addr'],
+            IpLinkEnum.HEADER_IPV4_SERVER.value: x[LABEL_GS_IFL]['ipv4_addr']
             } for x in iplink_result.ok_value]
         return Ok(iplink_list)
     

@@ -1,0 +1,9 @@
+line,blueprint,switch,interface,server,ipv4_switch,ipv4_server
+0,terra,border_1,xe-0/0/16.2253,mx80-1,10.0.0.142/31,10.0.0.143/31
+1,terra,border_1,xe-0/0/0.33,server7-1,10.0.0.146/31,10.0.0.147/31
+2,terra,border_1,xe-0/0/17.2253,mx80-2,10.0.0.100/31,10.0.0.101/31
+3,terra,border_1,et-0/0/54.10,dci,10.0.0.118/31,10.0.0.119/31
+4,terra,border_2,xe-0/0/16.2253,mx80-1,10.0.0.144/31,10.0.0.145/31
+5,terra,border_2,et-0/0/55,dh50,10.0.0.123/31,10.0.0.122/31
+6,terra,server_2,xe-0/0/5.3998,server2-2,192.168.0.1/30,192.168.0.2/30
+7,dh,dh_border1,et-0/0/4.10,dci,10.0.0.121/31,10.0.0.120/31
