@@ -865,6 +865,8 @@ def import_iplink_ct(ctx, csv_in: str):
 def export_iplink(ctx, csv_out: str = None):
     """
     Export the IP Links into a CSV file
+
+    \b
     The headers:
         line, blueprint, switch, interface, ipv4_switch, ipv4_server, server
     """
