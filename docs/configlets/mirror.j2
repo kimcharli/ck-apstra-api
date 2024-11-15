@@ -2,7 +2,11 @@
 {% set mirrored_interfaces = [] %}
 {% for intf in interface.values() %}
 {% if 'intf_tags' in intf and 'mirror' in intf['intf_tags'] %}
+{% if intf['part_of'] == '' %}
 {% set mirrored_interfaces = mirrored_interfaces.append(intf['intfName']) %}
+{% else %}
+{% set mirrored_interfaces = mirrored_interfaces.append(intf['part_of']) %}
+{% endif %}
 {% endif %}
 {% endfor %}
 {% if mirrored_interfaces|length %}
