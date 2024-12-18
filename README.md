@@ -25,7 +25,7 @@ ckim@ckim-mbp:sandbox % mkdir test
 ckim@ckim-mbp:sandbox % cd test             
 ckim@ckim-mbp:test % python -m venv .venv                      
 ckim@ckim-mbp:test % source .venv/bin/activate
-(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.4.13
+(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.5.0
 ...                                                                                             
 (.venv) ckim@ckim-mbp:test % 
 ```
@@ -36,7 +36,7 @@ ckim@ckim-mbp:test % source .venv/bin/activate
 cd test
 py -m venv .venv
 .venv\Scripts\activate
-pip install ck-apstra-api==0.4.13
+pip install ck-apstra-api==0.5.0
 ```
 
 
@@ -44,7 +44,7 @@ pip install ck-apstra-api==0.4.13
 
 ```
 (.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --version
-ck_apstra_api, 0.4.12
+ck_apstra_api, 0.5.0
 (.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 
