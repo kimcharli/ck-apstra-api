@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.5.2 20204-12-20
+- modularize cli
+
 ## 0.5.0 2024-12-18
 - change to uv from poetry
 
