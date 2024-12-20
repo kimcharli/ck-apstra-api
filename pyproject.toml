@@ -1,6 +1,6 @@
 [project]
 name = "ck-apstra-api"
-version = "0.5.0"
+version = "0.5.1"
 description = "An implementation to use Apstra API"
 authors = [ {name = "Charlie Kim", email = "ckim@juniper.net"} ]
 readme = "README.md"
@@ -8,12 +8,13 @@ requires-python = ">=3.11"
 license = {file = "MIT"}
 dependencies = [
     "click>=8.1.7",
+    "python-dotenv>=1.0.1",
     "requests>=2.32.3",
     "result>=0.17.0",
 ]
 
 [project.scripts]
-ck-cli = "ck_apstra_api.cli:cli"
+ck-cli = "ck_apstra_api.cli.cli:cli"
 
 [tool.uv]
 package = true

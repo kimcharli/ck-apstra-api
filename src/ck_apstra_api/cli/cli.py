@@ -6,9 +6,36 @@ import os
 import logging
 import time
 import json
+import dotenv
 from pprint import pprint
 import csv
 
+from ck_apstra_api import CkApstraSession, prep_logging
+from ck_apstra_api import CkApstraBlueprint
+
+
+# keep the common variables in a class
+class CliVar:
+    session = None
+    blueprint = None
+
+    def get_blueprint(self, bp_name, logger) -> CkApstraBlueprint:
+        """ Get the blueprint object. If not found, return None """
+        self.blueprint = CkApstraBlueprint(self.session, bp_name)
+        if not self.blueprint.id:
+            logger.error(f"Blueprint {bp_name} not found")
+            return None
+        logger.info(f"{bp_name=}, {self.blueprint.id=}")
+        if self.blueprint.id:
+            logger.info(f"Blueprint {bp_name} found")
+            return self.blueprint
+        else:
+            logger.warning(f"Blueprint {bp_name} not found")
+            return None
+
+
+dotenv.load_dotenv()
+cliVar = CliVar()
 
 def import_routing_zones(host_ip, host_port, host_user, host_password, input_file_path_string: str = None, sheet_name: str = 'routing_zones'):
     return
@@ -55,23 +82,41 @@ def import_routing_zones(host_ip, host_port, host_user, host_password, input_fil
 
 
 @click.group()
-# @click.option('--host-ip', type=str, default='10.85.192.45', help='Host IP address')
-@click.option('--host-ip', type=str, default='10.85.192.39', help='Host IP address')
-@click.option('--host-port', type=int, default=443, help='Host port')
-@click.option('--host-user', type=str, default='admin', help='Host username')
-@click.option('--host-password', type=str, default='admin', help='Host password')
+@click.option('--host-ip', type=str, envvar='HOST_IP', help='Host IP address')
+@click.option('--host-port', type=int, envvar='HOST_PORT', help='Host port')
+@click.option('--host-user', type=str, envvar='HOST_USER', help='Host username')
+@click.option('--host-password', type=str, envvar='HOST_PASSWORD', help='Host password')
 @click.version_option(message='%(package)s, %(version)s')
 @click.pass_context
 def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
     """
-    A CLI tool for interacting with ck-apstra-api
-    """    
+    A CLI tool for interacting with ck-apstra-api.
+
+    The options that can be specified in .env file: HOST_IP, HOST_PORT, HOST_USER, HOST_PASSWORD
+    """
     ctx.ensure_object(dict)
     ctx.obj['HOST_IP'] = host_ip
     ctx.obj['HOST_PORT'] = host_port
     ctx.obj['HOST_USER'] = host_user
     ctx.obj['HOST_PASSWORD'] = host_password
+    
+    logger = prep_logging('DEBUG', 'cli()')
+
+    cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    if cliVar.session.last_error:
+        logger.error(f"Session error: {cliVar.session.last_error}")
+        return
+
     pass
+
+
+@cli.command()
+@click.pass_context
+def debug_context(ctx):
+    """
+    Debug the context
+    """
+    print(f"{ctx.obj=}")
 
 
 @cli.command()
@@ -80,86 +125,41 @@ def check_apstra(ctx):
     """
     Test the connectivity to the server
     """
-    from ck_apstra_api import CkApstraSession, prep_logging
-    from result import Ok, Err
+    print(f"version {cliVar.session.version=} {cliVar.session.token=}")
+    cliVar.session.logout()
 
-    logger = prep_logging('DEBUG', 'check_apstra()')
-
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']
-
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
-        return
-    logger.info(f"version {session.version=} {session.token=}")
-    session.logout()
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.pass_context
 def check_blueprint(ctx, bp_name: str):
     """
     Test the connectivity to the blueprint
-    """
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
 
+    The blueprint name can be specified in the environment variable BP_NAME
+    """
     logger = prep_logging('DEBUG', 'check_blueprint()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
-        return
+    _ = cliVar.get_blueprint(bp_name, logger)        
+    cliVar.session.logout()
 
-    # bp_name = ctx.obj['BP_NAME']
-    bp = CkApstraBlueprint(session, bp_name)
-    if not bp.id:
-        logger.error(f"Blueprint {bp_name} not found")
-        return
-    logger.info(f"{bp_name=}, {bp.id=}")
-    if bp.id:
-        logger.info(f"Blueprint {bp_name} found")
-    else:
-        logger.warning(f"Blueprint {bp_name} not found")
-        
-    session.logout()
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
-@click.option('--json-file', type=str, help='Json file name to export to')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
+@click.option('--json-file', type=str, envvar='JSON_FILE', help='Json file name to export to')
 @click.pass_context
 def export_blueprint(ctx, bp_name: str, json_file: str = None):
     """
     Export a blueprint into a json file
-    """
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
 
+    bp-name can be specified in the environment variable BP_NAME
+    json-file can be specified in the environment variable JSON_FILE. If not specified, it will be the blueprint name
+    """
     logger = prep_logging('DEBUG', 'export_blueprint()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
-        return
-
-    bp = CkApstraBlueprint(session, bp_name)
-    if not bp.id:
-        logger.error(f"Blueprint {bp_name} not found")
-        return
-    logger.info(f"{bp_name=} {json_file=}")
+    bp = cliVar.get_blueprint(bp_name, logger)
 
     if not json_file:
         json_file = f"{bp_name}.json"
@@ -173,29 +173,21 @@ def export_blueprint(ctx, bp_name: str, json_file: str = None):
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name to create')
-@click.option('--json-file', type=str, help='Json file name to import from')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name to create')
+@click.option('--json-file', type=str, envvar='JSON_FILE', help='Json file name to import from')
 @click.pass_context
 def import_blueprint(ctx, bp_name: str, json_file: str = None):
     """
     Import a blueprint from a json file
-    """
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
 
+    bp-name can be specified in the environment variable BP_NAME
+    json-file can be specified in the environment variable JSON_FILE. If not specified, it will be the blueprint name
+    """
     logger = prep_logging('DEBUG', 'import_blueprint()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
+    if cliVar.get_blueprint(bp_name, logger):
+        logger.error(f"Blueprint {bp_name} already exists")
         return
-
-    logger.info(f"{bp_name=} {json_file=}")
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
 
     json_path = os.path.expanduser(json_file)
     with open(json_path, 'r') as f:
@@ -231,13 +223,13 @@ def import_blueprint(ctx, bp_name: str, json_file: str = None):
         'nodes': node_list,
         'relationships': relationship_list
     }
-    bp_created = session.post('blueprints', data=bp_spec)
+    bp_created = cliVar.session.post('blueprints', data=bp_spec)
     logger.info(f"blueprint {bp_name} created: {bp_created}")
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
-@click.option('--out-folder', type=str, default='~/Downloads/devices', help='Folder name to export')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
+@click.option('--out-folder', type=str, envvar='OUT_FOLDER', help='Folder name to export')
 @click.pass_context
 def export_device_configs(ctx, bp_name: str, out_folder: str):
     """
@@ -250,24 +242,10 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
     2_load_merge_configlet.txt (if applicable)
     3_load_set_configlet-set.txt (if applicable)
     """
-    from pathlib import Path
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
-
     logger = prep_logging('DEBUG', 'export_device_configs()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
-        return
-
-    bp = CkApstraBlueprint(session, bp_name)
-    if not bp.id:
-        logger.error(f"Blueprint {bp_name} not found")
+    bp = cliVar.get_blueprint(bp_name, logger)
+    if not bp:
         return
     
     logger.info(f"{bp_name=} {out_folder=}")
@@ -293,7 +271,7 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
         logger.info(f"{system_label=}")
 
         if system_serial:
-            pristine_config = session.get_items(f"systems/{system_serial}/pristine-config")['pristine_data'][0]['content']
+            pristine_config = cliVar.session.get_items(f"systems/{system_serial}/pristine-config")['pristine_data'][0]['content']
             write_to_file(f"{system_dir}/0_load_override_pristine.txt", pristine_config)
 
         rendered_confg = bp.get_item(f"nodes/{system_id}/config-rendering")['config']
@@ -322,33 +300,19 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--vn-csv', type=str, required=True, help='The CSV file path of virtual networks to import from')
 @click.pass_context
 def import_virtual_network(ctx, bp_name, vn_csv: str):
     """
     Import virtual networks from a CSV file
     """
-    from pathlib import Path
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
-    import io
-
     logger = prep_logging('DEBUG', 'import_virtual_network()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
+    bp = cliVar.get_blueprint(bp_name, logger)
+    if not bp:
         return
-
-    bp = CkApstraBlueprint(session, bp_name)
-    if not bp.id:
-        logger.error(f"Blueprint {bp_name} not found")
-        return
+ 
     logger.info(f"{bp_name=} {vn_csv=}")
 
     vn_csv_path = os.path.expanduser(vn_csv)
@@ -371,33 +335,19 @@ def import_virtual_network(ctx, bp_name, vn_csv: str):
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--vn-csv', type=str, required=True, help='The CSV file path of virtual networks to export to')
 @click.pass_context
 def export_virtual_network(ctx, bp_name, vn_csv: str):
     """
     Import virtual networks from a CSV file
     """
-    from pathlib import Path
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
-    import io
-
     logger = prep_logging('DEBUG', 'export_virtual_network()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
+    bp = cliVar.get_blueprint(bp_name, logger)
+    if not bp:
         return
 
-    bp = CkApstraBlueprint(session, bp_name)
-    if not bp.id:
-        logger.error(f"Blueprint {bp_name} not found")
-        return
     logger.info(f"{bp_name=} {vn_csv=}")
 
     vn_csv_path = os.path.expanduser(vn_csv)
@@ -409,40 +359,22 @@ def export_virtual_network(ctx, bp_name, vn_csv: str):
 
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.pass_context
 def print_lldp_data(ctx, bp_name: str = 'terra'):
     """
     Print the LLDP data of the blueprint
     """
-    from pathlib import Path
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
-
     logger = prep_logging('DEBUG', 'export_device_configs()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']    
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
+    bp = cliVar.get_blueprint(bp_name, logger)
+    if not bp:
         return
-
-    bp = CkApstraBlueprint(session, bp_name)
-    if not bp.id:
-        logger.error(f"Blueprint {bp_name} not found")
-        return
-    logger.info(f"{bp_name=}")
 
     lldp_data = bp.get_lldp_data()
     for link in lldp_data['links']:
         logger.info(f"{link['id']=} {link['endpoints'][0]['system']['label']}:{link['endpoints'][0]['interface']['if_name']} {link['endpoints'][1]['system']['label']}:{link['endpoints'][1]['interface']['if_name']}")
-    
-    # server_hostnames = session.get_items('server-hostnames-lldp')
-    # pprint(server_hostnames)
-    
+        
     return lldp_data
 
 
@@ -464,7 +396,7 @@ class SystemsData:
         self.device_profile = system_input['interface_map']['device_profile_id'] if system_input['interface_map'] else None
 
 @cli.command()
-@click.option('--bp-name', type=str, default='terra', help='Blueprint name')
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--systems-csv', type=str, required=True, help='The CSV file path to create')
 @click.pass_context
 def export_systems(ctx, bp_name, systems_csv):
@@ -475,23 +407,25 @@ def export_systems(ctx, bp_name, systems_csv):
     system, asn, lo0, rack, device_profile
     
     """
-    from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
-    from result import Ok, Err
     logger = prep_logging('DEBUG', 'export_systems()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']
+    bp = cliVar.get_blueprint(bp_name, logger)
+    if not bp:
+        return
 
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
-        return
-    bp = CkApstraBlueprint(session, bp_name)
-    if not bp.id:
-        logger.error(f"Blueprint {bp_name} not found")
-        return
+    # host_ip = ctx.obj['HOST_IP']
+    # host_port = ctx.obj['HOST_PORT']
+    # host_user = ctx.obj['HOST_USER']
+    # host_password = ctx.obj['HOST_PASSWORD']
+
+    # session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    # if session.last_error:
+    #     logger.error(f"Session error: {session.last_error}")
+    #     return
+    # bp = CkApstraBlueprint(session, bp_name)
+    # if not bp.id:
+    #     logger.error(f"Blueprint {bp_name} not found")
+    #     return
     systems_csv_path = os.path.expanduser(systems_csv)
     logger.info(f"{systems_csv_path=} writing to {systems_csv_path}")
     """
@@ -970,6 +904,28 @@ def import_iplink(ctx, csv_in: str = None):
                 continue
             logger.info(f"{patched.ok_value}")
 
+
+@cli.command()
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
+@click.pass_context
+def export_dci(ctx, bp_name: str):
+    """
+    Export DCI information of a blueprint
+
+    \b
+    The headers:
+        line, blueprint, switch, interface, ipv4_switch, ipv4_server, server
+    """
+    logger = prep_logging('DEBUG', 'export_iplink()')
+
+    bp = cliVar.get_blueprint(bp_name, logger)
+    if not bp:
+        return
+
+    dci_data = bp.get_item('evpn_interconnect_groups')
+
+    print(f"{dci_data=}")
+    pprint(dci_data)
 
 
 if __name__ == "__main__":
