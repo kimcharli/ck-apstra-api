@@ -2,6 +2,7 @@
 
 ## 0.5.2 20204-12-20
 - modularize cli
+- implement export-dci in yaml output
 
 ## 0.5.0 2024-12-18
 - change to uv from poetry

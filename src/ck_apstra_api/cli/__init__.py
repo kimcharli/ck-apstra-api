@@ -26,7 +26,7 @@ class CliVar:
         logger.info(f"{bp_name=}, {self.blueprint.id=}")
         if self.blueprint.id:
             logger.info(f"Blueprint {bp_name} found")
-            self.export_data['blueprint']['label'] = bp_name
+            self.export_data['blueprint'][bp_name] = {}
             return self.blueprint
         else:
             logger.warning(f"Blueprint {bp_name} not found")
