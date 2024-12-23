@@ -27,6 +27,7 @@ def export_dci(ctx, bp_name: str):
     # retrieve top level variables
     dci_data_in = bp.get_item(TOP_LEVEL)[TOP_LEVEL][0]
     dci_data = { k: v for k, v in dci_data_in.items() if k != 'id' and not isinstance(v, dict)  }
+    dci_data['remote_gateway_node_ids'] = [ x['gw_name'] for _, x in dci_data_in['remote_gateway_node_ids'].items() ]
 
     # retrieve routing zones
     dci_data[ROUTING_ZONES] = { v1['vrf_name']: 
