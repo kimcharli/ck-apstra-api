@@ -113,17 +113,23 @@ def pull_ott(bp, dci_tree):
     pass
 
 
-def pull_esi_msbs(bp, dci_tree):
-    """
-    Pull ESI MSBs from the blueprint
 
-    """
-    logger = prep_logging('DEBUG', 'pull_esi_msbs()')
+class DciEsiMacMsb():
+    def pull_msb():
+        '''Retribe ESI MAC MSB from the blueprint'''
+        bp = cliVar.blueprint
+        fabric_settings_in_bp = bp.get_item('fabric-settings')
+        dci_tree = cliVar.data_in_file['blueprint'][bp.label]['dci']
+        dci_tree['esi_mac_msb'] = fabric_settings_in_bp['esi_mac_msb']
 
-    fabric_settings_in = bp.get_item('fabric-settings')
-    dci_tree['esi_mac_msb'] = fabric_settings_in['esi_mac_msb']
-    logger.info(f"{dci_tree['esi_mac_msb']=}")
-    return
+    def push_msb():
+        '''Update ESI MAC MSB in the blueprint'''
+        bp = cliVar.blueprint
+        dci_in_file = cliVar.data_in_file['blueprint'][bp.label]['dci']
+        fabric_settings_in_bp = bp.get_item('fabric-settings')
+        if fabric_settings_in_bp['esi_mac_msb'] != dci_in_file['esi_mac_msb']:
+            _ = bp.patch_item('fabric-settings', {'esi_mac_msb': dci_in_file['esi_mac_msb']})
+
 
 
 @click.command()
@@ -142,13 +148,13 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     if not bp:
         return
 
-    dci_tree = cliVar.export_data['blueprint'][bp.label].setdefault('dci', {})
+    dci_tree = cliVar.data_in_file['blueprint'][bp.label].setdefault('dci', {})
 
     pull_interconnect(bp, dci_tree)
 
     pull_ott(bp, dci_tree)
 
-    pull_esi_msbs(bp, dci_tree)
+    DciEsiMacMsb.pull_msb()
 
 
     # write to file based on the format with the blueprint name
@@ -156,11 +162,10 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     file_path = os.path.expanduser(f"{file_folder}/{file_name}")
     with open(file_path, 'w') as f:
         if'file_format' == 'json':
-            f.write(json.dumps(cliVar.export_data, indent=2))
+            f.write(json.dumps(cliVar.data_in_file, indent=2))
         else:
-            f.write(yaml.dump(cliVar.export_data))
+            f.write(yaml.dump(cliVar.data_in_file))
 
-    # print(yaml.dump(cliVar.export_data))
 
 
 def create_interconnect(bp, ic_spec) -> str:
@@ -175,16 +180,17 @@ def create_interconnect(bp, ic_spec) -> str:
     return posted.json()['id']
 
 
-def import_interconnect(bp, dci_in_file):
+def import_interconnect():
     """
     Update interconnect data in the blueprint
 
     """
     logger = prep_logging('DEBUG', 'update_interconnect()')
-    pass
+
+    bp = cliVar.blueprint
 
     interconnect_in_blueprint = bp.get_item(INTERCONNECT)[INTERCONNECT]
-    interconnect_in_file = dci_in_file['interconnect']
+    interconnect_in_file = cliVar.bp_in_file['dci']['interconnect']
     # conver to dictionary for easy access
     ic_data_in_bp = { x['label']: x for x in interconnect_in_blueprint}
 
@@ -265,7 +271,6 @@ def import_interconnect(bp, dci_in_file):
         security_zones_in_file = ic_datum_in_file['interconnect_security_zones']
         rz_spec = ic_spec['interconnect_security_zones'] = {}
         for vrf_name, security_zone_in_file in security_zones_in_file.items():
-            # breakpoint()
             security_zone_in_bp = security_zones_in_bp[vrf_name]
             this_rz_spec = {}
             sz_id = security_zone_in_bp['security_zone_id']
@@ -275,19 +280,52 @@ def import_interconnect(bp, dci_in_file):
             this_rz_spec['interconnect_route_target'] = security_zone_in_file['interconnect_route_target']
             if security_zone_in_file['interconnect_route_target'] != security_zone_in_bp['interconnect_route_target']:
                 is_changed = True
-            # breakpoint()
             this_rz_spec['routing_policy_id'] = get_routing_policy_id(bp, security_zone_in_file['routing_policy_label'])
             rz_spec[sz_id] = this_rz_spec
+
+        # iterate through the virtual networks
+        virtual_networks_in_file = ic_datum_in_file['interconnect_virtual_networks']
+        virtual_networks_in_bp = ic_datum_in_bp['interconnect_virtual_networks']
+        vn_spec = ic_spec['interconnect_virtual_networks'] = {}
+        for vn_id, virtual_network_in_bp in virtual_networks_in_bp.items():
+            vn_label = virtual_network_in_bp['label']
+            virtual_network_in_file = virtual_networks_in_file.get(vn_label, {})
+            if virtual_network_in_file:
+                if any([
+                    virtual_network_in_file['translation_vni'] != virtual_network_in_bp['translation_vni'],
+                    virtual_network_in_file['l2'] != virtual_network_in_bp['l2'],
+                    virtual_network_in_file['l3'] != virtual_network_in_bp['l3']
+                ]):
+                    is_changed = True
+                this_vn_spec = {
+                    'translation_vni': virtual_network_in_file['translation_vni'],
+                    'l2': virtual_network_in_file['l2'],
+                    'l3': virtual_network_in_file['l3']
+                }
+            else:
+                is_changed = True
+                this_vn_spec = {
+                    'translation_vni': virtual_network_in_bp['translation_vni'],
+                    'l2': virtual_network_in_bp['l2'],
+                    'l3': virtual_network_in_bp['l3']
+                }
+            if is_changed:
+                vn_spec[vn_id] = this_vn_spec
+
         if is_changed:
             patched = bp.patch_item(f"{INTERCONNECT}/{ic_id}", ic_spec)
             logger.info(f"{patched=}, {patched.text=}, {patched.status_code=}")
-            
+
+    return
 
 
+def import_ott():
+    """
+    Update OTT data in the blueprint
 
-
-
-
+    """
+    logger = prep_logging('DEBUG', 'import_ott()')
+    pass
 
 
 @click.command()
@@ -301,19 +339,18 @@ def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'import_dci()')
 
+    # read the file based on the format with the blueprint name
+    file_name = f"{bp_name}.{file_format}"
+    file_path = os.path.expanduser(f"{file_folder}/{file_name}")
+    cliVar.load_file(file_path, file_format)
+
     bp = cliVar.get_blueprint(bp_name, logger)
     if not bp:
         return
 
-    # read the file based on the format with the blueprint name
-    file_name = f"{bp_name}.{file_format}"
-    file_path = os.path.expanduser(f"{file_folder}/{file_name}")
-    with open(file_path, 'r') as f:
-        # data_read = {}
-        if'file_format' == 'json':
-            data_in_file = json.load(f)
-        else:
-            data_in_file = yaml.load(f, yaml.SafeLoader)
 
-    import_interconnect(bp, data_in_file['blueprint'][bp_name]['dci'])
+    import_interconnect()
 
+    import_ott()
+
+    DciEsiMacMsb.push_msb()
