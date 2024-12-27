@@ -30,6 +30,7 @@ uv run python src/ck_apstra_api/generic_system.py
 
 uv publish was unstable
 ```
+pip index versions ck-apstra-api
 uv build
 python -m twine upload dist/*
 ```
