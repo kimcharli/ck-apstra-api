@@ -1,3 +1,4 @@
+from functools import cache
 import json
 import os
 import time
@@ -10,6 +11,20 @@ INTERCONNECT = 'evpn_interconnect_groups'
 IC_ROUTING_ZONES = 'interconnect_security_zones'
 IC_VIRTUAL_NETWORKS = 'interconnect_virtual_networks'
 
+
+@cache
+def get_routing_policy_id(bp, label: str):
+    """
+    Get routing policy by label
+
+    """
+    logger = prep_logging('DEBUG', 'get_routing_policy()')
+
+    if label:
+        routing_policies = {x['label']: x for x in bp.get_item('routing-policies')['items']}
+        if label in routing_policies:
+            return routing_policies[label]['id']
+    return None
 
 def pull_ic_virtual_networks(ic_datum_in_blueprint: dict, ic_datum: dict):
     """
@@ -160,7 +175,7 @@ def create_interconnect(bp, ic_spec) -> str:
     return posted.json()['id']
 
 
-def update_interconnect(bp, dci_in_file):
+def import_interconnect(bp, dci_in_file):
     """
     Update interconnect data in the blueprint
 
@@ -183,6 +198,8 @@ def update_interconnect(bp, dci_in_file):
             'interconnect_route_target': ic_datum_in_file['interconnect_route_target'],
             'interconnect_esi_mac': ic_datum_in_file['interconnect_esi_mac']
         }
+        # update if there is a change
+        is_changed = False
         logger.info(f"{ic_label=}")        
         if not ic_id:
             # create the interconnect
@@ -199,10 +216,10 @@ def update_interconnect(bp, dci_in_file):
             patched = bp.patch_item(f"{INTERCONNECT}/{ic_id}", ic_spec)
             logger.info(f"{patched=}, {patched.text=}, {patched.status_code=}")
 
-        # remote gateways
+        # import remote gateways
         remote_gateways_in_bp = { x['gw_name']: x for x in ic_datum_in_bp.get('remote_gateway_node_ids', {}).values()}
         remote_gateways_in_file = ic_datum_in_file['remote_gateway_node_ids']
-        # remove the remote gateways that are not in the file
+        # remove the remote gateways those are not present in the file
         for rg_in_bp in remote_gateways_in_bp.values():
             if rg_in_bp['gw_name'] not in remote_gateways_in_file:
                 rg_deleted = bp.delete_item(f"remote_gateways/{rg_in_bp['id']}")
@@ -211,6 +228,7 @@ def update_interconnect(bp, dci_in_file):
         for rg_datum_in_file in remote_gateways_in_file.values():
             rg_name = rg_datum_in_file['gw_name']
             rg_datum_in_bp = remote_gateways_in_bp.get(rg_name, {})
+            rg_datum_id = rg_datum_in_bp.get('id', None)
             rg_spec = {
                 'gw_name': rg_datum_in_file['gw_name'],
                 'gw_ip': rg_datum_in_file['gw_ip'],
@@ -226,10 +244,45 @@ def update_interconnect(bp, dci_in_file):
                 # create the remote gateway
                 rg_spec['evpn_interconnect_group_id'] = ic_id
                 rg_spec['evpn_route_types'] = 'all'
-                # breakpoint()
                 rg_spec['local_gw_nodes'] = [bp.get_system_node_from_label(x).ok_value['id'] for x in rg_datum_in_file['local_gw_nodes']]
                 posted = bp.post_item("remote_gateways", rg_spec)
                 logger.info(f"{posted=}, {posted.text=}, {posted.status_code=}")
+                continue
+            for variable in ['gw_ip', 'gw_asn', 'ttl', 'keepalive_timer', 'holdtime_timer']:
+                if rg_datum_in_file[variable] != rg_datum_in_bp.get(variable, None):
+                    is_changed = True
+            # local_gw_nodes should be present always
+            if is_changed or rg_datum_in_file['local_gw_nodes'] != [x['label'] for x in rg_datum_in_bp['local_gw_nodes']]:
+                rg_spec['local_gw_nodes'] = [bp.get_system_node_from_label(x).ok_value['id'] for x in rg_datum_in_file['local_gw_nodes']]
+            if is_changed:
+                patched = bp.put_item(f"remote_gateways/{rg_datum_id}", rg_spec)
+                logger.info(f"{patched=}, {patched.text=}, {patched.status_code=}")                
+            else:
+                logger.info(f"No change in remote gateway {rg_name}")
+
+        # iterarte through the routing zones        
+        security_zones_in_bp = { x['vrf_name']: x for x in ic_datum_in_bp.get('interconnect_security_zones', {}).values()}
+        security_zones_in_file = ic_datum_in_file['interconnect_security_zones']
+        rz_spec = ic_spec['interconnect_security_zones'] = {}
+        for vrf_name, security_zone_in_file in security_zones_in_file.items():
+            # breakpoint()
+            security_zone_in_bp = security_zones_in_bp[vrf_name]
+            this_rz_spec = {}
+            sz_id = security_zone_in_bp['security_zone_id']
+            this_rz_spec['enabled_for_l3'] = security_zone_in_file['enabled_for_l3']
+            if security_zone_in_file['enabled_for_l3'] != security_zone_in_bp['enabled_for_l3']:
+                is_changed = True
+            this_rz_spec['interconnect_route_target'] = security_zone_in_file['interconnect_route_target']
+            if security_zone_in_file['interconnect_route_target'] != security_zone_in_bp['interconnect_route_target']:
+                is_changed = True
+            # breakpoint()
+            this_rz_spec['routing_policy_id'] = get_routing_policy_id(bp, security_zone_in_file['routing_policy_label'])
+            rz_spec[sz_id] = this_rz_spec
+        if is_changed:
+            patched = bp.patch_item(f"{INTERCONNECT}/{ic_id}", ic_spec)
+            logger.info(f"{patched=}, {patched.text=}, {patched.status_code=}")
+            
+
 
 
 
@@ -248,7 +301,6 @@ def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'import_dci()')
 
-
     bp = cliVar.get_blueprint(bp_name, logger)
     if not bp:
         return
@@ -263,5 +315,5 @@ def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
         else:
             data_in_file = yaml.load(f, yaml.SafeLoader)
 
-    update_interconnect(bp, data_in_file['blueprint'][bp_name]['dci'])
+    import_interconnect(bp, data_in_file['blueprint'][bp_name]['dci'])
 
