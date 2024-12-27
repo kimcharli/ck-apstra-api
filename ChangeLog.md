@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.5.3 20205-01-00
+- implement import-dci in yaml/json
+
 ## 0.5.2 20204-12-20
 - modularize cli
 - implement export-dci in yaml output
