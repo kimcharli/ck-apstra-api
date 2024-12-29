@@ -1,0 +1,68 @@
+{#
+Configure snmp v3 with generated keys instead of plain text password.
+  
+Test command example:
+    snmpwalk -v3  -l authPriv -u v3-user-a -a SHA-256 -A secure-auth-password -x AES-128 -X secure-priv-password 10.85.192.16 .1.3.6.1.2.1.1
+
+#}
+
+{# use fixed engine_id to produce consistent keys #}
+{% set engine_id = 8888 %}
+{% set v3_user_a = "v3-user-a" %}
+{# The following key is generated using the following command:
+    set snmp v3 usm local-engine user v3-user-a authentication-sha256 authentication-password secure-auth-password
+    show snmp v3 usm local-engine user v3-user-a authentication-sha256 authentication-key
+#}
+{% set v3_auth_key_a = "$9$L7oxwYGDiPTz7-Hqf5F3M8LNs2aZUm5QJZFnCA1IbsYoaUHkPTQnYgQFn9pu1RhylMNdbw24W8Ujq.zF/CtuORylKMWx9A0IEcleX7-bs4GDiqP5oaUHkmTQ369tBIEhrKvLRE24ZGq.0B1Ire7-Vws4-dgJZDkqRhcSvWNdbwgodVQFn/tpxN-dYg" %}
+{# The following key is generated using the following command:
+    set snmp v3 usm local-engine user v3-user-a authentication-sha256 authentication-password secure-priv-password
+    show snmp v3 usm local-engine user v3-user-a privacy-aes128 privacy-key
+#}
+{% set v3_priv_key_a = "$9$D-iP59ApESrqmhSyrvMikqPz3n/C01Rtp7-dVY2GDi.QFn/Cu0IUjtuOIcS24oGUHQFn9CuzF9pO1yrgoaZk.QFn/9p3n" %}
+{% set v3_group_a = "v3-group-a" %}
+{% set v3_view_a = "v3-view-a" %}
+{% set v3_oid_a = ".1.3.6.1.2" %}
+
+snmp {
+    v3 {
+        usm {
+            local-engine {
+                user {{v3_user_a}} {
+                    authentication-sha256 {
+                        authentication-key "{{v3_auth_key_a}}"; ## SECRET-DATA
+                    }
+                    privacy-aes128 {
+                        privacy-key "{{v3_priv_key_a}}"; ## SECRET-DATA
+                    }
+                }
+            }
+        }
+        vacm {
+            security-to-group {
+                security-model usm {
+                    security-name {{v3_user_a}} {
+                        group {{ v3_group_a }};
+                    }
+                }
+            }
+            access {
+                group {{ v3_group_a }} {
+                    default-context-prefix {
+                        security-model usm {
+                            security-level authentication {
+                                read-view {{ v3_view_a }};
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    engine-id {
+        local {{ engine_id }};
+    }
+    view {{ v3_view_a }} {
+        oid {{ v3_oid_a }};
+    }
+    routing-instance-access;
+}

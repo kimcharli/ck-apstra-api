@@ -1,6 +1,9 @@
 # Change Log
 
-## 0.5.3 20205-01-00
+## 0.5.4 20205-12-28
+- implement test-configlet
+
+## 0.5.3 20204-12-27
 - implement import-dci in yaml/json
 
 ## 0.5.2 20204-12-20
