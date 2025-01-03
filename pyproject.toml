@@ -1,6 +1,6 @@
 [project]
 name = "ck-apstra-api"
-version = "0.5.4"
+version = "0.5.5"
 description = "An implementation to use Apstra API"
 authors = [ {name = "Charlie Kim", email = "ckim@juniper.net"} ]
 readme = "README.md"

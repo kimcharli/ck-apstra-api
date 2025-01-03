@@ -1,9 +1,6 @@
 from functools import cache
-import json
-import os
 import time
 import click
-import yaml
 
 from . import cliVar, prep_logging
 
@@ -156,15 +153,8 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
 
     DciEsiMacMsb.pull_msb()
 
-
     # write to file based on the format with the blueprint name
-    file_name = f"{bp.label}.{file_format}"
-    file_path = os.path.expanduser(f"{file_folder}/{file_name}")
-    with open(file_path, 'w') as f:
-        if'file_format' == 'json':
-            f.write(json.dumps(cliVar.data_in_file, indent=2))
-        else:
-            f.write(yaml.dump(cliVar.data_in_file))
+    cliVar.export_file(file_folder, file_format)
 
 
 
@@ -339,15 +329,11 @@ def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'import_dci()')
 
-    # read the file based on the format with the blueprint name
-    file_name = f"{bp_name}.{file_format}"
-    file_path = os.path.expanduser(f"{file_folder}/{file_name}")
-    cliVar.load_file(file_path, file_format)
-
     bp = cliVar.get_blueprint(bp_name, logger)
     if not bp:
         return
 
+    cliVar.import_file(file_folder, file_format)
 
     import_interconnect()
 

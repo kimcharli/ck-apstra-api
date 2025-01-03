@@ -10,6 +10,7 @@ from .system import export_systems, export_generic_system, import_generic_system
 from .ip_link import export_iplink, import_iplink
 from .dci import export_dci, import_dci
 from .configlet_test import test_configlet
+from .resource import export_resources
 
 
 @click.group()
@@ -81,6 +82,8 @@ cli.add_command(import_iplink)
 
 cli.add_command(export_dci)
 cli.add_command(import_dci)
+
+cli.add_command(export_resources)
 
 cli.add_command(test_configlet)
 
