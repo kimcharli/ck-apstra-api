@@ -11,7 +11,7 @@ from .ip_link import export_iplink, import_iplink
 from .dci import export_dci, import_dci
 from .configlet_test import test_configlet
 from .resource import export_resources
-
+from .design import export_design
 
 @click.group()
 @click.option('--host-ip', type=str, envvar='HOST_IP', help='Host IP address')
@@ -86,6 +86,8 @@ cli.add_command(import_dci)
 cli.add_command(export_resources)
 
 cli.add_command(test_configlet)
+
+cli.add_command(export_design)
 
 if __name__ == "__main__":
     cli()
