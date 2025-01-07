@@ -740,11 +740,11 @@ class CkApstraBlueprint:
         lldp_data = self.session.get_items(f"blueprints/{self.id}/cabling-map/lldp")
         return lldp_data
 
-    def get_item(self, item: str):
+    def get_item(self, item: str, **kwargs):
         '''
         Get the items of the blueprint
         '''
-        items = self.session.get_items(f"blueprints/{self.id}/{item}")
+        items = self.session.get_items(f"blueprints/{self.id}/{item}", **kwargs)
         return items
 
 

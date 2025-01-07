@@ -139,7 +139,7 @@ class CkApstraSession:
         # url = f"{self.url_prefix}/design/logical-devices/{id}"
         return self.get_items(f"design/logical-devices/{id}")
 
-    def get_items(self, url: str) -> dict:
+    def get_items(self, url: str, **kwargs) -> dict:
         """
         Get the items from the url.
 
@@ -151,7 +151,7 @@ class CkApstraSession:
         """
         url = f"{self.url_prefix}/{url}"
         # self.logger.debug(f"{url=}")
-        return self.session.get(url).json()
+        return self.session.get(url, **kwargs).json()
 
     def patch_item(self, url: str, spec: dict) -> dict:
         """
