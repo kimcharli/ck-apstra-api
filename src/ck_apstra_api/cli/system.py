@@ -2,7 +2,9 @@ from dataclasses import dataclass, fields, asdict
 import os
 import click
 import csv
+from result import Ok, Err
 
+from ck_apstra_api import add_generic_systems, GsCsvKeys, get_generic_systems
 from . import cliVar, prep_logging
 
 
@@ -97,17 +99,15 @@ def import_generic_system(ctx, gs_csv_in: str):
     \b
     Sample CSV file: https://github.com/kimcharli/ck-apstra-api/blob/main/tests/fixtures/gs_sample.csv
     """
-    from ck_apstra_api import GsCsvKeys, add_generic_systems, CkApstraSession, prep_logging
-    from result import Ok, Err
-
     logger = prep_logging('DEBUG', 'import_generic_system()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']
+    # host_ip = ctx.obj['HOST_IP']
+    # host_port = ctx.obj['HOST_PORT']
+    # host_user = ctx.obj['HOST_USER']
+    # host_password = ctx.obj['HOST_PASSWORD']
 
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    session = cliVar.session
+    # CkApstraSession(host_ip, host_port, host_user, host_password)
     if session.last_error:
         logger.error(f"Session error: {session.last_error}")
         return
@@ -141,20 +141,21 @@ def export_generic_system(ctx, gs_csv_out: str):
     """
     Export generic systems to a CSV file
     """
-    from ck_apstra_api import get_generic_systems, CkApstraSession, prep_logging
-    from result import Ok, Err
+    # from ck_apstra_api import get_generic_systems, CkApstraSession, prep_logging
+    # from result import Ok, Err
 
     logger = prep_logging('DEBUG', 'export_generic_system()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']
+    # host_ip = ctx.obj['HOST_IP']
+    # host_port = ctx.obj['HOST_PORT']
+    # host_user = ctx.obj['HOST_USER']
+    # host_password = ctx.obj['HOST_PASSWORD']
 
     # uncomment below for debugging purpose. It prints the username and password
     # logger.info(f"{ctx.obj=}")
 
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    session = cliVar.session
+    # session = CkApstraSession(host_ip, host_port, host_user, host_password)
     if session.last_error:
         logger.error(f"Session error: {session.last_error}")
         return
