@@ -141,7 +141,7 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'export_dci()')
 
-    bp = cliVar.get_blueprint(bp_name, logger)
+    bp = cliVar.get_blueprint(bp_name)
     if not bp:
         return
 
@@ -334,6 +334,7 @@ def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
         return
 
     cliVar.import_file(file_folder, file_format)
+
 
     import_interconnect()
 

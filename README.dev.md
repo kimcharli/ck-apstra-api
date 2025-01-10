@@ -35,3 +35,12 @@ uv build
 python -m twine upload dist/*
 ```
 
+## pyreverse
+
+In development invironment (not in project)
+```
+pip install pylint
+pyreverse -o dot -d docs src/ck_apstra_api
+```
+
+

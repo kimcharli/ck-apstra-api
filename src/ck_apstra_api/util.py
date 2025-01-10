@@ -1,7 +1,9 @@
 from datetime import datetime
+import os
 import logging
 
 logging_format = "%(asctime)s - %(levelname)8s - %(name)s - %(message)s (%(filename)s:%(lineno)d)"
+fh = None
 class CustomFormatter(logging.Formatter):
     black = "\x1b[30;21m"
     grey = "\x1b[38;21m"
@@ -26,21 +28,25 @@ class CustomFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
-
-def prep_logging(log_level: str = 'INFO', log_name: str = 'root'):
+def prep_logging(log_level: str = 'INFO', log_name: str = 'root', out_folder: str ='.'):
     '''Configure logging options'''
-    timestamp = datetime.now().strftime("%Y%m%d-%H:%H:%S")
+    global fh
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
-
-    fh = logging.FileHandler(f'ck_apstra_api_{timestamp.replace(":", "")}.log')
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(logging.Formatter(logging_format))
     ch = logging.StreamHandler()
     ch.setLevel(log_level)
     ch.setFormatter(CustomFormatter())
     logger.addHandler(ch)
-    logger.addHandler(fh)
+    if fh is None:
+        timestamp = datetime.now().strftime("%Y%m%d-%H:%H:%S")
+        file_path = os.path.expanduser(f"{out_folder}/ck_apstra_api_{timestamp.replace(':', '')}.log")
+        fh = logging.FileHandler(file_path)
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(logging.Formatter(logging_format))
+        logger.addHandler(fh)
+        logger.info(f"Logging to {file_path}")
+    else:
+        logger.addHandler(fh)
     return logger
 
 

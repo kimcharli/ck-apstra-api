@@ -37,9 +37,9 @@ def get_interface_map_label(interface_map_id: str) -> dict:
     """Get the interface map from the blueprint"""
     if not interface_map_id:
         return None
-    interface_map_data = cliVar.session.get_items(f"design/interface-maps/{interface_map_id}")
-    if 'label' in interface_map_data:
-        return interface_map_data['label']    
+    interface_map_data = cliVar.blueprint.query(f"node(id='{interface_map_id}', name='n')").ok_value
+    if interface_map_data[0]['n']:
+        return interface_map_data[0]['n']['label']
     breakpoint()
 
 
@@ -56,7 +56,7 @@ def export_design(ctx, bp_name: str, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'export_resources()')
 
-    bp = cliVar.get_blueprint(bp_name, logger)
+    bp = cliVar.get_blueprint(bp_name)
     if not bp:
         return
 
@@ -101,23 +101,28 @@ def export_design(ctx, bp_name: str, file_format: str, file_folder: str):
         system_device_profile_label = get_device_profile_label(system_info['device_profile_id'])
         system_loopback_ipv4 = getattr(system_info, 'loopback', {}).get('ipv4_addr', None)
         system_loopback_ipv6 = getattr(system_info, 'loopback', {}).get('ipv6_addr', None)
-        node_in_file[system_name] = {
+        # breakpoint()
+        this_system = {
             'label': system_name,
-            'tags': system_info['tags'],
             'role': system_info['role'],
-            'external': system_info['external'],
-            'deploy_mode': system_info['deploy_mode'],
-            'device_profile': system_device_profile_label,
-            'hostname': system_info['hostname'],
-            'asn': system_info['domain_id'],
-            'loopback_ipv4': system_loopback_ipv4,
-            'loopback_ipv6': system_loopback_ipv6,
-
-            'interface_map': system_interface_map_label,
+            'tags': system_info['tags'],
         }
+        if system_info['role'] == 'redundancy_group':
+            pass
+        elif system_info['role'] in ['leaf', 'generic', 'spine']:
+            this_system['external'] = system_info['external']
+            this_system['deploy_mode'] = system_info['deploy_mode']
+            this_system['device_profile'] = system_device_profile_label
+            this_system['hostname'] = system_info['hostname']
+            this_system['asn'] = system_info['domain_id']
+            this_system['loopback_ipv4'] = system_loopback_ipv4
+            this_system['loopback_ipv6'] = system_loopback_ipv6
+            this_system['interface_map'] = system_interface_map_label
+        node_in_file[system_name] = this_system
+
         if system_info['interface_map_id']:
             interface_map_in_file[system_interface_map_label] = {
-                'logical_device': system_logical_device,
+                'logical_device': system_logical_device['display_name'],
                 'device_profile': system_device_profile_label,
             }
         if system_logical_device:
