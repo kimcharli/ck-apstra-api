@@ -1,137 +1,64 @@
 
-from functools import cache
-import json
+from dataclasses import dataclass
+from typing import Any, Dict
 import click
 
 from . import cliVar, prep_logging
 
 
-@cache
-def get_logical_device(logical_device_id: str) -> dict:
-    """Get the logical device from the blueprint"""
-    # logical_device_data = cliVar.session.get_items(f"design/logical-devices/{logical_device_id}")
-    if not logical_device_id:
-        return None
-    logical_device = cliVar.blueprint.query(f"node(id='{logical_device_id}', name='n')").ok_value
-    try:
-        if 'json' in logical_device[0]['n']:
-            return json.loads(logical_device[0]['n']['json'])
-    except Exception as e:
-        print(f"Error: {e}, {logical_device_id=}")
-        raise e
-    breakpoint()
-    return None
+# TODO: should be dataclass?
+@dataclass
+class BlueprintVar:
+    """Local variables for the module"""
+    bp_name: str
+    bp: Any  = None # reference to cliVar.blueprint
+    # logical_device_map: dict = {}  # internal variable: {id: label}
+    interface_map_map: Dict = None  # internal variable: {id: label}
+    # catalog_in_file: dict # reference to bp_in_file['catalog']
+    # logical_device: Dict = None  # reference to catalog_in_file['logical_device']
+    # interface_map_in_file: dict  # reference to catalog_in_file['interface_map']    
+    # phsical_in_file: dict  # reference to bp_in_file['physical']
+    # physical_node_in_file: dict  # reference to catalog_in_file['physical']['node']
+    # system_map: dict  # internal variable: {id: label}
+    # rack_type_map: dict  # internal variable: {rack-id: rack-label}
 
-@cache
-def get_device_profile_label(device_profile_id: str) -> dict:
-    """Get the device profile from the blueprint"""
-    if not device_profile_id:
-        return None
-    device_profile_data = cliVar.blueprint.query(f"node(id='{device_profile_id}', name='n')").ok_value
-    if device_profile_data[0]['n']:
-        return device_profile_data[0]['n']['label']
-    return None
+    def __post_init__(self):
+        self.bp = cliVar.get_blueprint(self.bp_name)
+        self.catalog_in_file = cliVar.bp_in_file.catalog
+        self.interface_map_in_file = self.catalog_in_file.interface_map
+        self.physical_in_file = cliVar.bp_in_file.physical
+        self.system_map = {}
+        self.interface_map_map = {}
+        # self.get_rack_type_map_from_blueprint()
+        self.rack_type_map = cliVar.data_in_file.get_rack_type_map_from_blueprint()
 
-@cache 
-def get_interface_map_label(interface_map_id: str) -> dict:
-    """Get the interface map from the blueprint"""
-    if not interface_map_id:
-        return None
-    interface_map_data = cliVar.blueprint.query(f"node(id='{interface_map_id}', name='n')").ok_value
-    if interface_map_data[0]['n']:
-        return interface_map_data[0]['n']['label']
-    breakpoint()
-
+bp_vars = None
 
 
 @click.command()
-@click.option('--file-format', type=click.Choice(['yaml', 'json']), default='yaml', help='File format')
-@click.option('--file-folder', type=str, default='.', help='File folder')
+@click.option('--file-format', type=str, default='', help='File format (yaml, json)')
+@click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.pass_context
 def export_design(ctx, bp_name: str, file_format: str, file_folder: str):
     """
-    Export the Resources in yaml, json format
+    Export the Logical Devices, Interface Maps, ... within a blueprint in yaml, json format
+
 
     """
+    global bp_vars
     logger = prep_logging('DEBUG', 'export_resources()')
+    # TODO: dataclass for bp_in_file
 
-    bp = cliVar.get_blueprint(bp_name)
-    if not bp:
+    bp_vars = BlueprintVar(bp_name)
+    if not bp_vars.bp:
+        logger.error(f"Blueprint {bp_name} not found")
         return
 
-    catalog_in_file = cliVar.bp_in_file['catalog'] = {}
-    logical_device_in_file = catalog_in_file['logical_device'] = {}
-    interface_map_in_file = catalog_in_file['interface_map'] = {}
-    physical_in_file = catalog_in_file['physical'] = {}
-    node_in_file = physical_in_file['node'] = {}
-
-    system_info_results = bp.get_item("experience/web/system-info", 
-        params={'type': 'staging', 'comment': 'system-nodes'})
-    # breakpoint()
-    # switch_query = "node('system', name='system', system_type='switch').out().node('interface_map', name='interface_map')"
-    # switch_nodes = cliVar.blueprint.query(switch_query).ok_value
-    # for nodes in switch_nodes:
-    #     switch_in_bp = nodes['system']
-    #     switch_label = switch_in_bp['label']
-    #     interface_map_in_bp = nodes['interface_map']
-    #     interface_map_label = interface_map_in_bp['label']
-    #     logical_device_id = interface_map_in_bp['logical_device_id']
-    #     logical_device_data = get_logical_device(logical_device_id)
-    #     logical_device_name = logical_device_data.get('display_name', f"{logical_device_id}-not-found")
-    #     node_in_file[switch_label] = {
-    #         'label': switch_label,
-    #         'system_type': switch_in_bp['system_type'],
-    #         'hostname': switch_in_bp['hostname'],
-    #         'interface_map': interface_map_in_bp['label'],
-    #         'role': switch_in_bp['role'],
-    #     }
-    #     interface_map_in_file[interface_map_label] = {
-    #         'logical_device': logical_device_name,
-    #         'device_profile': interface_map_in_bp['device_profile_id'],
-    #     }
-    #     logical_device_in_file[logical_device_name] = {'panels': logical_device_data.get('panels', [])}
-    for system_info in system_info_results['data']:
-        system_id = system_info['system_id']
-        system_name = system_info['label']
-        # system_interface_map = system_info['interface_map_id']
-        system_interface_map_label = get_interface_map_label(system_info['interface_map_id'])
-        # system_logical_device = get_logical_device(system_info['logical_device_id'])
-        system_logical_device = get_logical_device(system_info['logical_device_id'])
-        system_device_profile_label = get_device_profile_label(system_info['device_profile_id'])
-        system_loopback_ipv4 = getattr(system_info, 'loopback', {}).get('ipv4_addr', None)
-        system_loopback_ipv6 = getattr(system_info, 'loopback', {}).get('ipv6_addr', None)
-        # breakpoint()
-        this_system = {
-            'label': system_name,
-            'role': system_info['role'],
-            'tags': system_info['tags'],
-        }
-        if system_info['role'] == 'redundancy_group':
-            pass
-        elif system_info['role'] in ['leaf', 'generic', 'spine']:
-            this_system['external'] = system_info['external']
-            this_system['deploy_mode'] = system_info['deploy_mode']
-            this_system['device_profile'] = system_device_profile_label
-            this_system['hostname'] = system_info['hostname']
-            this_system['asn'] = system_info['domain_id']
-            this_system['loopback_ipv4'] = system_loopback_ipv4
-            this_system['loopback_ipv6'] = system_loopback_ipv6
-            this_system['interface_map'] = system_interface_map_label
-        node_in_file[system_name] = this_system
-
-        if system_info['interface_map_id']:
-            interface_map_in_file[system_interface_map_label] = {
-                'logical_device': system_logical_device['display_name'],
-                'device_profile': system_device_profile_label,
-            }
-        if system_logical_device:
-            system_logical_device_name = system_logical_device['display_name']
-            if system_logical_device_name not in logical_device_in_file:
-                # breakpoint()
-                logical_device_in_file[system_logical_device_name] = {'panels': system_logical_device['panels']} 
-
+    # bp_vars.get_logical_device_map_from_blueprint()
+    bp_vars.logical_device_map = cliVar.data_in_file.get_logical_device_map_from_blueprint()
+    bp_vars.interface_map_map = cliVar.data_in_file.get_interface_map_map_from_blueprint()
+    bp_vars.system_map = cliVar.data_in_file.get_system_nodes_from_blueprint()
 
     cliVar.export_file(file_folder, file_format)
     
-

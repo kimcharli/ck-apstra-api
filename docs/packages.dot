@@ -1,0 +1,45 @@
+digraph "packages" {
+rankdir=BT
+charset="utf-8"
+"ck_apstra_api" [color="black", label=<ck_apstra_api>, shape="box", style="solid"];
+"ck_apstra_api.apstra_blueprint" [color="black", label=<ck_apstra_api.apstra_blueprint>, shape="box", style="solid"];
+"ck_apstra_api.apstra_session" [color="black", label=<ck_apstra_api.apstra_session>, shape="box", style="solid"];
+"ck_apstra_api.cli" [color="black", label=<ck_apstra_api.cli>, shape="box", style="solid"];
+"ck_apstra_api.cli.blueprint" [color="black", label=<ck_apstra_api.cli.blueprint>, shape="box", style="solid"];
+"ck_apstra_api.cli.cli" [color="black", label=<ck_apstra_api.cli.cli>, shape="box", style="solid"];
+"ck_apstra_api.cli.configlet_test" [color="black", label=<ck_apstra_api.cli.configlet_test>, shape="box", style="solid"];
+"ck_apstra_api.cli.dci" [color="black", label=<ck_apstra_api.cli.dci>, shape="box", style="solid"];
+"ck_apstra_api.cli.design" [color="black", label=<ck_apstra_api.cli.design>, shape="box", style="solid"];
+"ck_apstra_api.cli.ip_link" [color="black", label=<ck_apstra_api.cli.ip_link>, shape="box", style="solid"];
+"ck_apstra_api.cli.resource" [color="black", label=<ck_apstra_api.cli.resource>, shape="box", style="solid"];
+"ck_apstra_api.cli.routing_zone" [color="black", label=<ck_apstra_api.cli.routing_zone>, shape="box", style="solid"];
+"ck_apstra_api.cli.system" [color="black", label=<ck_apstra_api.cli.system>, shape="box", style="solid"];
+"ck_apstra_api.cli.virtual_network" [color="black", label=<ck_apstra_api.cli.virtual_network>, shape="box", style="solid"];
+"ck_apstra_api.connectivity_template" [color="black", label=<ck_apstra_api.connectivity_template>, shape="box", style="solid"];
+"ck_apstra_api.generic_system" [color="black", label=<ck_apstra_api.generic_system>, shape="box", style="solid"];
+"ck_apstra_api.ip_endpoint" [color="black", label=<ck_apstra_api.ip_endpoint>, shape="box", style="solid"];
+"ck_apstra_api.pull_device_configuration" [color="black", label=<ck_apstra_api.pull_device_configuration>, shape="box", style="solid"];
+"ck_apstra_api.util" [color="black", label=<ck_apstra_api.util>, shape="box", style="solid"];
+"ck_apstra_api" -> "ck_apstra_api.apstra_blueprint" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api" -> "ck_apstra_api.apstra_session" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api" -> "ck_apstra_api.connectivity_template" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api" -> "ck_apstra_api.generic_system" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api" -> "ck_apstra_api.util" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.apstra_blueprint" -> "ck_apstra_api.util" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli" -> "ck_apstra_api" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.blueprint" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.configlet_test" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.dci" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.design" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.ip_link" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.resource" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.system" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.cli" -> "ck_apstra_api.cli.virtual_network" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.ip_link" -> "ck_apstra_api" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.cli.system" -> "ck_apstra_api" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.connectivity_template" -> "ck_apstra_api" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.generic_system" -> "ck_apstra_api" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.ip_endpoint" -> "ck_apstra_api.cli" [arrowhead="open", arrowtail="none"];
+"ck_apstra_api.pull_device_configuration" -> "ck_apstra_api.cli" [arrowhead="open", arrowtail="none"];
+}

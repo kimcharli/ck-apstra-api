@@ -49,7 +49,7 @@ def export_virtual_network(ctx, bp_name, vn_csv: str):
     """
     logger = prep_logging('DEBUG', 'export_virtual_network()')
 
-    bp = cliVar.get_blueprint(bp_name, logger)
+    bp = cliVar.get_blueprint(bp_name)
     if not bp:
         return
 

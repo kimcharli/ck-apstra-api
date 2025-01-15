@@ -23,82 +23,6 @@ def get_routing_policy_id(bp, label: str):
             return routing_policies[label]['id']
     return None
 
-def pull_ic_virtual_networks(ic_datum_in_blueprint: dict, ic_datum: dict):
-    """
-    Retrieve virtual networks
-
-    """
-    logger = prep_logging('DEBUG', 'pull_ic_virtual_networks()')
-
-    variables = ['label', 'translation_vni', 'vrf_name', 'vni', 'l2', 'l3']
-    ic_datum[IC_VIRTUAL_NETWORKS] = { v1['label']: 
-                                { k2: v2 for k2, v2 in v1.items() if k2 in variables } 
-                                for v1 in ic_datum_in_blueprint[IC_VIRTUAL_NETWORKS].values()}
-
-    return
-
-
-def pull_ic_routingz_zones(ic_datum_in_blueprint: dict, ic_datum: dict):
-    """
-    Retrieve routing zones
-
-    """
-    logger = prep_logging('DEBUG', 'pull_ic_routingz_zones()')
-
-    variables = ['vrf_name', 'routing_policy_label', 'interconnect_route_target', 'enabled_for_l3']
-    ic_datum[IC_ROUTING_ZONES] = { v1['vrf_name']: 
-        { k2: v2 for k2, v2 in v1.items() if k2 in variables } 
-        for v1 in ic_datum_in_blueprint[IC_ROUTING_ZONES].values()}
-
-    return
-
-
-def pull_remote_gateway_node_ids(ic_rw_node_ids:dict, ic_datum: dict ):
-    """
-    Retrieve remote gateway variables
-
-    """
-    logger = prep_logging('DEBUG', 'pull_remote_gateway_variables()')
-
-    variables = ['gw_name', 'gw_ip', 'gw_asn', 'ttl', 'keepalive_timer', 'holdtime_timer', 'local_gw_nodes']
-    remote_gateway_data = ic_datum['remote_gateway_node_ids'] = {}
-
-    for rg_datum_in in ic_rw_node_ids.values():
-        rg_name = rg_datum_in['gw_name']
-        rg_datum = remote_gateway_data[rg_name] = { k: v for k, v in rg_datum_in.items() if k in variables}
-        rg_datum['local_gw_nodes'] = [ x['label'] for x in rg_datum_in['local_gw_nodes']]
-
-    return
-
-
-
-def pull_interconnect(bp, dci_tree):
-    """
-    Pull interconnect data from the blueprint
-
-    """
-    logger = prep_logging('DEBUG', 'pull_interconnect()')
-
-    variables = ['label', 'interconnect_route_target', 'interconnect_esi_mac']
-    ic_tree = dci_tree['interconnect'] = []
-
-    # retrieve top level variables
-    ic_data_in_blueprint = bp.get_item(INTERCONNECT)[INTERCONNECT]
-    if not ic_data_in_blueprint:
-        logger.info(f"No DCI interconnect data in blueprint {bp.label}")
-        return
-    
-    # 'evpn_interconnect_groups': [ dci, dci, ...]
-    for ic_datum_in_bp in ic_data_in_blueprint:
-        ic_datum = { k: v for k, v in ic_datum_in_bp.items() if k in variables  }
-
-        pull_remote_gateway_node_ids(ic_datum_in_bp['remote_gateway_node_ids'], ic_datum)
-        pull_ic_routingz_zones(ic_datum_in_bp, ic_datum)
-        pull_ic_virtual_networks(ic_datum_in_bp, ic_datum)
-
-        ic_tree.append(ic_datum)
-
-    return
 
 
 def pull_ott(bp, dci_tree):
@@ -116,8 +40,7 @@ class DciEsiMacMsb():
         '''Retribe ESI MAC MSB from the blueprint'''
         bp = cliVar.blueprint
         fabric_settings_in_bp = bp.get_item('fabric-settings')
-        dci_tree = cliVar.data_in_file['blueprint'][bp.label]['dci']
-        dci_tree['esi_mac_msb'] = fabric_settings_in_bp['esi_mac_msb']
+        cliVar.bp_in_file.dci.settings.esi_mac_msb = fabric_settings_in_bp['esi_mac_msb']
 
     def push_msb():
         '''Update ESI MAC MSB in the blueprint'''
@@ -130,8 +53,8 @@ class DciEsiMacMsb():
 
 
 @click.command()
-@click.option('--file-format', type=click.Choice(['yaml', 'json']), default='yaml', help='File format')
-@click.option('--file-folder', type=str, default='.', help='File folder')
+@click.option('--file-format', type=str, default='', help='File format (yaml, json)')
+@click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.pass_context
 def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
@@ -145,9 +68,9 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     if not bp:
         return
 
-    dci_tree = cliVar.data_in_file['blueprint'][bp.label].setdefault('dci', {})
+    dci_tree = cliVar.bp_in_file.dci
 
-    pull_interconnect(bp, dci_tree)
+    cliVar.data_in_file.pull_interconnect()
 
     pull_ott(bp, dci_tree)
 

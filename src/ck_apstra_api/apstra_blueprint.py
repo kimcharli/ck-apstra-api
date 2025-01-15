@@ -740,6 +740,38 @@ class CkApstraBlueprint:
         lldp_data = self.session.get_items(f"blueprints/{self.id}/cabling-map/lldp")
         return lldp_data
 
+    def _default_type_staging(self, **kwargs):
+        '''
+        Get the default type staging
+        '''
+        params = kwargs.get('params', {})
+        var_type = params.get('type', None)
+        if not var_type:
+            var_type = 'staging'
+        
+
+    def get_experience_web_system_info_list(self, **kwargs):
+        '''
+        Get the web system info
+        '''
+        self._default_type_staging(**kwargs)
+        return self.get_item('experience/web/system-info', **kwargs)['data']
+
+    def get_experience_web_logical_devices_items(self, **kwargs):
+        '''
+        Get the web logical device list
+        '''
+        self._default_type_staging(**kwargs)
+        return self.get_item('experience/web/logical-devices', **kwargs)['items']
+
+    def get_experience_web_interface_maps_items(self, **kwargs):
+        '''
+        Get the web interface maps list
+        '''
+        self._default_type_staging(**kwargs)
+        return self.get_item('experience/web/interface-maps', **kwargs)['items']
+
+
     def get_item(self, item: str, **kwargs):
         '''
         Get the items of the blueprint

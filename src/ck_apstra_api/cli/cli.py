@@ -38,7 +38,7 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
     if cliVar.session.last_error:
         logger.error(f"Session error: {cliVar.session.last_error}")
         return
-
+    cliVar.data_in_file.session = cliVar.session
     pass
 
 

@@ -37,7 +37,7 @@ def export_systems(ctx, bp_name, systems_csv):
     """
     logger = prep_logging('DEBUG', 'export_systems()')
 
-    bp = cliVar.get_blueprint(bp_name, logger)
+    bp = cliVar.get_blueprint(bp_name)
     if not bp:
         return
 
