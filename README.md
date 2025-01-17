@@ -52,9 +52,13 @@ ck_apstra_api, 0.5.0
 (.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --help   
 Usage: ck-cli [OPTIONS] COMMAND [ARGS]...
 
-  A CLI tool for interacting with ck-apstra-api
+  A CLI tool for interacting with ck-apstra-api.
+
+  The options that can be specified in .env file: HOST_IP, HOST_PORT,
+  HOST_USER, HOST_PASSWORD
 
 Options:
+  --env-file TEXT       env file
   --host-ip TEXT        Host IP address
   --host-port INTEGER   Host port
   --host-user TEXT      Host username
@@ -63,16 +67,28 @@ Options:
   --help                Show this message and exit.
 
 Commands:
-  check-apstra           Test the connectivity to the server
-  check-blueprint        Test the connectivity to the blueprint
-  export-blueprint       Export a blueprint into a json file
-  export-device-configs  Export a device configurations into multiple files
-  export-generic-system  Export generic systems to a CSV file
-  export-systems         Export systems of a blueprint to a CSV file
-  import-blueprint       Import a blueprint from a json file
-  import-generic-system  Import generic systems from a CSV file
-  relocate-vn            Move a Virtual Network to the target Routing Zone
-  test-get-temp-vn       Test get_temp_vn
+  assign-vn-to-leaf           Test to patch vn for the bound_to
+  check-apstra                Test the connectivity to the server
+  check-blueprint             Test the connectivity to the blueprint
+  debug-context               Debug the context
+  export-blueprint-json       Export a blueprint into a json file
+  export-dci                  Export the DCI interconnect configuration...
+  export-design               Export the Logical Devices, Interface Maps,...
+  export-device-configs       Export a device configurations into...
+  export-generic-system       Export generic systems to a CSV file
+  export-iplink-csv           Export the IP Links into a CSV file
+  export-resources            Export the Resources in yaml, json format
+  export-systems-csv          Export systems of a blueprint to a CSV file
+  export-virtual-network-csv  Import virtual networks from a CSV file
+  import-blueprint            Import a blueprint from a json file
+  import-dci                  Import the DCI interconnect configuration...
+  import-generic-system       Import generic systems from a CSV file
+  import-iplink               Import the IP Links from a CSV file.
+  import-virtual-network      Import virtual networks from a CSV file
+  print-lldp-data             Print the LLDP data of the blueprint
+  relocate-vn                 Move a Virtual Network to the target...
+  test-configlet              Test the configlet (jinja) against the system
+  test-get-temp-vn            Test get_temp_vn
 (.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 

@@ -1,4 +1,5 @@
 import click
+from dotenv import load_dotenv
 
 from ck_apstra_api import CkApstraSession, prep_logging
 
@@ -14,19 +15,22 @@ from .resource import export_resources
 from .design import export_design
 
 @click.group()
+@click.option('--env-file', type=str, default='.env', help='env file')
 @click.option('--host-ip', type=str, envvar='HOST_IP', help='Host IP address')
 @click.option('--host-port', type=int, envvar='HOST_PORT', help='Host port')
 @click.option('--host-user', type=str, envvar='HOST_USER', help='Host username')
 @click.option('--host-password', type=str, envvar='HOST_PASSWORD', help='Host password')
 @click.version_option(message='%(package)s, %(version)s')
 @click.pass_context
-def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
+def cli(ctx, env_file, host_ip: str, host_port: str, host_user: str, host_password: str):
     """
     A CLI tool for interacting with ck-apstra-api.
 
     The options that can be specified in .env file: HOST_IP, HOST_PORT, HOST_USER, HOST_PASSWORD
     """
     ctx.ensure_object(dict)
+    load_dotenv(env_file)
+
     ctx.obj['HOST_IP'] = host_ip
     ctx.obj['HOST_PORT'] = host_port
     ctx.obj['HOST_USER'] = host_user

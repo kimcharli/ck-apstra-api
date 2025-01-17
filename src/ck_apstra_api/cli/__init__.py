@@ -3,7 +3,6 @@ from typing import Any, Dict
 import os
 import json
 import yaml
-import dotenv
 from enum import StrEnum
 
 from ck_apstra_api import CkApstraSession, CkApstraBlueprint, prep_logging, DataInFile
@@ -100,6 +99,5 @@ class CliVar:
             self.logger.warning(f"Blueprint {bp_name} not found")
             return None
 
-dotenv.load_dotenv()
 cliVar = CliVar()
 
