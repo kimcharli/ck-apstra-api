@@ -25,9 +25,10 @@ class SystemsData:
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
+@click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--systems-csv', type=str, required=True, help='The CSV file path to create')
 @click.pass_context
-def export_systems(ctx, bp_name, systems_csv):
+def export_systems_csv(ctx, bp_name, systems_csv, file_folder):
     """
     Export systems of a blueprint to a CSV file
 
@@ -41,20 +42,8 @@ def export_systems(ctx, bp_name, systems_csv):
     if not bp:
         return
 
-    # host_ip = ctx.obj['HOST_IP']
-    # host_port = ctx.obj['HOST_PORT']
-    # host_user = ctx.obj['HOST_USER']
-    # host_password = ctx.obj['HOST_PASSWORD']
-
-    # session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    # if session.last_error:
-    #     logger.error(f"Session error: {session.last_error}")
-    #     return
-    # bp = CkApstraBlueprint(session, bp_name)
-    # if not bp.id:
-    #     logger.error(f"Blueprint {bp_name} not found")
-    #     return
-    systems_csv_path = os.path.expanduser(systems_csv)
+    file_folder = file_folder or os.getenv('FILE_FOLDER', '.')
+    systems_csv_path = os.path.expanduser(f"{file_folder}/{systems_csv}")
     logger.info(f"{systems_csv_path=} writing to {systems_csv_path}")
     """
     TODO: implement tags

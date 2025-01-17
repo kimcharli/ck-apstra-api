@@ -40,10 +40,11 @@ def import_virtual_network(ctx, bp_name, vn_csv: str):
 
 
 @click.command()
+@click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--vn-csv', type=str, envvar='VN_CSV', help='The CSV file path of virtual networks to export to')
 @click.pass_context
-def export_virtual_network(ctx, bp_name, vn_csv: str):
+def export_virtual_network_csv(ctx, bp_name, vn_csv: str, file_folder: str):
     """
     Import virtual networks from a CSV file
     """
@@ -55,7 +56,8 @@ def export_virtual_network(ctx, bp_name, vn_csv: str):
 
     logger.info(f"{bp_name=} {vn_csv=}")
 
-    vn_csv_path = os.path.expanduser(vn_csv or f"{bp_name}-vn.csv")
+    file_folder = file_folder or os.getenv('FILE_FOLDER', '.')
+    vn_csv_path = os.path.expanduser(vn_csv or f"{file_folder}/{bp_name}-vn.csv")
     csv_string = bp.get_item('virtual-networks-csv-bulk')['csv_bulk']
     with open(vn_csv_path, 'w') as csvfile:
         csvfile.write(csv_string)
@@ -68,7 +70,7 @@ def export_virtual_network(ctx, bp_name, vn_csv: str):
 @click.option('--routing-zone', type=str, required=True, help='Destination Routing Zone name')
 @click.option('--blueprint', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.pass_context
-def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
+def relocate_vn(ctx, bp_name: str, virtual_network: str, routing_zone: str):
     """
     Move a Virtual Network to the target Routing Zone
 
@@ -78,7 +80,7 @@ def relocate_vn(ctx, blueprint: str, virtual_network: str, routing_zone: str):
 
     """
     logger = prep_logging('INFO', 'relocate_vn()')
-    logger.info(f"Took order {blueprint=} {virtual_network=} {routing_zone=}")
+    logger.info(f"Took order {bp_name=} {virtual_network=} {routing_zone=}")
 
     NODE_NAME_RZ = 'rz'
 

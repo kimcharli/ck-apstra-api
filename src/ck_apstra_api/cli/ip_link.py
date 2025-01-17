@@ -7,12 +7,13 @@ from result import Ok, Err
 
 from ck_apstra_api import CkApstraBlueprint, IpLinkEnum, CtCsvKeys, import_ip_link_ct
 
-from . import prep_logging, cliVar
+from . import EnvEnum, prep_logging, cliVar
 
 @click.command()
+@click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--csv-out', type=str, default='iplink-out.csv', help='CSV file name to create')
 @click.pass_context
-def export_iplink(ctx, csv_out: str = None):
+def export_iplink_csv(ctx, csv_out: str = None, file_folder: str = None):
     """
     Export the IP Links into a CSV file
 
@@ -48,7 +49,8 @@ def export_iplink(ctx, csv_out: str = None):
             iplinks.append(iplink)
             logger.info(f"{iplink=}")
 
-    csv_path = os.path.expanduser(f"{csv_out}")
+    file_folder = file_folder or os.getenv(EnvEnum.FILE_FOLDER, '.')
+    csv_path = os.path.expanduser(f"{file_folder}/{csv_out}")
     with open(csv_path, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=iplinks[0].keys())
         writer.writeheader()
@@ -63,9 +65,10 @@ def get_blueprint(session, bp_name):
 
 
 @click.command()
+@click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--csv-in', type=str, default='iplink-in.csv', help='CSV file name to read IpLinks')
 @click.pass_context
-def import_iplink(ctx, csv_in: str = None):
+def import_iplink(ctx, csv_in: str = None, file_folder: str = None):
     """
     Import the IP Links from a CSV file.
 
@@ -81,8 +84,10 @@ def import_iplink(ctx, csv_in: str = None):
         logger.error(f"Session error: {cliVar.session.last_error}")
         return
 
+    file_folder = file_folder or os.getenv(EnvEnum.FILE_FOLDER, '.')
+    csv_path = os.path.expanduser(f"{file_folder}/{csv_in}")
     ip_links_to_add = []
-    with open(csv_in, 'r') as csvfile:
+    with open(csv_path, 'r') as csvfile:
         csv_reader = csv.reader(csvfile)
         headers = next(csv_reader)  # Read the header row
         expected_headers = [header.value for header in IpLinkEnum]

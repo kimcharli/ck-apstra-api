@@ -70,7 +70,7 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
 
     dci_tree = cliVar.bp_in_file.dci
 
-    cliVar.data_in_file.pull_interconnect()
+    cliVar.bp_in_file.dci.pull_interconnect(bp)
 
     pull_ott(bp, dci_tree)
 

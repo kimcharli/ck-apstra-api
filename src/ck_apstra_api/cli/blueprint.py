@@ -16,15 +16,17 @@ def check_blueprint(ctx, bp_name: str):
     """
     logger = prep_logging('DEBUG', 'check_blueprint()')
 
-    _ = cliVar.get_blueprint(bp_name, logger)        
+    _ = cliVar.get_blueprint(bp_name)        
     cliVar.session.logout()
 
 
 @click.command()
+@click.option('--file-folder', type=str, default='', help='File folder')
+@click.option('--file-format', type=str, default='json', help='File format (yaml, json)')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--json-file', type=str, envvar='JSON_FILE', help='Json file name to export to')
 @click.pass_context
-def export_blueprint(ctx, bp_name: str, json_file: str = None):
+def export_blueprint_json(ctx, bp_name: str, json_file: str = None, file_folder: str = None, file_format: str = None):
     """
     Export a blueprint into a json file
 
@@ -34,16 +36,18 @@ def export_blueprint(ctx, bp_name: str, json_file: str = None):
     logger = prep_logging('DEBUG', 'export_blueprint()')
 
     bp = cliVar.get_blueprint(bp_name)
+    
 
-    if not json_file:
-        json_file = f"{bp_name}.json"
-    json_path = os.path.expanduser(json_file)
+    # if not json_file:
+    #     json_file = f"{bp_name}.json"
+    # json_path = os.path.expanduser(json_file)
 
-    the_blueprint_data = bp.dump()
-    with open(json_path, 'w') as f:
-        f.write(json.dumps(the_blueprint_data, indent=2))
+    cliVar.dump(file_folder, file_format)
+    # the_blueprint_data = bp.dump()
+    # with open(json_path, 'w') as f:
+    #     f.write(json.dumps(the_blueprint_data, indent=2))
 
-    logger.info(f"blueprint {bp_name} exported to {json_file}")
+    # logger.info(f"blueprint {bp_name} exported to {json_file}")
 
 
 @click.command()

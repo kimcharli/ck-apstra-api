@@ -22,7 +22,7 @@ class EnvEnum(StrEnum):
 @dataclass
 class CliVar:
     session: CkApstraSession = None
-    blueprint: CkApstraBlueprint = None
+    blueprint: CkApstraBlueprint = None  # get from get_blueprint
     # data_in_file: dict = None
     data_in_file: DataInFile = None
     # bp_in_file: dict = None
@@ -55,6 +55,19 @@ class CliVar:
         if self.blueprint.label:
             self.bp_in_file = self.data_in_file['blueprint'].setdefault(self.blueprint.label, {})
 
+    def dump(self, file_folder, file_format):
+        '''dump the data_in_file to a file'''
+        dump_data = self.blueprint.dump()
+        file_folder = file_folder or os.getenv(EnvEnum.FILE_FOLDER, '.')
+        file_format = file_format or os.getenv(EnvEnum.FILE_FORMAT, 'yaml')
+        file_path = self.get_default_file_path(file_folder, file_format)
+        self.logger.info(f"Exporting to {file_path}")
+        with open(file_path, 'w') as f:
+            if file_format == 'json':
+                f.write(json.dumps(dump_data, indent=2))
+            else:
+                f.write(yaml.dump(dump_data))
+
     def export_file(self, file_folder, file_format):
         '''export the data_in_file to a file'''
         file_folder = file_folder or os.getenv(EnvEnum.FILE_FOLDER, '.')
@@ -62,10 +75,10 @@ class CliVar:
         file_path = self.get_default_file_path(file_folder, file_format)
         self.logger.info(f"Exporting to {file_path}")
         with open(file_path, 'w') as f:
-            if'file_format' == 'json':
-                f.write(json.dumps(cliVar.data_in_file.as_dict(), indent=2))
+            if file_format == 'json':
+                f.write(json.dumps(asdict(self.data_in_file), indent=2))
             else:
-                f.write(yaml.dump(cliVar.data_in_file.as_dict()))
+                f.write(yaml.dump(asdict(self.data_in_file)))
 
     def get_blueprint(self, bp_name) -> CkApstraBlueprint:
         """ Get the blueprint object. If not found, return None """
@@ -76,8 +89,8 @@ class CliVar:
         #     self.logger.error(f"Blueprint {bp_name} not found")
         #     return None
         # breakpoint()
-        self.logger.info(f"{bp_name=}, {self.data_in_file.bp_data.id=}")
-        if self.data_in_file.bp_data.id:
+        self.logger.info(f"{bp_name=}, {self.blueprint.id=}")
+        if self.blueprint.id:
             self.logger.info(f"Blueprint {bp_name} found")
             # # set the bp_in_file to the blueprint data in th           
             # self.bp_in_file = self.data_in_file.blueprint[bp_name] = BpInFile()
