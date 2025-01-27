@@ -14,8 +14,9 @@ def export_resources(ctx, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'export_resources()')
 
+    cliVar.update(file_folder=file_folder, file_format=file_format)
     cliVar.data_in_file.pull_resources()
 
-    cliVar.export_file(file_folder, file_format)
+    cliVar.export_file()
     
 

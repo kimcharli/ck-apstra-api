@@ -73,6 +73,7 @@ class DataInFile:
         self.blueprint = {}
         self.design = DesignInFile()
         self.resource = {}
+        self.rack_type_map = {}
         self.logger = prep_logging('DEBUG', "DataInFile")
 
     @property
@@ -132,6 +133,7 @@ class DataInFile:
                 'deploy_mode': x['deploy_mode'],
                 'external': x['external'],
                 'interface_map': self.interface_map_map.get(x.get('interface_map_id', None), None),
+                # 'interface_map': x.get('interface_map_id', None),
                 'device_profile': x['device_profile_id'],
                 'logical_device': self.logical_device_map.get(x.get('logical_device', None), None),
                 'rack': self.rack_type_map.get(x['rack_id'], None),
@@ -139,7 +141,8 @@ class DataInFile:
                 'loopback_ipv4': (x.get('loopback', {}) or {}).get('ipv4_addr', None),
                 'loopback_ipv6': (x.get('loopback', {}) or {}).get('ipv6_addr', None),
                 } for x in system_info_list})
-        except Exception as e:
+        except Exception as e:            
+            self.logger.error(f"Error: {e}")
             breakpoint()
         return self.system_map
 

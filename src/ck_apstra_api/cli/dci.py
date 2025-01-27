@@ -38,17 +38,18 @@ def pull_ott(bp, dci_tree):
 class DciEsiMacMsb():
     def pull_msb():
         '''Retribe ESI MAC MSB from the blueprint'''
-        bp = cliVar.blueprint
-        fabric_settings_in_bp = bp.get_item('fabric-settings')
+        ck_bp = cliVar.blueprint
+        fabric_settings_in_bp = ck_bp.get_item('fabric-settings')
         cliVar.bp_in_file.dci.settings.esi_mac_msb = fabric_settings_in_bp['esi_mac_msb']
 
     def push_msb():
         '''Update ESI MAC MSB in the blueprint'''
-        bp = cliVar.blueprint
-        dci_in_file = cliVar.data_in_file['blueprint'][bp.label]['dci']
-        fabric_settings_in_bp = bp.get_item('fabric-settings')
-        if fabric_settings_in_bp['esi_mac_msb'] != dci_in_file['esi_mac_msb']:
-            _ = bp.patch_item('fabric-settings', {'esi_mac_msb': dci_in_file['esi_mac_msb']})
+        ck_bp = cliVar.blueprint
+        dci_in_file = cliVar.bp_in_file['dci']
+        msb = dci_in_file['settings']['esi_mac_msb']            
+        fabric_settings_in_bp = ck_bp.get_item('fabric-settings')
+        if fabric_settings_in_bp['esi_mac_msb'] != msb:
+            _ = ck_bp.patch_item('fabric-settings', {'esi_mac_msb': msb})
 
 
 
@@ -64,7 +65,8 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'export_dci()')
 
-    bp = cliVar.get_blueprint(bp_name)
+    cliVar.update(file_format=file_format, file_folder=file_folder, bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     if not bp:
         return
 
@@ -77,7 +79,7 @@ def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     DciEsiMacMsb.pull_msb()
 
     # write to file based on the format with the blueprint name
-    cliVar.export_file(file_folder, file_format)
+    cliVar.export_file()
 
 
 
@@ -100,15 +102,15 @@ def import_interconnect():
     """
     logger = prep_logging('DEBUG', 'update_interconnect()')
 
-    bp = cliVar.blueprint
+    ck_bp = cliVar.blueprint
 
-    interconnect_in_blueprint = bp.get_item(INTERCONNECT)[INTERCONNECT]
+    interconnect_in_blueprint = ck_bp.get_item(INTERCONNECT)[INTERCONNECT]
     interconnect_in_file = cliVar.bp_in_file['dci']['interconnect']
     # conver to dictionary for easy access
     ic_data_in_bp = { x['label']: x for x in interconnect_in_blueprint}
 
     # iterate through the interconnects in the file
-    for ic_datum_in_file in interconnect_in_file:
+    for ic_datum_in_file in interconnect_in_file.values():
         ic_label = ic_datum_in_file['label']
         ic_datum_in_bp = ic_data_in_bp.get(ic_label, {})
         ic_id = ic_datum_in_bp.get('id', None)
@@ -122,12 +124,12 @@ def import_interconnect():
         logger.info(f"{ic_label=}")        
         if not ic_id:
             # create the interconnect
-            posted = bp.post_item(INTERCONNECT, ic_spec)
+            posted = ck_bp.post_item(INTERCONNECT, ic_spec)
             logger.info(f"{posted=}, {posted.text=}, {posted.status_code=}")
             ic_id = posted.json()['id']
             # TODO:
             time.sleep(2)
-            ic_datum_in_bp = [ x for x in bp.get_item(INTERCONNECT)[INTERCONNECT] if x['label'] == ic_label][0]
+            ic_datum_in_bp = [ x for x in ck_bp.get_item(INTERCONNECT)[INTERCONNECT] if x['label'] == ic_label][0]
         if any([
             ic_datum_in_bp['interconnect_route_target'] != ic_datum_in_file['interconnect_route_target'],
             ic_datum_in_bp['interconnect_esi_mac'] != ic_datum_in_file['interconnect_esi_mac']
@@ -163,8 +165,8 @@ def import_interconnect():
                 # create the remote gateway
                 rg_spec['evpn_interconnect_group_id'] = ic_id
                 rg_spec['evpn_route_types'] = 'all'
-                rg_spec['local_gw_nodes'] = [bp.get_system_node_from_label(x).ok_value['id'] for x in rg_datum_in_file['local_gw_nodes']]
-                posted = bp.post_item("remote_gateways", rg_spec)
+                rg_spec['local_gw_nodes'] = [ck_bp.get_system_node_from_label(x).ok_value['id'] for x in rg_datum_in_file['local_gw_nodes']]
+                posted = ck_bp.post_item("remote_gateways", rg_spec)
                 logger.info(f"{posted=}, {posted.text=}, {posted.status_code=}")
                 continue
             for variable in ['gw_ip', 'gw_asn', 'ttl', 'keepalive_timer', 'holdtime_timer']:
@@ -172,9 +174,9 @@ def import_interconnect():
                     is_changed = True
             # local_gw_nodes should be present always
             if is_changed or rg_datum_in_file['local_gw_nodes'] != [x['label'] for x in rg_datum_in_bp['local_gw_nodes']]:
-                rg_spec['local_gw_nodes'] = [bp.get_system_node_from_label(x).ok_value['id'] for x in rg_datum_in_file['local_gw_nodes']]
+                rg_spec['local_gw_nodes'] = [ck_bp.get_system_node_from_label(x).ok_value['id'] for x in rg_datum_in_file['local_gw_nodes']]
             if is_changed:
-                patched = bp.put_item(f"remote_gateways/{rg_datum_id}", rg_spec)
+                patched = ck_bp.put_item(f"remote_gateways/{rg_datum_id}", rg_spec)
                 logger.info(f"{patched=}, {patched.text=}, {patched.status_code=}")                
             else:
                 logger.info(f"No change in remote gateway {rg_name}")
@@ -193,7 +195,7 @@ def import_interconnect():
             this_rz_spec['interconnect_route_target'] = security_zone_in_file['interconnect_route_target']
             if security_zone_in_file['interconnect_route_target'] != security_zone_in_bp['interconnect_route_target']:
                 is_changed = True
-            this_rz_spec['routing_policy_id'] = get_routing_policy_id(bp, security_zone_in_file['routing_policy_label'])
+            this_rz_spec['routing_policy_id'] = get_routing_policy_id(ck_bp, security_zone_in_file['routing_policy_label'])
             rz_spec[sz_id] = this_rz_spec
 
         # iterate through the virtual networks
@@ -226,7 +228,7 @@ def import_interconnect():
                 vn_spec[vn_id] = this_vn_spec
 
         if is_changed:
-            patched = bp.patch_item(f"{INTERCONNECT}/{ic_id}", ic_spec)
+            patched = ck_bp.patch_item(f"{INTERCONNECT}/{ic_id}", ic_spec)
             logger.info(f"{patched=}, {patched.text=}, {patched.status_code=}")
 
     return
@@ -243,7 +245,7 @@ def import_ott():
 
 @click.command()
 @click.option('--file-format', type=click.Choice(['yaml', 'json']), default='yaml', help='File format')
-@click.option('--file-folder', type=str, default='.', help='File folder')
+@click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.pass_context
 def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
@@ -252,12 +254,12 @@ def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'import_dci()')
 
-    bp = cliVar.get_blueprint(bp_name)
+    cliVar.update(file_format=file_format, file_folder=file_folder, bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     if not bp:
         return
 
-    cliVar.import_file(file_folder, file_format)
-
+    cliVar.import_file()
 
     import_interconnect()
 

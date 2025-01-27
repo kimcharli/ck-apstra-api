@@ -144,7 +144,8 @@ def export_device_configs(ctx, bp_name: str, file_folder: str):
     """
     logger = prep_logging('DEBUG', 'export_device_configs()')
 
-    bp = cliVar.get_blueprint(bp_name)
+    cliVar.update(file_folder=file_folder, bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     if not bp:
         return
     
