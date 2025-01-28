@@ -57,8 +57,7 @@ class DciEsiMacMsb():
 @click.option('--file-format', type=str, default='', help='File format (yaml, json)')
 @click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def export_dci(ctx, bp_name: str, file_format: str, file_folder: str):
+def export_dci(bp_name: str, file_format: str, file_folder: str):
     """
     Export the DCI interconnect configuration in yaml, json format
 
@@ -247,8 +246,7 @@ def import_ott():
 @click.option('--file-format', type=click.Choice(['yaml', 'json']), default='yaml', help='File format')
 @click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def import_dci(ctx, bp_name: str, file_format: str, file_folder: str):
+def import_dci(bp_name: str, file_format: str, file_folder: str):
     """
     Import the DCI interconnect configuration in yaml, json format
     """

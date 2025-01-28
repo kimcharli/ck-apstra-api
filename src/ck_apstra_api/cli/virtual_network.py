@@ -7,8 +7,7 @@ from . import cliVar, prep_logging
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--vn-csv', type=str, required=True, help='The CSV file path of virtual networks to import from')
-@click.pass_context
-def import_virtual_network(ctx, bp_name, vn_csv: str):
+def import_virtual_network(bp_name, vn_csv: str):
     """
     Import virtual networks from a CSV file
     """
@@ -43,8 +42,7 @@ def import_virtual_network(ctx, bp_name, vn_csv: str):
 @click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--vn-csv', type=str, envvar='VN_CSV', help='The CSV file path of virtual networks to export to')
-@click.pass_context
-def export_virtual_network_csv(ctx, bp_name, vn_csv: str, file_folder: str):
+def export_virtual_network_csv(bp_name, vn_csv: str, file_folder: str):
     """
     Import virtual networks from a CSV file
     """
@@ -69,8 +67,7 @@ def export_virtual_network_csv(ctx, bp_name, vn_csv: str, file_folder: str):
 @click.option('--virtual-network', type=str, required=True, help='Subject Virtual Network name')
 @click.option('--routing-zone', type=str, required=True, help='Destination Routing Zone name')
 @click.option('--blueprint', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def relocate_vn(ctx, bp_name: str, virtual_network: str, routing_zone: str):
+def relocate_vn(bp_name: str, virtual_network: str, routing_zone: str):
     """
     Move a Virtual Network to the target Routing Zone
 
@@ -162,15 +159,15 @@ def relocate_vn(ctx, bp_name: str, virtual_network: str, routing_zone: str):
 @click.command()
 @click.option('--virtual-network', type=str, required=True, help='Subject Virtual Network name')
 @click.option('--routing-zone', type=str, required=True, help='Destination Routing Zone name')
-@click.option('--blueprint', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def test_get_temp_vn(ctx, bp_name: str, virtual_network: str, routing_zone: str):
+@click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
+def test_get_temp_vn(bp_name: str, virtual_network: str, routing_zone: str):
     """
-    Test get_temp_vn
+    Test get_temp_vn from existing routing zone and virtual network
     """
     logger = prep_logging('INFO', 'test_get_temp_vn()')
 
-    bp = cliVar.get_blueprint(bp_name, logger)
+    cliVar.update(bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     if not bp:
         return
 
@@ -185,14 +182,14 @@ def test_get_temp_vn(ctx, bp_name: str, virtual_network: str, routing_zone: str)
 @click.option('--virtual-network', type=str, default='ESX-Replication', help='Subject Virtual Network name')
 @click.option('--bound-to', type=str, default='CHA08P25LP01', help='The leaf pair label to bound to')
 @click.option('--blueprint', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def assign_vn_to_leaf(ctx, bp_name: str, virtual_network: str, bound_to: str):
+def assign_vn_to_leaf(bp_name: str, virtual_network: str, bound_to: str):
     """
     Test to patch vn for the bound_to
     """
     logger = prep_logging('INFO', 'assign_vn_to_leaf()')
 
-    bp = cliVar.get_blueprint(bp_name, logger)
+    cliVar.update(bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     if not bp:
         return
 

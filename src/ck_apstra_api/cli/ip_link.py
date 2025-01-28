@@ -12,8 +12,7 @@ from . import EnvEnum, prep_logging, cliVar
 @click.command()
 @click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--csv-out', type=str, default='iplink-out.csv', help='CSV file name to create')
-@click.pass_context
-def export_iplink_csv(ctx, csv_out: str = None, file_folder: str = None):
+def export_iplink_csv(csv_out: str = None, file_folder: str = None):
     """
     Export the IP Links into a CSV file
 
@@ -67,8 +66,7 @@ def get_blueprint(session, bp_name):
 @click.command()
 @click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--csv-in', type=str, default='iplink-in.csv', help='CSV file name to read IpLinks')
-@click.pass_context
-def import_iplink(ctx, csv_in: str = None, file_folder: str = None):
+def import_iplink(csv_in: str = None, file_folder: str = None):
     """
     Import the IP Links from a CSV file.
 
@@ -112,8 +110,7 @@ def import_iplink(ctx, csv_in: str = None, file_folder: str = None):
 
 @click.command()
 @click.option('--csv-in', type=str, default='~/Downloads/iplink_ct.csv', help='Path to the CSV file for iplink CT')
-@click.pass_context
-def import_iplink_ct(ctx, csv_in: str):
+def import_iplink_ct(csv_in: str):
     """
     Import IpLink Connectivity Template from a CSV file
 

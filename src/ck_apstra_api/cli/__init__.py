@@ -4,6 +4,7 @@ import os
 import json
 import yaml
 from enum import StrEnum
+from dotenv import load_dotenv
 
 from ck_apstra_api import CkApstraSession, CkApstraBlueprint, prep_logging, DataInFile
 
@@ -20,7 +21,11 @@ class EnvEnum(StrEnum):
 
 @dataclass
 class CliVar:
-    session: CkApstraSession = None
+    _session: CkApstraSession = None
+    host_ip: str = None
+    host_port: int = None
+    host_user: str = None
+    host_password: str = None
     blueprint: CkApstraBlueprint = None  # get from get_blueprint
     # data_in_file: dict = None
     data_in_file: DataInFile = None
@@ -34,10 +39,17 @@ class CliVar:
         #     'blueprint': {}
         # }
         # first prep_logging is to set the logging file
+
         self.logger = prep_logging('DEBUG', 'CliVar', os.getenv(EnvEnum.FILE_FOLDER, '.'))
         self.data_in_file = DataInFile()
         self.file_folder = None
         self.bp_name = None
+
+    @property
+    def session(self):
+        if not self._session:
+            self._session = CkApstraSession(self.host_ip, self.host_port, self.host_user, self.host_password)
+        return self._session
 
     def update(self, **kwargs):
         '''Update the variables with the kwargs'''
@@ -96,6 +108,8 @@ class CliVar:
 
     def get_blueprint(self) -> CkApstraBlueprint:
         """ Get the blueprint object. If not found, return None """
+        if not self.session:
+            return None
         self.blueprint = self.data_in_file.get_blueprint(self.session, self.bp_name)
         # self.logger = prep_logging('DEBUG', f"CliVar(bp={bp_name})")
         # self.blueprint = CkApstraBlueprint(self.session, bp_name)
@@ -114,5 +128,6 @@ class CliVar:
             self.logger.warning(f"Blueprint {self.bp_name} not found")
             return None
 
+# should be here to be able to use the env variables in click options
+load_dotenv()
 cliVar = CliVar()
-

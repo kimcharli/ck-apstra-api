@@ -39,8 +39,7 @@ from . import cliVar, prep_logging
 @click.option('--file-format', type=str, default='', help='File format (yaml, json)')
 @click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def export_design(ctx, bp_name: str, file_format: str, file_folder: str):
+def export_design(bp_name: str, file_format: str, file_folder: str):
     """
     Export the Logical Devices, Interface Maps, ... within a blueprint in yaml, json format
 

@@ -1,7 +1,5 @@
 import click
-from dotenv import load_dotenv
-
-from ck_apstra_api import CkApstraSession, prep_logging
+from ck_apstra_api import prep_logging
 
 from . import cliVar
 
@@ -21,43 +19,24 @@ from .design import export_design
 @click.option('--host-user', type=str, envvar='HOST_USER', help='Host username')
 @click.option('--host-password', type=str, envvar='HOST_PASSWORD', help='Host password')
 @click.version_option(message='%(package)s, %(version)s')
-@click.pass_context
-def cli(ctx, env_file, host_ip: str, host_port: str, host_user: str, host_password: str):
+def cli(env_file, host_ip: str, host_port: str, host_user: str, host_password: str):
     """
     A CLI tool for interacting with ck-apstra-api.
 
     The options that can be specified in .env file: HOST_IP, HOST_PORT, HOST_USER, HOST_PASSWORD
     """
-    ctx.ensure_object(dict)
-    load_dotenv(env_file)
-
-    ctx.obj['HOST_IP'] = host_ip
-    ctx.obj['HOST_PORT'] = host_port
-    ctx.obj['HOST_USER'] = host_user
-    ctx.obj['HOST_PASSWORD'] = host_password
-    
     logger = prep_logging('DEBUG', 'cli()')
 
-    cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    cliVar.update(host_ip=host_ip, host_port=host_port, host_user=host_user, host_password=host_password)    
+
     if cliVar.session.last_error:
         logger.error(f"Session error: {cliVar.session.last_error}")
         return
     cliVar.data_in_file.session = cliVar.session
-    pass
 
 
 @cli.command()
-@click.pass_context
-def debug_context(ctx):
-    """
-    Debug the context
-    """
-    print(f"{ctx.obj=}")
-
-
-@cli.command()
-@click.pass_context
-def check_apstra(ctx):
+def check_apstra():
     """
     Test the connectivity to the server
     """

@@ -6,8 +6,7 @@ from . import cliVar, prep_logging
 @click.command()
 @click.option('--file-format', type=click.Choice(['yaml', 'json']), default='yaml', help='File format')
 @click.option('--file-folder', type=str, default='', help='File folder')
-@click.pass_context
-def export_resources(ctx, file_format: str, file_folder: str):
+def export_resources(file_format: str, file_folder: str):
     """
     Export the Resources in yaml, json format
 

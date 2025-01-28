@@ -7,8 +7,7 @@ from . import cliVar, prep_logging
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def check_blueprint(ctx, bp_name: str):
+def check_blueprint(bp_name: str):
     """
     Test the connectivity to the blueprint
 
@@ -16,17 +15,16 @@ def check_blueprint(ctx, bp_name: str):
     """
     logger = prep_logging('DEBUG', 'check_blueprint()')
 
-    _ = cliVar.get_blueprint(bp_name)        
+    cliVar.update(bp_name=bp_name)
+    _ = cliVar.get_blueprint()        
     cliVar.session.logout()
 
 
 @click.command()
-@click.option('--file-folder', type=str, default='', help='File folder')
-@click.option('--file-format', type=str, default='json', help='File format (yaml, json)')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
+@click.option('--file-format', type=str, default='json', help='File format (yaml, json)')
 @click.option('--json-file', type=str, envvar='JSON_FILE', help='Json file name to export to')
-@click.pass_context
-def export_blueprint_json(ctx, bp_name: str, json_file: str = None, file_folder: str = None, file_format: str = None):
+def export_blueprint_json(bp_name: str, json_file: str = None, file_folder: str = None, file_format: str = None):
     """
     Export a blueprint into a json file
 
@@ -35,26 +33,16 @@ def export_blueprint_json(ctx, bp_name: str, json_file: str = None, file_folder:
     """
     logger = prep_logging('DEBUG', 'export_blueprint()')
 
-    bp = cliVar.get_blueprint(bp_name)
+    cliVar.update(file_folder=file_folder, file_format=file_format, bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     
-
-    # if not json_file:
-    #     json_file = f"{bp_name}.json"
-    # json_path = os.path.expanduser(json_file)
-
-    cliVar.dump(file_folder, file_format)
-    # the_blueprint_data = bp.dump()
-    # with open(json_path, 'w') as f:
-    #     f.write(json.dumps(the_blueprint_data, indent=2))
-
-    # logger.info(f"blueprint {bp_name} exported to {json_file}")
+    cliVar.dump()
 
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name to create')
 @click.option('--json-file', type=str, envvar='JSON_FILE', help='Json file name to import from')
-@click.pass_context
-def import_blueprint(ctx, bp_name: str, json_file: str = None):
+def import_blueprint(bp_name: str, json_file: str = None):
     """
     Import a blueprint from a json file
 
@@ -63,7 +51,8 @@ def import_blueprint(ctx, bp_name: str, json_file: str = None):
     """
     logger = prep_logging('DEBUG', 'import_blueprint()')
 
-    if cliVar.get_blueprint(bp_name, logger):
+    cliVar.update(bp_name=bp_name)
+    if cliVar.get_blueprint():
         logger.error(f"Blueprint {bp_name} already exists")
         return
 
@@ -109,14 +98,14 @@ def import_blueprint(ctx, bp_name: str, json_file: str = None):
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def print_lldp_data(ctx, bp_name: str = 'terra'):
+def print_lldp_data(bp_name: str = 'terra'):
     """
     Print the LLDP data of the blueprint
     """
     logger = prep_logging('DEBUG', 'export_device_configs()')
 
-    bp = cliVar.get_blueprint(bp_name, logger)
+    cliVar.update(bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     if not bp:
         return
 
@@ -130,8 +119,7 @@ def print_lldp_data(ctx, bp_name: str = 'terra'):
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--file-folder', type=str, envvar='FILE_FOLDER', help='Folder name to export')
-@click.pass_context
-def export_device_configs(ctx, bp_name: str, file_folder: str):
+def export_device_configs(bp_name: str, file_folder: str):
     """
     Export a device configurations into multiple files
 
@@ -143,7 +131,7 @@ def export_device_configs(ctx, bp_name: str, file_folder: str):
     3_load_set_configlet-set.txt (if applicable)
     """
     logger = prep_logging('DEBUG', 'export_device_configs()')
-
+    
     cliVar.update(file_folder=file_folder, bp_name=bp_name)
     bp = cliVar.get_blueprint()
     if not bp:

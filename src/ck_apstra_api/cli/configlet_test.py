@@ -9,8 +9,7 @@ from . import cliVar, prep_logging
 @click.option('--system', type=str, required=True, help='System label to test against')
 @click.option('--configlet-file', type=str, required=True, help='Configlet File (jinjia2)')
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.pass_context
-def test_configlet(ctx, bp_name: str, configlet_file: str, system: str):
+def test_configlet(bp_name: str, configlet_file: str, system: str):
     """
     Test the configlet (jinja) against the system
 

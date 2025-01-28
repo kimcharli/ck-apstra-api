@@ -27,8 +27,7 @@ class SystemsData:
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--file-folder', type=str, default='', help='File folder')
 @click.option('--systems-csv', type=str, required=True, help='The CSV file path to create')
-@click.pass_context
-def export_systems_csv(ctx, bp_name, systems_csv, file_folder):
+def export_systems_csv(bp_name, systems_csv, file_folder):
     """
     Export systems of a blueprint to a CSV file
 
@@ -38,7 +37,8 @@ def export_systems_csv(ctx, bp_name, systems_csv, file_folder):
     """
     logger = prep_logging('DEBUG', 'export_systems()')
 
-    bp = cliVar.get_blueprint(bp_name)
+    cliVar.update(file_folder=file_folder, bp_name=bp_name)
+    bp = cliVar.get_blueprint()
     if not bp:
         return
 
@@ -79,9 +79,8 @@ def export_systems_csv(ctx, bp_name, systems_csv, file_folder):
 
 
 @click.command()
-@click.option('--gs-csv-in', type=str, default='~/Downloads/gs_sample.csv', help='Path to the CSV file for generic systems')
-@click.pass_context
-def import_generic_system(ctx, gs_csv_in: str):
+@click.option('--gs-csv-in', type=str, default='./var/gs_sample.csv', help='Path to the CSV file for generic systems')
+def import_generic_system(gs_csv_in: str):
     """
     Import generic systems from a CSV file
 
@@ -89,11 +88,6 @@ def import_generic_system(ctx, gs_csv_in: str):
     Sample CSV file: https://github.com/kimcharli/ck-apstra-api/blob/main/tests/fixtures/gs_sample.csv
     """
     logger = prep_logging('DEBUG', 'import_generic_system()')
-
-    # host_ip = ctx.obj['HOST_IP']
-    # host_port = ctx.obj['HOST_PORT']
-    # host_user = ctx.obj['HOST_USER']
-    # host_password = ctx.obj['HOST_PASSWORD']
 
     session = cliVar.session
     # CkApstraSession(host_ip, host_port, host_user, host_password)
@@ -124,27 +118,14 @@ def import_generic_system(ctx, gs_csv_in: str):
 
 
 @click.command()
-@click.option('--gs-csv-out', type=str, default='~/gs.csv', help='Path to the CSV file for generic systems')
-@click.pass_context
-def export_generic_system(ctx, gs_csv_out: str):
+@click.option('--gs-csv-out', type=str, default='./var/gs.csv', help='Path to the CSV file for generic systems')
+def export_generic_system(gs_csv_out: str):
     """
     Export generic systems to a CSV file
     """
-    # from ck_apstra_api import get_generic_systems, CkApstraSession, prep_logging
-    # from result import Ok, Err
-
     logger = prep_logging('DEBUG', 'export_generic_system()')
 
-    # host_ip = ctx.obj['HOST_IP']
-    # host_port = ctx.obj['HOST_PORT']
-    # host_user = ctx.obj['HOST_USER']
-    # host_password = ctx.obj['HOST_PASSWORD']
-
-    # uncomment below for debugging purpose. It prints the username and password
-    # logger.info(f"{ctx.obj=}")
-
     session = cliVar.session
-    # session = CkApstraSession(host_ip, host_port, host_user, host_password)
     if session.last_error:
         logger.error(f"Session error: {session.last_error}")
         return
