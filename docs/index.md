@@ -1,12 +1,17 @@
 ---
-title: CK-Apstra-API
-description: CK-Apstra-API
-pubDate: 2025-02-15
-keywords:
-    - CK-Apstra-API
-    - CMS
+title: Documentation Home
+layout: default
 ---
 
-# CK-Apstra-API
+# Documentation
 
+## Latest Posts
 
+{% for post in site.pages %}
+  {% if post.path contains 'notes' %}
+* [{{ post.title }}]({{ post.url | relative_url }}) - {{ post.pubDate | date: "%Y-%m-%d" }}
+    {% if post.description %}
+    > {{ post.description }}
+    {% endif %}
+  {% endif %}
+{% endfor %}
