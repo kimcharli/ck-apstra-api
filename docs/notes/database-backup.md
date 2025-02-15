@@ -13,7 +13,7 @@ keywords:
 
 The procedure for backing up the Apstra database is described in the [Back up Apstra Database](https://www.juniper.net/documentation/us/en/software/apstra5.1/apstra-user-guide/topics/task/apstra-server-database-back-up.html).
 
-As the precude above doesn't mention the way to copy over the database to a remote server, here are the steps to do that.
+The procedure above doesn't mention the way to copy over the database to a remote server, here are the steps to do that.
 
 ## Steps to Backup and Transfer Database
 
@@ -33,34 +33,43 @@ admin@aos-server:~$
 </div>
 
 ### Step 2: Create Compressed Archive
-Create a file to be able to copy the database to a remote server.
+Create a compressed archive of the backup. Note: Replace <snapshot-name> with your actual backup timestamp.
 <div class="command-block">
-admin@aos-server:~$ sudo tar zcf backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz /var/lib/aos/snapshot/<span class="snapshot-name">2025-02-14_23-09-45</span>
+admin@aos-server:~$ sudo tar zcf aos-backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz /var/lib/aos/snapshot/<span class="snapshot-name">2025-02-14_23-09-45</span>
 tar: Removing leading `/' from member names
 admin@aos-server:~$ 
 </div>
 
 ### Step 3: Set File Permissions
-Change the ownership of the file to the user that will copy the file to the remote server.
+Change the ownership of the backup file.
 <div class="command-block">
-admin@aos-server:~$ sudo chown admin backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz
+admin@aos-server:~$ sudo chown admin aos-backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz
 </div>
 
 ### Step 4: Transfer the Backup
-This can be done in a number of ways:
+Choose one of the following methods to transfer the backup file. Replace the IP address and path with your target server details.
 
-#### Option A: Copy from Apstra server to remote server
+#### Option A: Push from Apstra server to remote server
 <div class="command-block">
-scp backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz admin@10.1.1.100:/home/admin
+scp aos-backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz admin@10.1.1.100:/home/admin/
 </div>
 
-#### Option B: Copy from remote server to Apstra server
+#### Option B: Pull from remote server to Apstra server
 <div class="command-block">
-scp admin@10.1.1.100:/home/admin/backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz .
+scp admin@aos-server:/home/admin/aos-backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz .
 </div>
 
 #### Option C: Using WinSCP
-Use the WinSCP graphical interface to transfer the file.
+Use the WinSCP graphical interface to transfer the file. Ensure you have SSH access configured properly.
+
+### Best Practices
+- Always verify the backup file size after transfer
+  ```bash
+  ls -lh aos-backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz
+  ```
+- Keep backups in a secure location
+- Consider automating this process for regular backups: [KB37808 Automating Backup Collection](https://supportportal.juniper.net/s/article/Juniper-Apstra-Automating-Backup-Collection)
+- Maintain proper backup rotation to manage storage space
 
 
 
