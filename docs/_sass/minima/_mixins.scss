@@ -1,0 +1,3 @@
+@mixin relative-font-size($ratio) {
+  font-size: #{$ratio}rem;
+} 

@@ -1,0 +1,16 @@
+protocols {
+    pim {
+        rp {
+            static {
+                address 10.0.0.0;
+            }
+        }
+{% for vlan_data in vlan.values() %}
+{% if 'fhrp_ipv4_address' in vlan_data %}
+        interface irb.{{ vlan_data['id'] }} {
+            distributed-dr;
+        }
+{% endif %}
+{% endfor %}
+    }
+}

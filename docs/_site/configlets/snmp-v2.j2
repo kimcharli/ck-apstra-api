@@ -1,0 +1,12 @@
+set snmp view all oid .1
+set snmp client-list SNMP-RO 10.85.192.45/32
+set snmp client-list SNMP-RO 10.85.192.47/32
+set snmp community test1 view all
+set snmp community test1 authorization read-only
+set snmp community test1 routing-instance mgmt_junos client-list-name SNMP-RO
+set snmp trap-options routing-instance mgmt_junos source-address {{ management_ip }}
+set snmp trap-group TRAP-1 version v2
+set snmp trap-group TRAP-1 targets 10.85.192.45
+set snmp trap-group TRAP-1 targets 10.85.192.47
+set snmp trap-group TRAP-1 routing-instance mgmt_junos
+set snmp routing-instance-access

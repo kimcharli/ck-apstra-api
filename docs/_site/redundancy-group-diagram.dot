@@ -1,0 +1,39 @@
+digraph G {
+  compound=true
+  graph [fontname="Monospace"]
+  edge [dir=none, fontname="Monospace", fontsize=8]
+  node [shape=box, style=rounded, fontname="Monospace", fontsize=8]
+
+  subgraph cluster_rack {
+      label = "rack: label=r5r14"
+      fontsize=8
+      style = "filled,rounded"
+      color = lightblue
+
+    subgraph cluster_pair {
+        label = "redundancy_group: label=r5r14-pair"
+        fontsize=8
+        style = "filled,rounded"
+        color = lightgrey
+        fontname="Monospace"
+
+        node [style="filled,rounded", color=white]
+
+        leaf1_1 [label=<system<br />label=laef1_1<br/>system_type=switch>]
+        cluster1_1 [label=" ", color=lightgrey]
+        leaf1_2 [label=<system<br />label=laef1_2<br/>system_type=switch>]
+    }
+
+  }
+  
+  single_home_1
+  single_home_2
+  dual_home_1
+  
+  leaf1_1 -> single_home_1 [taillabel="xe-0/0/1" headlabel=eth0]
+  leaf1_2 -> single_home_2 [taillabel="xe-0/0/1" headlabel=eth0]
+  leaf1_1 -> dual_home_1 [taillabel="xe-0/0/3" headlabel=eth0]
+  leaf1_2 -> dual_home_1 [taillabel="xe-0/0/3",labeldistance="1.0" headlabel=eth1]
+  cluster1_1 -> dual_home_1 [taillabel=ae3 ltail=cluster_pair label="        " headlabel=bond0 labeldistance="1.0"]
+  
+}

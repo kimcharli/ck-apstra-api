@@ -1,0 +1,23 @@
+{# v1.0.0 2024-09-16 #}
+{# configlet name: loop-detect #}
+{# configlet description: Configure loop detection on L2 edge interfaces #}
+{# reference: https://www.juniper.net/documentation/us/en/software/junos/evpn-vxlan/topics/concept/evpn-vxlan-lightweight-leaf-server-loop-detection.html #}
+{# configlet scope: role in ["leaf"] #}
+{% if interface != '' %}
+{% for intf in interface.values()|selectattr('role', 'eq', 'l2edge')|selectattr('allowed_vlans') %}
+{% if loop.first %}
+protocols {
+    loop-detect {
+        enhanced {
+{% endif %}
+            interface {{ intf.intfName }}.0 {
+                vlan-id {{ intf.allowed_vlans[-1] }};
+                revert-interval 10;
+            }
+{% if loop.last %}
+        }
+    }
+}
+{% endif %}
+{% endfor %}
+{% endif %}

@@ -1,0 +1,154 @@
+collapsed_core_1:
+  hosts:
+    ex4600-1:
+      ansible_host: 10.85.156.172
+      peer: ex4600-2
+      hostname: ex4600-1
+    ex4600-2:
+      ansible_host: 10.85.156.171
+      peer: ex4600-1
+      hostname: ex4600-2
+  vars:
+    model: ex4600
+    default_mtu: 9216
+    root_encrypted_password: "$1$u0szc6EF$XbsAoAH1t7nU4crY44IE5/"
+    root_ssh_rsa: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDPL78MoahulNonlvUSG4F0GHXRTp4lrFdynZO1ufdXHBSGc0SuZTiJAPbPGJidMxWpWoIHEVpp8x3u5jNMVoo4UCEiMrQc4Cqz5NlxCNM2Y5mn/LO7no3LijlMV8QW72eo79LZFjPwwnFeclvEaqCazZ7QCjpLA9dadLa4+dG9AgZQ9p6AsbY4iNIBVyvRZO1zrE2qOUBdeYy1nBMy8iDdquZGityhLBABEaXHi7TcLP5evCCQ/PkVWtmwO7V5d6fniFhWAlAFo7sKm25RTYffcA1wCnGFOGqbtzkYgW8LSZKe4DKtRmp/NrhoG59rqXf+y+zzZayQtIlbyML7Q9Ot ckim@ckim-mbp"
+    admin_user: root
+    # ssh_private_key_file: /Users/ckim/.ssh/id_rsa
+    admin_password: Juniper
+    admin_encrypted_password: "$1$vqJOfwrJ$pvWLh0z9FVLjzEDWBCqP4/"
+    login_message: "                                                            Authorized Use Only\\n\\nThis system is solely for the use of authorized users for official purposes.  You have no\\nexpectation of privacy in its use and to ensure that the system is functioning properly,\\nindividuals using this system are subject to having all their activities monitored and\\nrecorded by the system and system personnel.\\n\\nUse of this system evidences an express consent to such monitoring and agreement that if such monitoring reveals evidence of possible abuse or criminal activity, system personnel may provide the results of such monitoring to appropriate officials.\\n\\nLocal configuration changes will be overwritten.\\n\\n"
+    port: 22
+    vxlan_vrf_target_default: target:100:100
+    bgp_authentication_key: $9$WOBL-Vs24ZDiY2z3/Cu0-VbwaZ
+    mgmt_prefix_length: 25
+    mgmt_gateway: 10.85.156.129
+    hold_time_up: 1000 #100000
+    domain_search:
+    - pslab.net
+    - test.net
+    name_servers:
+    - 10.85.192.2
+    - 10.85.128.33
+    ntp_servers:
+    - 10.85.128.128
+    snmp_contact: call ext 9988
+    snmp_community_ro: readonly
+    snmp_community_rw: readwrite
+    time_zone: UTC
+    bgp_as_common: 65100
+    lo0_ip:
+      ex4600-1: 192.168.206.1
+      ex4600-2: 192.168.206.2
+    ae0_ip:
+      ex4600-1: 10.0.1.0
+      ex4600-2: 10.0.1.1
+    bgp_as:
+      ex4600-1: 65101
+      ex4600-2: 65102
+    vlans:
+      1:
+        name: default
+        # l3_interface: irb.0
+        vni: 10001
+      3503:
+        name: WAPMgmt
+      3536:
+        name: WAPMgmt
+        # l3_interface: irb.3536
+      3532:
+        name: Wired-Data1
+        # l3_interface: irb.3532
+      3540:
+        name: Wireless-Data1
+        # subnet: 10.128.40.11/24
+        # vip: 10.128.40.1
+      3541:
+        name: pcn-voice
+        # l3_interface: irb.3541
+      990:
+        name: Enterprise-990
+      21:
+        name: Guest-21
+      3010:
+        name: Infra-mgmt-3010
+      555:
+        name: IoT
+      556:
+        name: V556
+    interfaces:
+      xe-0/0/0:
+        ae: 11
+      xe-0/0/1:
+        description: MDF Server Room Stack SW031 - Enterprise
+        ae: 31
+      xe-0/0/2:
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      xe-0/0/3:
+        description: MDF Server Room Stack SW031 - 41
+        ae: 41
+      xe-0/0/5:
+        description: xe-0/0/5
+        native_vlan_id: 990
+        vlans:
+        - Enterprise-990
+      xe-0/0/40:
+        description: Firewall ae1 Uplink to MOS04FW001
+        ae: 1
+    ae_interfaces:
+      1:
+        description: Firewall ae1 Uplink to MOS04FW001
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      11:
+        description: Firewall ae11 Uplink to MOS04FW002
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      21:
+        description: ae21 Uplink to server switches SW021 and SW022
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      31:
+        description: MDF Server Room Stack SW031 - Enterprise
+        esi: True
+        native_vlan_id: 3010
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+      41:
+        description: MDF Server Room Stack SW031 - 41
+        esi: True
+        vlans:
+        - Enterprise-990
+        - Guest-21
+        - Infra-mgmt-3010
+        - IoT
+        - WAPMgmt
+        - V556
+        
+
+
+    

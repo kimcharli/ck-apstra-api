@@ -1,0 +1,15 @@
+@import "minima/initialize";
+
+// Add your custom styles below
+.command-block {
+    margin: 0;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+p + .command-block,
+.command-block + p {
+    margin-top: 0;
+} 

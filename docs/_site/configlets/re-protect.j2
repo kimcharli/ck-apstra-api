@@ -1,0 +1,79 @@
+{# v1.0.0 2024-09-16 #}
+{# configlet name: re-protect #}
+{# configlet description: Apply a basic set of firewall filters to protect the routing engine #}
+{# configlet scope: role in all #}
+policy-options {
+    prefix-list ssh-whitelist {
+        10.85.192.0/26;
+        10.104.0.0/16;
+    }
+    prefix-list apstra-servers {
+        10.85.192.45/32;
+    }
+    prefix-list bgp-neighbors-global {
+        apply-path "protocols bgp group <*> neighbor <*>";
+    }
+    prefix-list bgp-neighbors-ri {
+        apply-path "routing-instances <*> protocols bgp group <*> neighbor <*>";
+    }
+}
+firewall {
+    family inet {
+        filter re-protect {
+            term ssh-allow {
+                from {
+                    source-prefix-list {
+                        ssh-whitelist;
+                        apstra-servers;
+                    }
+                    protocol tcp;
+                    destination-port [ ssh 830 ];
+                }
+                then accept;
+            }
+            term ssh-deny {
+                from {
+                    protocol tcp;
+                    destination-port [ ssh 830 ];
+                }
+                then {
+                    discard;
+                }
+            }
+            term bgp-allow {
+                from {
+                    source-prefix-list {
+                        bgp-neighbors-global;
+                        bgp-neighbors-ri;
+                    }
+                    protocol tcp;
+                    destination-port bgp;
+                }
+                then accept;
+            }
+            term bgp-deny {
+                from {
+                    protocol tcp;
+                    destination-port bgp;
+                }
+                then {
+                    discard;
+                }
+            }
+            term else {
+                then accept;
+            }
+        }
+    }
+}
+interfaces {
+    lo0 {
+        unit 0 {
+            family inet {
+                filter {
+                    input re-protect;
+                }
+            }
+        }
+    }
+}

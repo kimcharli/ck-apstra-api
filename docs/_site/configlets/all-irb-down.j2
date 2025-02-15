@@ -1,0 +1,5 @@
+{% for vlan_data in vlan.values() %}
+{% if vlan_data['impl_type'] == 'vxlan' and vlan_data['fhrp_ipv4_address']|length %}
+set interfaces irb unit {{ vlan_data['id'] }} disable
+{% endif %}
+{% endfor %}

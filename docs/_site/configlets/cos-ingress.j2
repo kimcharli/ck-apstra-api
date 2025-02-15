@@ -1,0 +1,78 @@
+firewall {
+    family inet {
+        filter CLASSIFY-FC {
+            interface-specific;
+            term Critical {
+                from {
+                    destination-address {
+                        10.0.0.101/32;
+                    }
+                }
+                then {
+                    policer SAP-Policer;
+                    count Critical;
+                    loss-priority low;
+                    forwarding-class CRITICAL;
+                }
+            }
+            term else {
+                then accept;
+            }
+        }
+    }
+    policer SAP-Policer {
+        if-exceeding {
+            bandwidth-limit 10g;
+            burst-size-limit 90k;
+        }
+        then discard;
+    }
+}
+class-of-service {
+    interfaces {
+        all {
+            unit 0 {
+                rewrite-rules {
+                    ieee-802.1 RW-TCI;
+                }
+            }
+            rewrite-rules {
+                dscp RW-DSCP;
+                ieee-802.1 RW-TCI;
+            }
+        }
+    }
+    rewrite-rules {
+        dscp RW-DSCP {
+            forwarding-class BE {
+                loss-priority low code-point be;
+            }
+            forwarding-class CRITICAL {
+                loss-priority low code-point af41;
+            }
+            forwarding-class NC {
+                loss-priority low code-point nc1;
+            }
+            forwarding-class VOICE {
+                loss-priority low code-point be;
+            }
+        }
+        ieee-802.1 RW-TCI {
+            forwarding-class CRITICAL {
+                loss-priority low code-point 101;
+            }
+        }
+    }
+}
+interfaces {
+    irb {
+        unit 2222 {
+            family inet {
+                filter {
+                    input CLASSIFY-FC;
+                }
+                address 10.2.2.3/24;
+            }
+        }
+    }
+}

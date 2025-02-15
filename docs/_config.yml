@@ -13,6 +13,35 @@ kramdown:
   parse_block_html: true
   syntax_highlighter_opts:
     disable: true
-baseurl: "/ck-apstra-api"
-title: "CK Apstra API Documentation"
+
+title: CK Apstra API
+description: Documentation for CK Apstra API
+baseurl: "/ck-apstra-api"  # Match your GitHub repository name
+url: "https://github.com/kimcharli/ck-apstra-api"  # Your GitHub Pages URL
+
+# Build settings
 markdown: kramdown
+remote_theme: jekyll/minima
+
+# Plugin settings
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-remote-theme
+
+# Include assets directory
+include:
+  - assets
+  - assets/css
+
+# Sass/SCSS processing
+sass:
+  sass_dir: _sass
+  style: compressed
+
+# Exclude files from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor

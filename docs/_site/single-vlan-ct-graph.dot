@@ -1,0 +1,66 @@
+digraph {
+    labelloc=t
+    label="Relationship between Single VLAN Connectivity Template and interfaces"
+    compound=true
+    fontname="Arial"
+    
+    node [shape=Mrecord, style=filled, fontname="Courier:bold"]
+    
+    subgraph cluster_ct {
+        label="Connectivity Template" 
+        EG [label="ep_group", fillcolor="green"]
+        EPI [label="ep_application_instance", fillcolor="green"]
+        EEPB [label="{ep_endpoint_policy | policy_type_name=batch}", fillcolor="orange", penwidth=3 ]
+        EEPP [label="{ep_endpoint_policy | policy_type_name=pipeline}", fillcolor="green"]
+        EEPS [label="{ep_endpoint_policy | policy_type_name=AttachSingleVLAN}", fillcolor="green"]
+    }
+    
+    RACK [label="rack", pos = "0,0!"]
+    RG [label="redundancy_group", fillcolor="green"]
+    Switch [label="{system | label=atl1tor-r5r14b | system_type=switch}"]
+    IF_evpn [label="{interface | if_type=port_channel | po_control_protocol=evpn}", fillcolor="orange", penwidth=3]
+    IF_eth [label="{interface | if_type=ethernet}", fillcolor="orange", penwidth=3]
+    IF_member [label="{interface | if_type=ethernet}"]
+    IF_ae [label="{interface | if_type=port_channel}"]
+    LINK_evpn [label="link"]
+    LINK_ethernet [label="link"]
+    LINK_member [label="link"]
+    IF_GS_PC [label="{interface | GS/PC }"]
+    SS [label="{ system | system_type=server}"]
+    VN [label="{virtual_network | vn_id=100121}", fillcolor="green"]
+    VE [label="vn_endpoint", fillcolor="green"]
+    VI [label="{vn_instance | vlan_id=121}", fillcolor="green"]
+    SZ [label="security_zone"]
+
+    RG -> RACK [label="part_of_rack"]
+    RG ->Switch [label="composed_of_systems"]
+    RG -> IF_evpn [label="hosted_interfaces"]
+    Switch -> VI [label="hosted_vn_instances"]
+
+    IF_eth -> EG [label="ep_member_of", color="red", penwidth=3, headlabel="1", taillabel="*"]
+    IF_evpn -> EG [label="ep_member_of", color="red", penwidth=3, headlabel="1", taillabel="*"]
+
+    EEPB -> EEPP [label="ep_subpolicy", color="red"]
+    EPI -> EEPB [label="ep_top_level", color="red", penwidth=3 ]
+    EPI -> EG [label="ep_affected_by", color="red", penwidth=3, headlabel="1", taillabel="*"]
+    EPI -> EEPP [label="?ep_nested"]
+    EPI -> EEPS [label="?ep_nested"]
+    EEPP -> EEPS [label="ep_first_subpolicy", color="red"]
+    EEPS -> VN [label="vn_to_attach", color="red"]
+    VN -> VE [label="member_endpoints"]
+    VN -> VI [label="instantiated_by"]
+    SZ -> VN [label="member_vns", headlabel="*", taillabel="1"]
+    VE -> VN [label="member_of"]
+    IF_GS_PC -> VE [label="hosted_vn_endpoints"]
+    SS -> IF_GS_PC
+    VI -> VN [label="instantiates"]
+    IF_evpn -> IF_ae [label="composed_of"]
+    IF_ae -> IF_member [label="composed_of"]
+    IF_member -> LINK_member [label="link"]
+    IF_eth -> LINK_ethernet [label="link"]
+    IF_evpn -> LINK_evpn [label="link"]
+    Switch -> IF_eth [label="hosted_interfaces"]
+    Switch -> RG [label="part_of_redundancy_group"]
+    Switch -> IF_ae [label="hosted_interfaces"]
+    Switch -> IF_member [label="hosted_interfaces"]
+}

@@ -1,0 +1,15 @@
+{% for intf, intf_dict in interface.items() %}
+{% if loop.first %}
+interfaces {
+{% endif %}
+{% if 'fec108' in intf_dict['tags'] %}
+    {{ intf_dict['intfName'] }} {
+        gigether-options {
+            fec fec108;
+        }
+    }
+{% endif %}
+{% if loop.last %}
+}
+{% endif %}
+{% endfor %}

@@ -1,0 +1,23 @@
+// Import variables first
+@import "minima/variables";
+
+// Import minima theme
+@import
+  "minima/base",
+  "minima/layout",
+  "minima/syntax-highlighting"
+;
+
+// Your custom styles
+.command-block {
+    margin: 0;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+p + .command-block,
+.command-block + p {
+    margin-top: 0;
+} 

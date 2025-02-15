@@ -1,0 +1,319 @@
+{# A system hostname is required on the system for purposes such as hostname and
+   lldp cabling telemetry. #}
+{% set lo0_ip = property_sets.get('systems')[hostname]['lo0'] %}
+{% set asn = property_sets.get('bgp_asns')[hostname] %}
+{% set vlans = property_sets.get('vlans', {}).get(hostname, {}).values() %}
+{% set tagged_interfaces = [] %}
+{% for intfs in  vlans | selectattr('tagged_interfaces') | map(attribute='tagged_interfaces') | list %}
+{% for intf in intfs %}
+{{ tagged_interfaces.append(intf) or "" }}
+{% endfor %}
+{% endfor %}
+
+{% block system %}
+{%- include "system.jinja" %}
+{% endblock system %}
+
+chassis {
+    aggregated-devices {
+        ethernet {
+            device-count 188;
+        }
+    }
+}
+interfaces {
+    em0 {
+        unit 0 {
+        family inet {
+            address {{ management_ip }}/{{ property_sets.get('systems')[hostname]['em0_prefix_length']}};
+        }
+    }
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address {{ lo0_ip }}/32;
+            }
+        }
+    }
+}
+{% if hostname in property_sets.get('vlans', {}) %}
+switch-options {
+    vtep-source-interface lo0.0;
+    route-distinguisher {{ lo0_ip }}:{{ asn }};
+    vrf-target {
+        target:100:100;
+        auto;
+    }
+}
+{% endif %}
+
+routing-options {
+    router-id {{ lo0_ip }};
+    autonomous-system {{ asn }};
+    forwarding-table {
+        export PFE-LB;
+        ecmp-fast-reroute;
+    }
+}
+interfaces {
+{% for interface_name, iface in interfaces.iteritems() %}
+    {{ interface_name }} {
+        description "{{ iface['description'] }}";
+{% if iface.get('part_of') and iface.get('lag_mode') in ['lacp_active', 'lacp_passive', 'static_lag'] %}
+        ether-options {
+           802.3ad {{iface['part_of']}};
+        }
+{% endif %}
+{% set esi_id = property_sets.get('esi', {}).get(hostname, {}).get(interface_name, {}).get('esi_id', {}) %}
+{% set esi_system_id = property_sets.get('esi', {}).get(hostname, {}).get(interface_name, {}).get('system_id', {}) %}
+{% if esi_system_id %}
+            esi {
+              {{ esi_id }};
+               all-active;
+            }
+{% endif %}
+{% if iface.get('if_type') == 'port_channel' and iface.get('lag_mode') in ['lacp_active', 'lacp_passive'] %}
+            aggregated-ether-options {
+                lacp {
+{% if esi_system_id %}
+                    system-id {{ esi_system_id }};
+{% endif %}
+            {{ 'active' if iface['lag_mode'] == 'lacp_active' else 'passive' }};
+                }
+            }
+{% endif %}
+{% if iface.get('ipv4_address') and iface.get('ipv4_prefixlen') %}
+        unit 0 {
+            family inet {
+                address {{ iface['ipv4_address'] }}/{{ iface['ipv4_prefixlen'] }};
+            }
+        }
+{% endif %}
+{% if hostname in property_sets.get('vlans', {}) %}
+{% set ns_vlans = namespace( native_vlan = 0, tagged_vlans = [] ) %}
+{% for vlan, vlan_data in property_sets['vlans'][hostname].iteritems()|sort %}
+    {% if interface_name in vlan_data.get('native_interfaces', {}) %}
+        {% set ns_vlans.native_vlan = vlan_data['vlan_id'] %}
+        {% do ns_vlans.tagged_vlans.append(vlan) %}
+    {% elif interface_name in vlan_data.get('tagged_interfaces', {}) %}
+        {% do ns_vlans.tagged_vlans.append(vlan) %}
+    {% endif %}
+{% endfor %}
+{% if ns_vlans.native_vlan != 0 %}
+    native-vlan-id {{ ns_vlans.native_vlan }};
+{% endif %}
+{% if ns_vlans.tagged_vlans %}
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk
+                vlan {
+                    members [ {{ ns_vlans.tagged_vlans|join(' ') }} ]
+                }
+            }
+        }
+{% endif %}
+{% endif %}
+    }
+{% endfor %}
+}
+policy-options {
+    policy-statement AllPodNetworks {
+        term AllPodNetworks-10 {
+            from {
+                family inet;
+                protocol direct;
+            }
+            then accept;
+        }
+        term AllPodNetworks-100 {
+            then reject;
+        }
+    }
+    policy-statement BGP-AOS-Policy {
+        term BGP-AOS-Policy-10 {
+            from policy AllPodNetworks;
+            then accept;
+        }
+        term BGP-AOS-Policy-20 {
+            from protocol bgp;
+            then accept;
+        }
+        term BGP-AOS-Policy-100 {
+            then reject;
+        }
+    }
+    policy-statement PFE-LB {
+        then {
+            load-balance per-packet;
+        }
+    }
+}
+protocols {
+    lldp {
+        port-id-subtype interface-name;
+        port-description-type interface-description;
+        neighbour-port-info-display port-id;
+        interface all;
+    }
+    bgp {
+        group underlay {
+            type external;
+            hold-time 10;
+            export BGP-AOS-Policy;
+            multipath {
+                multiple-as;
+            }
+{% for interface in interfaces.itervalues() if 'bgp' in interface.link_tags and interface.ipv4_address %}
+    {% set neighbor_interface = interface.neighbor_interfaces[0] %}
+    {% set neighbor_hostname = neighbor_interface.system_hostname %}
+    {% set neighbor_asn = property_sets.get('bgp_asns', {}).get(neighbor_hostname) %}
+    {# Defend against invalid configuration rendering in the event the remote interface
+       does not have an IP address assigned, or the remote ASN is missing from the
+       'bgp_asns' property set.
+       If this jinja renders empty values such as 'peer-as ;', this would result
+       in a deployment failure raised by a junos commit-check. #}
+    {% if not neighbor_interface.ipv4_address or not neighbor_asn %}
+        {% continue %}
+    {% endif %}
+            neighbor {{ neighbor_interface.ipv4_address }} {
+                description facing_{{ neighbor_hostname }}-underlay;
+                local-address {{ interface.ipv4_address }};
+                family inet {
+                    unicast;
+                }
+                peer-as {{ neighbor_asn }};
+                bfd-liveness-detection {
+                    minimum-interval 1000;
+                    multiplier 3;
+                }
+            }
+    {% endfor %}{# interface in interfaces.itervalues() if 'bgp' in interface.link_tags and interface.ipv4_addr #}
+            vpn-apply-export;
+        }
+        group overlay {
+            type external;
+            hold-time 10;
+            multipath {
+                multiple-as;
+            }
+            {# EVPN neighbors peer between loopbacks, which are routed across
+               point-to-point underlay links. The TTL for those bgp neighbors
+               must be set accordingly. #}
+            multihop {
+            {% if 'spine' in system_tags %}
+                no-nexthop-change;
+            {% endif %}
+                ttl 2;
+            }
+{# Peer between spine & leaf loopback IP addresses, which are described in the 'loopbacks' property set. #}
+{% set loopback = property_sets.get('loopbacks', {}).get(hostname) %}
+{% for system_name, loopback_ip in function.sorted_dict(property_sets['loopbacks']) if system_name != hostname %}
+    {# Only allow a leaf to peer EVPN overlay with a spine #}
+    {% if 'leaf' in system_tags and 'spine' not in system_name %}
+        {# 'continue' will exit this for loop and continue to the next
+            iteration without executing any more code below within the block. #}
+        {% continue %}
+    {# Only allow a spine to peer EVPN overlay with a leaf #}
+    {% elif 'spine' in system_tags and 'leaf' not in system_name %}
+        {% continue %}
+    {% endif %}
+    {% set neighbor_asn = property_sets.get('bgp_asns', {}).get(system_name) %}
+    {% if loopback and neighbor_asn %}
+            neighbor {{ loopback_ip }} {
+                description facing_{{ system_name }}-overlay;
+                local-address {{ loopback }};
+                family evpn {
+                    signaling;
+                }
+                peer-as {{ neighbor_asn }};
+            }
+    {% endif %}
+{% endfor %}
+            vpn-apply-export;
+        }
+    }
+{% if hostname in property_sets.get('vlans', {}) %}
+    evpn {
+        encapsulation vxlan;
+        default-gateway do-not-advertise;
+        vni-options {
+            {% for vlan, vlan_data in property_sets['vlans'][hostname].iteritems()|sort %}
+            vni {{ vlan_data['vxlan_id'] }} {
+                vrf-target target:{{ vlan_data['vxlan_id'] }}:1;
+            }
+            {% endfor %}
+        }
+        extended-vni-list all;
+    }
+{% endif %}
+}
+
+{% if hostname in property_sets.get('vlans', {}) %}
+
+{% block forwarding_options %}
+{%- include "forwarding_options.jinja" %}
+{% endblock forwarding_options %}
+
+{% endif %}
+
+routing-instances {
+{% if hostname in property_sets.get('vlans', {}) %}
+    evpn-1 {
+        instance-type mac-vrf;
+        protocols {
+            evpn {
+                encapsulation vxlan;
+                default-gateway do-not-advertise;
+                duplicate-mac-detection {
+                    auto-recovery-time 9;
+                }
+                extended-vni-list all;
+                vni-options {
+{% for vlan, vlan_data in property_sets['vlans'][hostname].iteritems()|sort %}
+{% if vlan_data.get('vxlan_id') %}
+                    vni {{ vlan_data['vxlan_id'] }} {
+                        vrf-target target:{{ vlan_data['vxlan_id'] }}:1;
+                    }
+{% endif %}
+{% endfor %}
+                }
+            }
+        }
+        vtep-source-interface lo0.0;
+        service-type vlan-aware;
+{% for intf in tagged_interfaces | unique %}
+        interface {{ intf }}.0 ;
+{% endfor %}
+        route-distinguisher {{ lo0_ip }}:65534;
+        vrf-target target:100:100;
+        {% if hostname in property_sets.get('vlans', {}) %}
+        vlans {
+            {% for vlan, vlan_data in property_sets['vlans'][hostname].iteritems()|sort %}
+            {{ vlan }} {
+                {% if vlan_data.get('description') %}
+                description "{{ vlan_data['description'] }}";
+                {% endif %}
+                vlan-id {{ vlan_data['vlan_id'] }};
+                {% if vlan_data.get('ipv4_address') %}
+                l3-interface irb.{{ vlan_data['vlan_id'] }};
+                {% endif %}
+                {% if vlan_data.get('vxlan_id') %}
+                vxlan {
+                    vni {{ vlan_data['vxlan_id'] }};
+                }
+                {% endif %}
+            }
+            {% endfor %}
+        }
+        {% endif %}
+    }
+{% endif %}
+    mgmt_junos {
+        routing-options {
+            static {
+                route 0.0.0.0/0 next-hop {{ property_sets.get('systems')[hostname]['gw'] }};
+            }
+        }
+    }
+}

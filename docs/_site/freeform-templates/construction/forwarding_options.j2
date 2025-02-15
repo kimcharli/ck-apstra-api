@@ -1,0 +1,10 @@
+forwarding-options {
+    evpn-vxlan {
+        shared-tunnels;
+    }
+    vxlan-routing {
+        next-hop 32768;
+        interface-num 8192;
+        overlay-ecmp;
+    }
+}

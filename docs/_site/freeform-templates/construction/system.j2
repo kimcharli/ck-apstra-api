@@ -1,0 +1,15 @@
+system {
+    host-name {{hostname}};
+    root-authentication {
+        encrypted-password "{{ property_sets.get('labroot')['root_auth'] }}"; ## SECRET-DATA
+    }
+    login {
+        user labroot {
+            class super-user;
+            authentication {
+                encrypted-password "{{ property_sets.get('labroot')['labroot_auth'] }}"; ## SECRET-DATA
+            }
+        }
+    }
+    management-instance;
+}

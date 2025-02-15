@@ -1,0 +1,21 @@
+system {
+    login {
+        user labroot {
+            class super-user;
+            authentication {
+                encrypted-password "$6$o0oFDCXs$GVVRn8Rmt/QaDhg0KHmo3mErxBZM4g8xbxOqonmLhpiaPauY2hXbevrNpa7e2I3pKDsgYrnDjEsAC3/KOjpcV1"; ## SECRET-DATA
+            }
+        }
+    }
+    services {
+        ssh {
+            sftp-server;
+        {# aes256-cbc is depricated #}
+            ciphers [ "aes128-gcm@openssh.com" "aes256-gcm@openssh.com" aes256-ctr ];
+            key-exchange [ dh-group14-sha1 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 ];            
+        }
+    }
+    ntp {
+        server 10.85.130.130 routing-instance mgmt_junos;
+    }
+}

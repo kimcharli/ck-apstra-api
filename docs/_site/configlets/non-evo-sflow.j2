@@ -1,0 +1,27 @@
+{% if not os_version.endswith("-EVO") %}
+routing-options {
+    static {
+        route {{collector_ip}}/32 next-table mgmt_junos.inet.0;
+    }
+}
+protocols {
+    sflow {
+        polling-interval 10;
+        sample-rate {
+            ingress 1024;
+            egress 1024;
+        }
+    {% if management_ip is defined and management_ip %}
+        source-ip {{management_ip}};
+    {% endif %}
+        collector {{collector_ip}} {
+            udp-port 6343;
+        }
+    {% for interface, settings in portSetting.items() %}
+        {% if settings['state'] == 'active' %}
+        interfaces {{ interface }};
+        {% endif %}
+    {% endfor %}
+    }
+}
+{% endif %}

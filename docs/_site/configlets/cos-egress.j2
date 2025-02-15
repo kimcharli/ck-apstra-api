@@ -1,0 +1,47 @@
+class-of-service {
+    drop-profiles {
+        BE-DP {
+            interpolate {
+                fill-level [ 30 75 ];
+                drop-probability [ 0 80 ];
+            }
+        }
+    }
+    scheduler-maps {                    
+        MAP {
+            forwarding-class BE scheduler BE-SCHEDULER;
+            forwarding-class CRITICAL scheduler CRITICAL-SCHEDULER;
+            forwarding-class HEARTBEAT scheduler HB-SCHEDULER;
+            forwarding-class NC scheduler NC-SCHEDULER;
+            forwarding-class VOICE scheduler VOICE-SCHEDULER;
+        }                               
+    }                                   
+    schedulers {                        
+        BE-SCHEDULER {                  
+            transmit-rate percent 57;   
+            buffer-size percent 57;     
+            priority low;               
+            drop-profile-map loss-priority low protocol any drop-profile BE-DP;
+            explicit-congestion-notification;
+        }                               
+        CRITICAL-SCHEDULER {            
+            transmit-rate percent 30;   
+            buffer-size percent 30;     
+            priority strict-high;       
+        }                               
+        HB-SCHEDULER {                  
+            transmit-rate percent 1;    
+            buffer-size percent 1;      
+            priority strict-high;       
+        }                               
+        NC-SCHEDULER {                  
+            shaping-rate percent 2;     
+            buffer-size percent 2;      
+        }                               
+        VOICE-SCHEDULER {               
+            transmit-rate percent 10;   
+            buffer-size percent 10;     
+            priority strict-high;       
+        }                               
+    }
+}

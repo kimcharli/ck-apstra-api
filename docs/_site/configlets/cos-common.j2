@@ -1,0 +1,51 @@
+
+{# role == leaf #}
+class-of-service {
+    classifiers {
+        dscp BA-DSCP {
+            import default;
+            forwarding-class BE {
+                loss-priority low code-points be;
+            }
+            forwarding-class CRITICAL {
+                loss-priority low code-points af41;
+            }
+            forwarding-class NC {
+                loss-priority low code-points nc1;
+            }
+            forwarding-class VOICE {
+                loss-priority low code-points ef;
+            }
+        }
+        ieee-802.1 BA-TCI {
+            import default;
+            forwarding-class HEARTBEAT {
+                loss-priority low code-points 101;
+            }
+        }
+    }
+    host-outbound-traffic {
+        forwarding-class NC;
+        dscp-code-point nc1;
+    }
+    forwarding-classes {
+        class BE queue-num 0;
+        class CRITICAL queue-num 1;
+        class HEARTBEAT queue-num 2 no-loss;
+        class NC queue-num 3;
+        class VOICE queue-num 2 no-loss;
+    }
+    interfaces {
+        all {
+            unit 0 {
+                classifiers {
+                    ieee-802.1 BA-TCI;
+                }
+            }
+            classifiers {
+                dscp BA-DSCP;
+                ieee-802.1 BA-TCI;
+            }                           
+        }                               
+    }
+}
