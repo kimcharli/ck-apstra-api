@@ -15,4 +15,14 @@
     font-family: monospace;
     white-space: pre;
     overflow-x: auto;
+    margin: 0;
+}
+
+p + .command-block,
+.command-block + p {
+    margin-top: 1em;
+}
+
+p .command-block {
+    margin: 0;
 } 
