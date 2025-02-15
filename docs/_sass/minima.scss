@@ -1,0 +1,11 @@
+// Import variables first
+@import "minima/variables";
+
+// Import minima theme
+@import
+  "minima/base",
+  "minima/layout",
+  "minima/syntax-highlighting"
+;
+
+@import "common";

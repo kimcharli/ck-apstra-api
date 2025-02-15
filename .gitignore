@@ -1,3 +1,6 @@
+# Ignore the generated site files
+docs/_site/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -160,4 +163,5 @@ cython_debug/
 #.idea/
 .DS_Store
 
+# not sure this
 swark-output

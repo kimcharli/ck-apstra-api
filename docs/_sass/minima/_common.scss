@@ -1,0 +1,46 @@
+// Add common styles here
+
+// Example common styles
+$base-font-size: 16px;
+$base-line-height: 1.5;
+$spacing-unit: 10px;
+$border-color-01: #ddd;
+$border-color-03: #333;
+$site-title-color: #000;
+$background-color: #fff;
+$text-color: #333;
+$brand-color: #0073e6;
+$small-font-size: 0.875rem;
+
+
+.command-block {
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: "Menlo", "Inconsolata", "Consolas", "Roboto Mono", monospace;
+    white-space: pre-wrap; /* Ensure line breaks are preserved */
+}
+
+.command-block pre {
+    margin: 0;
+}
+
+.command-block code {
+    background: none;
+    padding: 0;
+    border: none;
+}
+
+.snapshot-name {
+    /* color: #00b4ff; */
+    color: orange;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
