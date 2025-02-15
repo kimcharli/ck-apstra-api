@@ -1,0 +1,28 @@
+.snapshot-name {
+    color: #00b4ff;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.command-block {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre;
+    overflow-x: auto;
+    margin: 0;
+}
+
+p + .command-block,
+.command-block + p {
+    margin-top: 1em;
+}
+
+p .command-block {
+    margin: 0;
+} 
