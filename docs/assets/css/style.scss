@@ -1,2 +1,6 @@
 @import "minima/initialize";
-@import "common";
+@import "minima/layout"; // Import _layout.scss
+@import "common"; // Import common styles
+
+// Add your custom styles below
+
