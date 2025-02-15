@@ -19,7 +19,9 @@ As the precude above doesn't mention the way to copy over the database to a remo
 
 ### Step 1: Create Database Backup
 Login to the Apstra server as admin and take a backup of the database.
-```
+
+{% raw %}
+```shell
 admin@aos-server:~$ sudo aos_backup
 [sudo] password for admin: 
 Including secret keys from the backup
@@ -30,6 +32,7 @@ Include all sysdb files
 New AOS snapshot: <span class="snapshot-name">2025-02-14_23-09-45</span>
 admin@aos-server:~$ 
 ```
+{% endraw %}
 
 ### Step 2: Create Compressed Archive
 Create a file to be able to copy the database to a remote server.
