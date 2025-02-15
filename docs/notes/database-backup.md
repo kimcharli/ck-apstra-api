@@ -64,9 +64,9 @@ Use the WinSCP graphical interface to transfer the file. Ensure you have SSH acc
 
 ### Best Practices
 - Always verify the backup file size after transfer
-  ```bash
+  <div class="command-block">
   ls -lh aos-backup-<span class="snapshot-name">2025-02-14_23-09-45</span>.tgz
-  ```
+  </div>
 - Keep backups in a secure location
 - Consider automating this process for regular backups: [KB37808 Automating Backup Collection](https://supportportal.juniper.net/s/article/Juniper-Apstra-Automating-Backup-Collection)
 - Maintain proper backup rotation to manage storage space
