@@ -8,21 +8,5 @@
     padding: 20px;
 }
 
-.command-block {
-    background-color: #f5f5f5;
-    padding: 0px;
-    border-radius: 5px;
-    font-family: monospace;
-    white-space: pre;
-    overflow-x: auto;
-    margin: 0;
-}
+@import "common";
 
-p + .command-block,
-.command-block + p {
-    margin: 0;
-}
-
-p .command-block {
-    margin: 0;
-} 

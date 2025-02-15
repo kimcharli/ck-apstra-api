@@ -13,21 +13,6 @@ body {
     padding: 0 15px;
 }
 
-/* Command block styles */
-.command-block {
-    margin: 0;
-    padding: 10px;
-    background-color: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-family: "Menlo", "Inconsolata", "Consolas", "Roboto Mono", monospace;
-}
-
-p + .command-block,
-.command-block + p {
-    margin-top: 0;
-}
-
 /* Links */
 a {
     color: #2a7ae2;
@@ -86,4 +71,4 @@ h1, h2, h3, h4, h5, h6 {
 
 .site-nav a:hover {
     color: #333;
-} 
+}
