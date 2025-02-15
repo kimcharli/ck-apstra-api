@@ -1,6 +1,7 @@
 // Import functions and mixins first
 @import "minima/functions";
 @import "minima/mixins";
+@import 'common';
 
 // Define minima theme variables
 $base-font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Segoe UI Symbol", "Segoe UI Emoji", "Apple Color Emoji", Roboto, Helvetica, Arial, sans-serif !default;
@@ -56,4 +57,4 @@ $table-border-color:    $grey-color-light !default;
 @import 
   "minima/base",
   "minima/layout",
-  "minima/syntax-highlighting"; 
+  "minima/syntax-highlighting";

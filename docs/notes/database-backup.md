@@ -3,11 +3,10 @@ title: Apstra Database Backup
 description: 
 pubDate: 2025-02-15
 keywords:
-    - CK-Apstra-API
-    - CMS
+    - Apstra
+    - Database
+    - Backup
 ---
-
-# Apstra Database Backup
 
 ## Overview
 

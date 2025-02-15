@@ -1,0 +1,89 @@
+/* Base styles */
+body {
+    font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Segoe UI Symbol", "Segoe UI Emoji", "Apple Color Emoji", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    color: #111111;
+    background-color: #fdfdfd;
+}
+
+/* Layout */
+.wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+/* Command block styles */
+.command-block {
+    margin: 0;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: "Menlo", "Inconsolata", "Consolas", "Roboto Mono", monospace;
+}
+
+p + .command-block,
+.command-block + p {
+    margin-top: 0;
+}
+
+/* Links */
+a {
+    color: #2a7ae2;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Headers */
+h1, h2, h3, h4, h5, h6 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+/* Header */
+.site-header {
+    border-bottom: 1px solid #e8e8e8;
+    padding: 15px 0;
+    background-color: #f8f8f8;
+}
+
+.site-header .wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.site-title {
+    display: flex;
+    align-items: center;
+    color: #333;
+    text-decoration: none;
+}
+
+.home-icon {
+    fill: currentColor;
+    margin-right: 8px;
+    transition: transform 0.2s ease;
+}
+
+.site-title:hover .home-icon {
+    transform: scale(1.1);
+}
+
+.site-nav {
+    display: flex;
+    gap: 20px;
+}
+
+.site-nav a {
+    color: #666;
+    text-decoration: none;
+}
+
+.site-nav a:hover {
+    color: #333;
+} 
