@@ -7,7 +7,7 @@ layout: default
 
 [Documentation TODO List](./TODO) - Track our documentation improvements
 
-## Latest Posts
+# [Latest Posts](./notes)
 
 {% assign notes = site.pages | where_exp: "item", "item.path contains 'notes/'" %}
 {% for note in notes %}

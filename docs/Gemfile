@@ -1,19 +1,20 @@
 source "https://rubygems.org"
 
 # For GitHub Pages, use specific versions
-gem "github-pages", "~> 231", group: :jekyll_plugins
 gem "webrick", "~> 1.8"
 gem "csv"     # Required for Ruby 3.4+
 gem "logger"  # Required for Ruby 3.4+
 gem "base64"  # Required for Ruby 3.4+
 gem "bigdecimal" # Required for Ruby 3.4+
-gem "minima", "~> 2.5" # Jekyll default theme
 
 group :jekyll_plugins do
+  gem "github-pages", "~> 231"  # Moved here
+  gem "jekyll-remote-theme" # If needed by the new theme
+  gem "jekyll-theme-leap-day", "~> 0.2.0" # Or the latest version
   gem "jekyll-feed", "~> 0.12"
-  gem "jekyll-seo-tag", "~> 2.8"
-  gem "jekyll-remote-theme"
+  gem "jekyll-seo-tag", "~> 2.8" # Unless the theme handles this
 end
+
 
 # Windows and JRuby does not include zoneinfo files, so bundle the tzinfo-data gem
 platforms :mingw, :x64_mingw, :mswin, :jruby do

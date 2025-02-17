@@ -16,17 +16,18 @@ kramdown:
 
 title: CK Apstra API
 description: Documentation for CK Apstra API
+show_downloads: true
 baseurl: "/ck-apstra-api"  # Match your GitHub repository name
 url: "https://github.com/kimcharli/ck-apstra-api"  # Your GitHub Pages URL
 
 # Build settings
 markdown: kramdown
-remote_theme: jekyll/minima
+remote_theme: pages-themes/leap-day@v0.2.0  # Changed to Leap Day
 
 # Plugin settings
 plugins:
-  - jekyll-feed
-  - jekyll-seo-tag
+  # - jekyll-feed  # Remove if Leap Day includes its own
+  # - jekyll-seo-tag # Remove if Leap Day includes its own
   - jekyll-remote-theme
 
 # Include assets directory
@@ -51,4 +52,4 @@ defaults:
   - scope:
       path: "" # an empty string here means all files in the project
     values:
-      layout: "default"
+      layout: "default" # You may need to change this depending on Leap Day's layouts

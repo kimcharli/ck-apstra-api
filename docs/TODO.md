@@ -16,6 +16,7 @@ description: List of pending improvements for documentation
 - [ ] Add search functionality
 
 ## General Improvements
+- [ ] Add a home icon to the header of every page.
 - [ ] Add "Last Updated" dates to pages
 - [ ] Add "Edit this page on GitHub" links
 - [ ] Add breadcrumb navigation
