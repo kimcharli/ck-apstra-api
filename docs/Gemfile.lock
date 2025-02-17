@@ -310,7 +310,7 @@ DEPENDENCIES
   logger
   tzinfo (>= 1, < 3)
   tzinfo-data
-  webrick (~> 1.8)
+  webrick
 
 BUNDLED WITH
    2.6.3
