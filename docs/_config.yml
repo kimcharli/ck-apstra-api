@@ -6,13 +6,6 @@ safe: true
 #highlighter: rouge
 gist:
   noscript: false
-kramdown:
-  math_engine: mathjax
-  syntax_highlighter: rouge
-  input: GFM
-  parse_block_html: true
-  syntax_highlighter_opts:
-    disable: true
 
 title: CK Apstra API
 description: Documentation for CK Apstra API
@@ -22,6 +15,14 @@ url: "https://github.com/kimcharli/ck-apstra-api"  # Your GitHub Pages URL
 
 # Build settings
 markdown: kramdown
+kramdown:
+  math_engine: mathjax
+  syntax_highlighter: rouge
+  input: GFM
+  parse_block_html: true
+  syntax_highlighter_opts:
+    disable: true
+
 remote_theme: pages-themes/leap-day@v0.2.0  # Changed to Leap Day
 
 # Plugin settings
