@@ -302,7 +302,7 @@ DEPENDENCIES
   base64
   bigdecimal
   csv
-  github-pages (~> 231)
+  github-pages
   jekyll-feed (~> 0.12)
   jekyll-remote-theme
   jekyll-seo-tag (~> 2.8)
