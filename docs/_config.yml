@@ -11,7 +11,7 @@ title: CK Apstra API
 description: Documentation for CK Apstra API
 show_downloads: true
 baseurl: "/ck-apstra-api"  # Match your GitHub repository name
-url: "https://github.com/kimcharli/ck-apstra-api"  # Your GitHub Pages URL
+url: "https://kimcharli.github.io/ck-apstra-api/"  # This GitHub Pages URL
 
 # Build settings
 markdown: kramdown
