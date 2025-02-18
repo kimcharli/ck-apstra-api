@@ -60,7 +60,7 @@ defaults:
       layout: "post" # Default layout for posts
 
 # Permalinks
-permalink: pretty
+# permalink: pretty
 
 # Other settings
 social:
