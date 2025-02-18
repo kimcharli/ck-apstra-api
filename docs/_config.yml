@@ -6,6 +6,15 @@ safe: true
 #highlighter: rouge
 gist:
   noscript: false
+
+title: CK Apstra API
+description: Documentation for CK Apstra API
+show_downloads: true
+baseurl: "/ck-apstra-api"  # Match your GitHub repository name
+url: "https://kimcharli.github.io/ck-apstra-api/"  # This GitHub Pages URL
+
+# Build settings
+markdown: kramdown
 kramdown:
   math_engine: mathjax
   syntax_highlighter: rouge
@@ -14,19 +23,12 @@ kramdown:
   syntax_highlighter_opts:
     disable: true
 
-title: CK Apstra API
-description: Documentation for CK Apstra API
-baseurl: "/ck-apstra-api"  # Match your GitHub repository name
-url: "https://github.com/kimcharli/ck-apstra-api"  # Your GitHub Pages URL
-
-# Build settings
-markdown: kramdown
-remote_theme: jekyll/minima
+remote_theme: pages-themes/leap-day@v0.2.0  # Changed to Leap Day
 
 # Plugin settings
 plugins:
-  - jekyll-feed
-  - jekyll-seo-tag
+  # - jekyll-feed  # Remove if Leap Day includes its own
+  # - jekyll-seo-tag # Remove if Leap Day includes its own
   - jekyll-remote-theme
 
 # Include assets directory
@@ -51,4 +53,16 @@ defaults:
   - scope:
       path: "" # an empty string here means all files in the project
     values:
-      layout: "default"
+      layout: "default" # Default layout for all pages
+  - scope:
+      path: "_posts"
+    values:
+      layout: "post" # Default layout for posts
+
+# Permalinks
+# permalink: pretty
+
+# Other settings
+social:
+  twitter: your_twitter_handle
+  github: your_github_username

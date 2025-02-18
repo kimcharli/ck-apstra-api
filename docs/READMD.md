@@ -42,6 +42,8 @@ This documentation is built using Jekyll and can be tested locally before deploy
 
 ## Project Structure
 
+https://jekyllrb.com/docs/structure/
+
 ```
 docs/
 ├── assets/
