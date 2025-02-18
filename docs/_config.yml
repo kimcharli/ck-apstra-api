@@ -53,4 +53,16 @@ defaults:
   - scope:
       path: "" # an empty string here means all files in the project
     values:
-      layout: "default" # You may need to change this depending on Leap Day's layouts
+      layout: "default" # Default layout for all pages
+  - scope:
+      path: "_posts"
+    values:
+      layout: "post" # Default layout for posts
+
+# Permalinks
+permalink: pretty
+
+# Other settings
+social:
+  twitter: your_twitter_handle
+  github: your_github_username
