@@ -1,5 +1,8 @@
 # Change Log
 
+## 0.5.6 2025-02-18
+- minor cosmetic improvement in export-device-configs
+
 ## 0.5.5 2025-02-18
 - initiate github pages
 - initiate file-folder from export-device-configs

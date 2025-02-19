@@ -32,13 +32,16 @@ class CliVar:
 
     file_path: str = None
     file_format: str = None
+    file_folder: str = None
+    bp_name: str = None
     logger: Any = None
+
 
     def __post_init__(self):
         self.data_in_file = {
             'blueprint': {}
         }
-        self.logger = prep_logging('DEBUG', os.getenv(EnvEnum.FILE_FOLDER, '.'))
+        self.logger = prep_logging('DEBUG', 'CliVar::')
 
     def update(self, **kwargs):
         '''Update the variables with the kwargs'''

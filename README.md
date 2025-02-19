@@ -25,7 +25,7 @@ ckim@ckim-mbp:sandbox % mkdir test
 ckim@ckim-mbp:sandbox % cd test             
 ckim@ckim-mbp:test % python -m venv .venv                      
 ckim@ckim-mbp:test % source .venv/bin/activate
-(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.5.0
+(.venv) ckim@ckim-mbp:test % pip install ck-apstra-api==0.5.6
 ...                                                                                             
 (.venv) ckim@ckim-mbp:test % 
 ```
@@ -36,15 +36,15 @@ ckim@ckim-mbp:test % source .venv/bin/activate
 cd test
 py -m venv .venv
 .venv\Scripts\activate
-pip install ck-apstra-api==0.5.0
+pip install ck-apstra-api==0.5.6
 ```
 
 
 ## help commands
 
 ```
-(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --version
-ck_apstra_api, 0.5.0
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --version         
+ck_apstra_api, 0.5.6
 (.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 
@@ -52,7 +52,10 @@ ck_apstra_api, 0.5.0
 (.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli --help   
 Usage: ck-cli [OPTIONS] COMMAND [ARGS]...
 
-  A CLI tool for interacting with ck-apstra-api
+  A CLI tool for interacting with ck-apstra-api.
+
+  The options that can be specified in .env file: HOST_IP, HOST_PORT,
+  HOST_USER, HOST_PASSWORD
 
 Options:
   --host-ip TEXT        Host IP address
@@ -63,16 +66,26 @@ Options:
   --help                Show this message and exit.
 
 Commands:
-  check-apstra           Test the connectivity to the server
-  check-blueprint        Test the connectivity to the blueprint
-  export-blueprint       Export a blueprint into a json file
-  export-device-configs  Export a device configurations into multiple files
-  export-generic-system  Export generic systems to a CSV file
-  export-systems         Export systems of a blueprint to a CSV file
-  import-blueprint       Import a blueprint from a json file
-  import-generic-system  Import generic systems from a CSV file
-  relocate-vn            Move a Virtual Network to the target Routing Zone
-  test-get-temp-vn       Test get_temp_vn
+  assign-vn-to-leaf       Test to patch vn for the bound_to
+  check-apstra            Test the connectivity to the server
+  check-blueprint         Test the connectivity to the blueprint
+  debug-context           Debug the context
+  export-blueprint        Export a blueprint into a json file
+  export-dci              Export the DCI interconnect configuration in...
+  export-device-configs   Export a device configurations into multiple files
+  export-generic-system   Export generic systems to a CSV file
+  export-iplink           Export the IP Links into a CSV file
+  export-systems          Export systems of a blueprint to a CSV file
+  export-virtual-network  Import virtual networks from a CSV file
+  import-blueprint        Import a blueprint from a json file
+  import-dci              Import the DCI interconnect configuration in...
+  import-generic-system   Import generic systems from a CSV file
+  import-iplink           Import the IP Links from a CSV file.
+  import-virtual-network  Import virtual networks from a CSV file
+  print-lldp-data         Print the LLDP data of the blueprint
+  relocate-vn             Move a Virtual Network to the target Routing Zone
+  test-configlet          Test the configlet (jinja) against the system
+  test-get-temp-vn        Test get_temp_vn
 (.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 
@@ -349,7 +362,7 @@ from ck_apstra_api.apstra_session import CkApstraSession, prep_logging
 ## export device configurations
 
 ```
-.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli export-device-configs --help
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli export-device-configs --help
 Usage: ck-cli export-device-configs [OPTIONS]
 
   Export a device configurations into multiple files
@@ -361,35 +374,53 @@ Usage: ck-cli export-device-configs [OPTIONS]
   applicable)
 
 Options:
-  --bp-name TEXT     Blueprint name
-  --out-folder TEXT  Folder name to export
-  --help             Show this message and exit.
+  --bp-name TEXT      Blueprint name
+  --file-folder TEXT  Folder name to export
+  --help              Show this message and exit.
 (.venv) ckim@ckim-mbp:ck-apstra-api % 
-(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli export-device-configs --bp-name dh --out-folder ~/Downloads/dev1
-2024-07-17 19:02:23,828 - INFO     - export_device_configs() - bp_name='dh' out_folder='/Users/ckim/Downloads/dev1' (cli.py:280)
-2024-07-17 19:02:23,952 - INFO     - export_device_configs() - system_label='dh_border2' (cli.py:301)
-2024-07-17 19:02:24,501 - INFO     - export_device_configs() - write_to_file(): rendered.txt (cli.py:291)
-2024-07-17 19:02:24,502 - INFO     - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (cli.py:291)
-2024-07-17 19:02:24,502 - INFO     - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (cli.py:291)
-2024-07-17 19:02:24,503 - INFO     - export_device_configs() - system_label='spine1' (cli.py:301)
-2024-07-17 19:02:24,715 - INFO     - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (cli.py:291)
-2024-07-17 19:02:25,173 - INFO     - export_device_configs() - write_to_file(): rendered.txt (cli.py:291)
-2024-07-17 19:02:25,174 - INFO     - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (cli.py:291)
-2024-07-17 19:02:25,175 - INFO     - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (cli.py:291)
-2024-07-17 19:02:25,175 - INFO     - export_device_configs() - system_label='spine2' (cli.py:301)
-2024-07-17 19:02:25,654 - INFO     - export_device_configs() - write_to_file(): rendered.txt (cli.py:291)
-2024-07-17 19:02:25,655 - INFO     - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (cli.py:291)
-2024-07-17 19:02:25,655 - INFO     - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (cli.py:291)
-2024-07-17 19:02:25,656 - INFO     - export_device_configs() - system_label='dh_border1' (cli.py:301)
-2024-07-17 19:02:25,868 - INFO     - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (cli.py:291)
-2024-07-17 19:02:26,414 - INFO     - export_device_configs() - write_to_file(): rendered.txt (cli.py:291)
-2024-07-17 19:02:26,414 - INFO     - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (cli.py:291)
-2024-07-17 19:02:26,415 - INFO     - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (cli.py:291)
-2024-07-17 19:02:26,415 - INFO     - export_device_configs() - write_to_file(): 3_load_set_configlet-set.txt (cli.py:291)
-2024-07-17 19:02:26,415 - INFO     - export_device_configs() - system_label='terra-border1' (cli.py:301)
-2024-07-17 19:02:26,533 - INFO     - export_device_configs() - system_label='terra-border2' (cli.py:301)
-(.venv) ckim@ckim-mbp:ck-apstra-api % ls ~/Downloads/dev1/dh 
-dh_border1    dh_border2    spine1        spine2        terra-border1 terra-border2
+(.venv) ckim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api % ck-cli export-device-configs --bp-name terra --file-folder var
+2025-02-18 19:49:50,975 -     INFO - CliVar:: - Updating {'file_folder': 'var', 'bp_name': 'terra'} (__init__.py:48)
+2025-02-18 19:49:51,245 -     INFO - export_device_configs() - bp_name='terra', self.blueprint.id='9da08ee9-1291-4aa1-981c-d75bb94b1923' (__init__.py:68)
+2025-02-18 19:49:51,245 -     INFO - export_device_configs() - Blueprint terra found (__init__.py:70)
+2025-02-18 19:49:51,245 -     INFO - export_device_configs() - Configuration files will be written under var/terra/<device-label> (blueprint.py:148)
+2025-02-18 19:49:51,384 -     INFO - export_device_configs() - system_label='border_1' (blueprint.py:168)
+2025-02-18 19:49:51,640 -     INFO - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (blueprint.py:158)
+2025-02-18 19:49:52,617 -     INFO - export_device_configs() - write_to_file(): rendered.txt (blueprint.py:158)
+2025-02-18 19:49:52,618 -     INFO - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (blueprint.py:158)
+2025-02-18 19:49:52,618 -     INFO - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (blueprint.py:158)
+2025-02-18 19:49:52,619 -     INFO - export_device_configs() - write_to_file(): 3_load_set_configlet-set.txt (blueprint.py:158)
+2025-02-18 19:49:52,619 -     INFO - export_device_configs() - system_label='server_1' (blueprint.py:168)
+2025-02-18 19:49:52,857 -     INFO - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (blueprint.py:158)
+2025-02-18 19:49:53,668 -     INFO - export_device_configs() - write_to_file(): rendered.txt (blueprint.py:158)
+2025-02-18 19:49:53,671 -     INFO - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (blueprint.py:158)
+2025-02-18 19:49:53,671 -     INFO - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (blueprint.py:158)
+2025-02-18 19:49:53,672 -     INFO - export_device_configs() - system_label='border_2' (blueprint.py:168)
+2025-02-18 19:49:53,818 -     INFO - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (blueprint.py:158)
+2025-02-18 19:49:54,765 -     INFO - export_device_configs() - write_to_file(): rendered.txt (blueprint.py:158)
+2025-02-18 19:49:54,766 -     INFO - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (blueprint.py:158)
+2025-02-18 19:49:54,766 -     INFO - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (blueprint.py:158)
+2025-02-18 19:49:54,767 -     INFO - export_device_configs() - write_to_file(): 3_load_set_configlet-set.txt (blueprint.py:158)
+2025-02-18 19:49:54,767 -     INFO - export_device_configs() - system_label='server_2' (blueprint.py:168)
+2025-02-18 19:49:54,998 -     INFO - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (blueprint.py:158)
+2025-02-18 19:49:55,777 -     INFO - export_device_configs() - write_to_file(): rendered.txt (blueprint.py:158)
+2025-02-18 19:49:55,778 -     INFO - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (blueprint.py:158)
+2025-02-18 19:49:55,778 -     INFO - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (blueprint.py:158)
+2025-02-18 19:49:55,779 -     INFO - export_device_configs() - system_label='spine1' (blueprint.py:168)
+2025-02-18 19:49:55,920 -     INFO - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (blueprint.py:158)
+2025-02-18 19:49:56,376 -     INFO - export_device_configs() - write_to_file(): rendered.txt (blueprint.py:158)
+2025-02-18 19:49:56,377 -     INFO - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (blueprint.py:158)
+2025-02-18 19:49:56,377 -     INFO - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (blueprint.py:158)
+2025-02-18 19:49:56,377 -     INFO - export_device_configs() - system_label='spine2' (blueprint.py:168)
+2025-02-18 19:49:56,568 -     INFO - export_device_configs() - write_to_file(): 0_load_override_pristine.txt (blueprint.py:158)
+2025-02-18 19:49:57,013 -     INFO - export_device_configs() - write_to_file(): rendered.txt (blueprint.py:158)
+2025-02-18 19:49:57,014 -     INFO - export_device_configs() - write_to_file(): 1_load_merge_intended.txt (blueprint.py:158)
+2025-02-18 19:49:57,014 -     INFO - export_device_configs() - write_to_file(): 2_load_merge_configlet.txt (blueprint.py:158)
+2025-02-18 19:49:57,014 -     INFO - export_device_configs() - system_label='old-border1' (blueprint.py:168)
+2025-02-18 19:49:57,149 -     INFO - export_device_configs() - system_label='old-border2' (blueprint.py:168)
+(.venv) ckim@ckim-mbp:ck-apstra-api % 
+(.venv) ckim@ckim-mbp:ck-apstra-api % ls var/terra
+border_1    border_2    old-border1 old-border2 server_1    server_2    spine1      spine2
 (.venv) ckim@ckim-mbp:ck-apstra-api % 
 ```
 

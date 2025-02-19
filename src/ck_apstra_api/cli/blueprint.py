@@ -145,7 +145,7 @@ def export_device_configs(ctx, bp_name: str, file_folder: str):
     if not bp:
         return
     
-    logger.info(f"{bp_name=} {file_folder=}")
+    logger.info(f"Configuration files will be written under {file_folder}/{bp_name}/<device-label>")
     bp_folder_path = os.path.expanduser(f"{file_folder}/{bp_name}")
     Path(bp_folder_path).mkdir(parents=True, exist_ok=True)
 
