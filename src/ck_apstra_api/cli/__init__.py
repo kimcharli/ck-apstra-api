@@ -1,10 +1,25 @@
 from dataclasses import dataclass
+from typing import Any
 import json
 import yaml
 import dotenv
+from enum import StrEnum
+import os
 
-from ck_apstra_api import CkApstraSession, prep_logging
-from ck_apstra_api import CkApstraBlueprint
+
+from ck_apstra_api import CkApstraSession, prep_logging, CkApstraBlueprint
+
+
+class EnvEnum(StrEnum):
+    '''Define the environment variables'''
+    HOST_IP = 'HOST_IP'
+    HOST_PORT = 'HOST_PORT'
+    HOST_USER = 'HOST_USER'
+    HOST_PASSWORD = 'HOST_PASSWORD'
+    FILE_FOLDER = 'FILE_FOLDER'
+    FILE_FORMAT = 'FILE_FORMAT'
+    BP_NAME = 'BP_NAME'
+    JSON_FILE = 'JSON_FILE'
 
 
 # keep the common variables in a class
@@ -15,10 +30,24 @@ class CliVar:
     data_in_file: dict = None
     bp_in_file: dict = None
 
+    file_path: str = None
+    file_format: str = None
+    logger: Any = None
+
     def __post_init__(self):
         self.data_in_file = {
             'blueprint': {}
         }
+        self.logger = prep_logging('DEBUG', os.getenv(EnvEnum.FILE_FOLDER, '.'))
+
+    def update(self, **kwargs):
+        '''Update the variables with the kwargs'''
+        self.logger.info(f"Updating {kwargs}")
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+            else:
+                self.logger.warning(f"Attribute {k} not found")
 
     def load_file(self, file_path, file_format):
         with open(file_path, 'r') as f:

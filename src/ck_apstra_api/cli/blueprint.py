@@ -125,9 +125,9 @@ def print_lldp_data(ctx, bp_name: str = 'terra'):
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.option('--out-folder', type=str, envvar='OUT_FOLDER', help='Folder name to export')
+@click.option('--file-folder', type=str, envvar='FILE_FOLDER', help='Folder name to export')
 @click.pass_context
-def export_device_configs(ctx, bp_name: str, out_folder: str):
+def export_device_configs(ctx, bp_name: str, file_folder: str):
     """
     Export a device configurations into multiple files
 
@@ -140,12 +140,13 @@ def export_device_configs(ctx, bp_name: str, out_folder: str):
     """
     logger = prep_logging('DEBUG', 'export_device_configs()')
 
+    cliVar.update(file_folder=file_folder, bp_name=bp_name)
     bp = cliVar.get_blueprint(bp_name, logger)
     if not bp:
         return
     
-    logger.info(f"{bp_name=} {out_folder=}")
-    bp_folder_path = os.path.expanduser(f"{out_folder}/{bp_name}")
+    logger.info(f"{bp_name=} {file_folder=}")
+    bp_folder_path = os.path.expanduser(f"{file_folder}/{bp_name}")
     Path(bp_folder_path).mkdir(parents=True, exist_ok=True)
 
 
