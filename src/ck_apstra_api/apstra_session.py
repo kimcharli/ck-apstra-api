@@ -224,3 +224,47 @@ class CkApstraSession:
         # self.logger.debug(f"post({url}, {data})")
         return self.session.post(url, json=data, params=params)
 
+
+    def create_blueprint_json(self, bp_name: str, blueprint_dict: dict ):
+        """
+        Create a blueprint From dict
+        Return CkApstraBlueprint
+        """
+        node_list = []
+        for node_dict in blueprint_dict['nodes'].values():
+            # remove system_id for switches
+            if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
+                node_dict['system_id'] = None
+                node_dict['deploy_mode'] = 'undeploy'
+            if node_dict['type'] == 'metadata':
+                node_dict['label'] = bp_name     
+            for k, v in node_dict.items():
+                if k == 'tags':
+                    if v is None or v == "['null']":
+                        node_dict[k] = []
+                elif k == 'property_set' and v is None:
+                    node_dict.update({
+                        k: {}
+                    })
+            node_list.append(node_dict)        
+
+        blueprint_dict['label'] = bp_name
+
+        # TODO: just reference copy
+        relationship_list = [rel_dict for rel_dict in blueprint_dict['relationships'].values()]
+
+        bp_spec = { 
+            'design': blueprint_dict['design'], 
+            'label': blueprint_dict['label'], 
+            'init_type': 'explicit', 
+            'nodes': node_list,
+            'relationships': relationship_list
+        }
+        bp_created = self.post('blueprints', data=bp_spec)
+        # may take 6 seconds or more
+        time.sleep(10)
+        return bp_created.json()['id']
+
+    def delete_raw(self, delete_url: str):
+        return self.session.delete(delete_url)
+    

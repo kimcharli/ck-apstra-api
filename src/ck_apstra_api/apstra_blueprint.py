@@ -5,6 +5,7 @@ from typing import Any, Dict, Generator, List, Optional
 import uuid
 from enum import StrEnum
 from functools import cache
+import time
 
 from result import Err, Result, Ok
 
@@ -866,6 +867,53 @@ class CkApstraBlueprint:
         yield temp_vn_spec
 
 
+    def import_blueprint_json(self, blueprint_dict: Dict, bp_name: str):
+        # '''
+        # Import the blueprint JSON
+
+        # Args:
+        #     blueprint_json: The blueprint JSON
+
+        # Returns:
+        #     Error message or the result of the import
+        #     Ok  )
+
+        # ```
+        pass
+        node_list = []
+        for node_dict in blueprint_dict['nodes'].values():
+            # remove system_id for switches
+            if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
+                node_dict['system_id'] = None
+                node_dict['deploy_mode'] = 'undeploy'
+            if node_dict['type'] == 'metadata':
+                node_dict['label'] = bp_name     
+            for k, v in node_dict.items():
+                if k == 'tags':
+                    if v is None or v == "['null']":
+                        node_dict[k] = []
+                elif k == 'property_set' and v is None:
+                    node_dict.update({
+                        k: {}
+                    })
+            node_list.append(node_dict)        
+
+        bp_dict['label'] = bp_name
+
+        # TODO: just reference copy
+        relationship_list = [rel_dict for rel_dict in bp_dict['relationships'].values()]
+
+        bp_spec = { 
+            'design': bp_dict['design'], 
+            'label': bp_dict['label'], 
+            'init_type': 'explicit', 
+            'nodes': node_list,
+            'relationships': relationship_list
+        }
+        bp_created = cliVar.session.post('blueprints', data=bp_spec)
+
+        
+
     def import_iplink(self, ip_links_in: dict) -> Result[dict, str]:
         '''
         Import the IP link
@@ -976,3 +1024,8 @@ class CkApstraBlueprint:
             } for x in iplink_result.ok_value]
         return Ok(iplink_list)
     
+    def delete_self(self):
+        '''Delete self - Blueprint'''
+        deleted = self.session.delete_raw(self.url_prefix)
+        time.sleep(3)
+        return deleted.status_code == 202  # 202 is ACCEPTED

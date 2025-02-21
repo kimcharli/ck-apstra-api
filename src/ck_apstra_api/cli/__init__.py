@@ -32,25 +32,32 @@ class CliVar:
 
     file_path: str = None
     file_format: str = None
-    file_folder: str = None
+    file_folder: str = None  # given 
+    file_name: str = None
     bp_name: str = None
     logger: Any = None
 
 
-    def __post_init__(self):
+    def __post_init__(self):  # TODO: remove this
         self.data_in_file = {
             'blueprint': {}
         }
-        self.logger = prep_logging('DEBUG', 'CliVar::')
 
     def update(self, **kwargs):
         '''Update the variables with the kwargs'''
-        self.logger.info(f"Updating {kwargs}")
         for k, v in kwargs.items():
             if hasattr(self, k):
                 setattr(self, k, v)
+                if k == 'file_folder':
+                    self.logger = prep_logging('DEBUG', 'CliVar::', v)
+            elif k in ['caller']:
+                continue
             else:
                 self.logger.warning(f"Attribute {k} not found")
+
+    def gen_logger(self, log_level: str, log_name):
+        '''Generate the logger'''
+        return prep_logging(log_level, log_name, self.file_folder)
 
     def load_file(self, file_path, file_format):
         with open(file_path, 'r') as f:
@@ -61,6 +68,8 @@ class CliVar:
 
     def get_blueprint(self, bp_name, logger) -> CkApstraBlueprint:
         """ Get the blueprint object. If not found, return None """
+        if not bp_name:
+            bp_name = self.bp_name
         self.blueprint = CkApstraBlueprint(self.session, bp_name)
         if not self.blueprint.id:
             logger.error(f"Blueprint {bp_name} not found")
@@ -74,6 +83,13 @@ class CliVar:
         else:
             logger.warning(f"Blueprint {bp_name} not found")
             return None
+
+    def write_file(self, data):
+        '''Write the data to the file'''
+        file_path = os.path.join(self.file_folder, self.file_name)
+        with open(file_path, 'w') as f:
+            f.write(data)
+        self.logger.info(f"File written to {file_path}")
 
 
 dotenv.load_dotenv()

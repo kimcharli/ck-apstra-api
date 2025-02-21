@@ -14,10 +14,10 @@ def load_gs_csv_file(gs_csv) -> list[dict]:
         csv_reader = csv.reader(csvfile)
         headers = next(csv_reader)  # Read the header row
         expected_headers = [header.value for header in GsCsvKeys]
-        if headers != expected_headers:
+        if headers.sort() != expected_headers.sort():
             raise ValueError(
-                "CSV header mismatch. Expected headers: "
-                    + ', '.join(expected_headers))
+                f"CSV header mismatch. Expected headers ({len(expected_headers)}): "
+                    + ', '.join(expected_headers) + f', Input headers ({len(headers)}) : ' + ', '.join(headers))
 
         for row in csv_reader:
             data.append(dict(zip(headers, row)))

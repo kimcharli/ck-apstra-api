@@ -26,21 +26,29 @@ class CustomFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
-
-def prep_logging(log_level: str = 'INFO', log_name: str = 'root'):
+log_file = ''
+def prep_logging(log_level: str = 'INFO', log_name: str = 'root', log_folder: str = '.'):
     '''Configure logging options'''
-    timestamp = datetime.now().strftime("%Y%m%d-%H:%H:%S")
+    global log_file
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
+    # print(f'prep_logging() log_file: {log_level=} {log_name=} {log_folder=}')
 
-    fh = logging.FileHandler(f'ck_apstra_api_{timestamp.replace(":", "")}.log')
+    if log_file == '':
+        timestamp = datetime.now().strftime("%Y%m%d-%H:%H:%S")
+        log_file = f'{log_folder}/ck_apstra_api_{timestamp.replace(":", "")}.log'
+        print(f'prep_logging() - new log_file: {log_file}')
+
+    fh = logging.FileHandler(log_file)
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(logging.Formatter(logging_format))
+
     ch = logging.StreamHandler()
     ch.setLevel(log_level)
     ch.setFormatter(CustomFormatter())
     logger.addHandler(ch)
     logger.addHandler(fh)
+
     return logger
 
 

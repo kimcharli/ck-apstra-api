@@ -1,6 +1,11 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
 [project]
 name = "ck-apstra-api"
-version = "0.5.6"
+version = "0.5.7"
 description = "An implementation to use Apstra API"
 authors = [ {name = "Charlie Kim", email = "ckim@juniper.net"} ]
 readme = "README.md"
@@ -18,5 +23,5 @@ dependencies = [
 [project.scripts]
 ck-cli = "ck_apstra_api.cli.cli:cli"
 
-[tool.uv]
-package = true
+
+

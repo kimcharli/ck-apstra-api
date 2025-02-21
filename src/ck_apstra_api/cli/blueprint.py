@@ -24,80 +24,97 @@ def check_blueprint(ctx, bp_name: str):
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--json-file', type=str, envvar='JSON_FILE', help='Json file name to export to')
 @click.pass_context
-def export_blueprint(ctx, bp_name: str, json_file: str = None):
+def export_blueprint_json(ctx, bp_name: str, json_file: str = None):
     """
     Export a blueprint into a json file
 
     bp-name can be specified in the environment variable BP_NAME
     json-file can be specified in the environment variable JSON_FILE. If not specified, it will be the blueprint name
     """
-    logger = prep_logging('DEBUG', 'export_blueprint()')
-
-    bp = cliVar.get_blueprint(bp_name, logger)
-
     if not json_file:
         json_file = f"{bp_name}.json"
-    json_path = os.path.expanduser(json_file)
+    cliVar.update(bp_name=bp_name, file_name=json_file, caller='export_blueprint_json')
+    logger = prep_logging('DEBUG', 'export_blueprint()')
+
+    bp = cliVar.get_blueprint(None, logger)
+
+    # if not json_file:
+    #     json_file = f"{bp_name}.json"
+    # json_path = os.path.expanduser(json_file)
 
     the_blueprint_data = bp.dump()
-    with open(json_path, 'w') as f:
-        f.write(json.dumps(the_blueprint_data, indent=2))
+    # with open(json_path, 'w') as f:
+    #     f.write(json.dumps(the_blueprint_data, indent=2))
 
-    logger.info(f"blueprint {bp_name} exported to {json_file}")
+    # logger.info(f"blueprint {bp_name} exported to {json_file}")
+    cliVar.write_file(json.dumps(the_blueprint_data, indent=2))
 
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name to create')
 @click.option('--json-file', type=str, envvar='JSON_FILE', help='Json file name to import from')
 @click.pass_context
-def import_blueprint(ctx, bp_name: str, json_file: str = None):
+def import_blueprint_json(ctx, bp_name: str, json_file: str = None):
     """
     Import a blueprint from a json file
 
     bp-name can be specified in the environment variable BP_NAME
     json-file can be specified in the environment variable JSON_FILE. If not specified, it will be the blueprint name
     """
-    logger = prep_logging('DEBUG', 'import_blueprint()')
+    if not json_file:
+        json_file = f"{bp_name}.json"
+    cliVar.update(bp_name=bp_name, file_name=json_file, caller='import_blueprint_json')
+    logger = prep_logging('DEBUG', 'import_blueprint_json()')
 
-    if cliVar.get_blueprint(bp_name, logger):
+    checked_bp = cliVar.get_blueprint(None, logger)
+    breakpoint()
+    if checked_bp:
         logger.error(f"Blueprint {bp_name} already exists")
         return
+
+    # logger = prep_logging('DEBUG', 'import_blueprint()')
+
+    # if cliVar.get_blueprint(bp_name, logger):
+    #     logger.error(f"Blueprint {bp_name} already exists")
+    #     return
 
     json_path = os.path.expanduser(json_file)
     with open(json_path, 'r') as f:
         bp_json = f.read()
+
     bp_dict = json.loads(bp_json)
-    node_list = []
-    for node_dict in bp_dict['nodes'].values():
-        # remove system_id for switches
-        if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
-            node_dict['system_id'] = None
-            node_dict['deploy_mode'] = 'undeploy'
-        if node_dict['type'] == 'metadata':
-            node_dict['label'] = bp_name     
-        for k, v in node_dict.items():
-            if k == 'tags':
-                if v is None or v == "['null']":
-                    node_dict[k] = []
-            elif k == 'property_set' and v is None:
-                node_dict.update({
-                    k: {}
-                })
-        node_list.append(node_dict)        
+    # node_list = []
+    # for node_dict in bp_dict['nodes'].values():
+    #     # remove system_id for switches
+    #     if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
+    #         node_dict['system_id'] = None
+    #         node_dict['deploy_mode'] = 'undeploy'
+    #     if node_dict['type'] == 'metadata':
+    #         node_dict['label'] = bp_name     
+    #     for k, v in node_dict.items():
+    #         if k == 'tags':
+    #             if v is None or v == "['null']":
+    #                 node_dict[k] = []
+    #         elif k == 'property_set' and v is None:
+    #             node_dict.update({
+    #                 k: {}
+    #             })
+    #     node_list.append(node_dict)        
 
-    bp_dict['label'] = bp_name
+    # bp_dict['label'] = bp_name
 
-    # TODO: just reference copy
-    relationship_list = [rel_dict for rel_dict in bp_dict['relationships'].values()]
+    # # TODO: just reference copy
+    # relationship_list = [rel_dict for rel_dict in bp_dict['relationships'].values()]
 
-    bp_spec = { 
-        'design': bp_dict['design'], 
-        'label': bp_dict['label'], 
-        'init_type': 'explicit', 
-        'nodes': node_list,
-        'relationships': relationship_list
-    }
-    bp_created = cliVar.session.post('blueprints', data=bp_spec)
+    # bp_spec = { 
+    #     'design': bp_dict['design'], 
+    #     'label': bp_dict['label'], 
+    #     'init_type': 'explicit', 
+    #     'nodes': node_list,
+    #     'relationships': relationship_list
+    # }
+    # bp_created = cliVar.session.post('blueprints', data=bp_spec)
+    bp_created = cliVar.session.create_blueprint_json(bp_name, bp_dict)
     logger.info(f"blueprint {bp_name} created: {bp_created}")
 
 

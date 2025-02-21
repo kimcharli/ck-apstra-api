@@ -4,12 +4,14 @@ from ck_apstra_api import CkApstraSession, prep_logging
 
 from . import cliVar
 
-from .blueprint import check_blueprint, export_blueprint, import_blueprint, print_lldp_data, export_device_configs
+from .blueprint import check_blueprint, export_blueprint_json, import_blueprint_json, print_lldp_data, export_device_configs
 from .virtual_network import export_virtual_network, import_virtual_network, relocate_vn, test_get_temp_vn, assign_vn_to_leaf
 from .system import export_systems, export_generic_system, import_generic_system
 from .ip_link import export_iplink, import_iplink
 from .dci import export_dci, import_dci
-from .configlet_test import test_configlet
+from .configlet_validate import validate_configlet
+from .vlan_cts import create_single_vlan_connectivity_template
+
 
 
 @click.group()
@@ -17,9 +19,10 @@ from .configlet_test import test_configlet
 @click.option('--host-port', type=int, envvar='HOST_PORT', help='Host port')
 @click.option('--host-user', type=str, envvar='HOST_USER', help='Host username')
 @click.option('--host-password', type=str, envvar='HOST_PASSWORD', help='Host password')
+@click.option('--file-folder', type=str, envvar='FILE_FOLDER', help='Folder path to read files from and write files to')
 @click.version_option(message='%(package)s, %(version)s')
 @click.pass_context
-def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
+def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, file_folder: str):
     """
     A CLI tool for interacting with ck-apstra-api.
 
@@ -30,8 +33,10 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str):
     ctx.obj['HOST_PORT'] = host_port
     ctx.obj['HOST_USER'] = host_user
     ctx.obj['HOST_PASSWORD'] = host_password
-    
-    logger = prep_logging('DEBUG', 'cli()')
+    ctx.obj['FILE_FOLDER'] = file_folder
+
+    cliVar.update(file_folder=file_folder)
+    logger = cliVar.gen_logger('DEBUG', 'cli()')
 
     cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
     if cliVar.session.last_error:
@@ -61,8 +66,8 @@ def check_apstra(ctx):
 
 
 cli.add_command(check_blueprint)
-cli.add_command(export_blueprint)
-cli.add_command(import_blueprint)
+cli.add_command(export_blueprint_json)
+cli.add_command(import_blueprint_json)
 cli.add_command(print_lldp_data)
 cli.add_command(export_device_configs)
 
@@ -82,7 +87,10 @@ cli.add_command(import_iplink)
 cli.add_command(export_dci)
 cli.add_command(import_dci)
 
-cli.add_command(test_configlet)
+cli.add_command(validate_configlet)
+
+cli.add_command(create_single_vlan_connectivity_template)
+
 
 if __name__ == "__main__":
     cli()
