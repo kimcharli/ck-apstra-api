@@ -3,6 +3,7 @@
 ## 0.5.7 2025-02-20
 - log file takes file-path
 - implement session.create_blueprint_json
+- implement test_20_generic_system.py
 
 ## 0.5.6 2025-02-18
 - minor cosmetic improvement in export-device-configs
