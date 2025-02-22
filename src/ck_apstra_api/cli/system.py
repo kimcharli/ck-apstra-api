@@ -120,20 +120,18 @@ def import_generic_system(ctx, gs_csv_in: str):
 
     links_to_add = []
     with open(gs_csv_path, 'r') as csvfile:
-        csv_reader = csv.reader(csvfile)
-        headers = next(csv_reader)  # Read the header row
+        csv_reader = csv.DictReader(csvfile)        
+        headers = csv_reader.fieldnames
         expected_headers = [header.value for header in GsCsvKeys]
         if sorted(headers) != sorted(expected_headers):
-            # raise ValueError(f"CSV header {headers} mismatch.\n    Expected headers: {expected_headers}")
             raise ValueError(
                 f"CSV header mismatch. Expected headers ({len(expected_headers)}): "
                     + ', '.join(expected_headers) + f', Input headers ({len(headers)}) : ' + ', '.join(headers))
 
         for row in csv_reader:
-            links_to_add.append(dict(zip(headers, row)))
+            links_to_add.append(row)
 
-    logger.info(f"Importing generic systems {links_to_add=}")
-    # logger.info(f"######## {links_to_add=}")
+    logger.debug(f"Importing generic systems {links_to_add=}")
     for res in add_generic_systems(cliVar.session, links_to_add):
         if isinstance(res, Ok):
             logger.info(res.ok_value)
