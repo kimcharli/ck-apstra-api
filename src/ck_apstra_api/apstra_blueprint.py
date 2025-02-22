@@ -150,7 +150,9 @@ class CkApstraBlueprint:
         if isinstance(system_im_result, Err):
             error_message = f"Error: {system_label=}\n\tquery() {system_im_result.err_value=}"
             return Err(error_message)
-        return Ok(system_im_result.ok_value[0])
+        if len(system_im_result.ok_value):
+            return Ok(system_im_result.ok_value[0])
+        return Err(f"Error: {system_label=}\n\tquery() {system_im_result.ok_value=}")
 
     # can be checked before the system creation - should not be cached in such case
     # @cache

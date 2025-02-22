@@ -97,20 +97,25 @@ def import_generic_system(ctx, gs_csv_in: str):
     \b
     Sample CSV file: https://github.com/kimcharli/ck-apstra-api/blob/main/tests/fixtures/gs_sample.csv
     """
+    cliVar.update(file_name=gs_csv_in, caller='import_generic_system')
+    logger = cliVar.gen_logger('DEBUG', 'import_generic_system()')
+
+
+
     from ck_apstra_api import GsCsvKeys, add_generic_systems, CkApstraSession, prep_logging
     from result import Ok, Err
 
-    logger = prep_logging('DEBUG', 'import_generic_system()')
+    # logger = prep_logging('DEBUG', 'import_generic_system()')
 
-    host_ip = ctx.obj['HOST_IP']
-    host_port = ctx.obj['HOST_PORT']
-    host_user = ctx.obj['HOST_USER']
-    host_password = ctx.obj['HOST_PASSWORD']
+    # host_ip = ctx.obj['HOST_IP']
+    # host_port = ctx.obj['HOST_PORT']
+    # host_user = ctx.obj['HOST_USER']
+    # host_password = ctx.obj['HOST_PASSWORD']
 
-    session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if session.last_error:
-        logger.error(f"Session error: {session.last_error}")
-        return
+    # session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    # if session.last_error:
+    #     logger.error(f"Session error: {session.last_error}")
+    #     return
     gs_csv_path = os.path.expanduser(gs_csv_in)
 
     links_to_add = []
@@ -119,13 +124,17 @@ def import_generic_system(ctx, gs_csv_in: str):
         headers = next(csv_reader)  # Read the header row
         expected_headers = [header.value for header in GsCsvKeys]
         if sorted(headers) != sorted(expected_headers):
-            raise ValueError(f"CSV header {headers} mismatch.\n    Expected headers: {expected_headers}")
+            # raise ValueError(f"CSV header {headers} mismatch.\n    Expected headers: {expected_headers}")
+            raise ValueError(
+                f"CSV header mismatch. Expected headers ({len(expected_headers)}): "
+                    + ', '.join(expected_headers) + f', Input headers ({len(headers)}) : ' + ', '.join(headers))
 
         for row in csv_reader:
             links_to_add.append(dict(zip(headers, row)))
 
     logger.info(f"Importing generic systems {links_to_add=}")
-    for res in add_generic_systems(session, links_to_add):
+    # logger.info(f"######## {links_to_add=}")
+    for res in add_generic_systems(cliVar.session, links_to_add):
         if isinstance(res, Ok):
             logger.info(res.ok_value)
         elif isinstance(res, Err):

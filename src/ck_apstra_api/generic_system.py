@@ -15,11 +15,11 @@ class GsCsvKeys(StrEnum):
     LINE = auto()
     """The line number for each entries in CSV file. This value can be used to create dummpy names for other members"""
     BLUEPRINT = auto()
-    SERVER = auto()
+    SERVER = auto()    # label of the generic system
     EXT = auto()
     DEPLOY_MODE = auto()
     """Designates if the generic system is external"""
-    TAGS_SERVER = auto()
+    TAGS_SERVER = auto()  # tage tags associated to the generic system
     """Tags for the generic system itself"""
     AE = auto()
     """The unique id for the link group within the generic system. When absent, it will be assigned '____{line}' to be used as a dummy name"""
@@ -95,7 +95,12 @@ class LeafSwitch:
                 self.last_error = switch_node_result.err_value
                 return Err(f"LeafSwitch::__init__ {self.switch_label=} not found in blueprint {self.bp.label}")
             self.interfaces = []
-            self.id = switch_node_result.ok_value[0]['system']['id']
+            # for i in range(5):
+            #     time.sleep(1)
+            #     if len(switch_node_result.ok_value):
+            #         break
+            if len(switch_node_result.ok_value):
+                self.id = switch_node_result.ok_value[0]['system']['id']
     
     # might not be needed
     def interface_id(self, if_name: str) -> str:
@@ -184,7 +189,7 @@ class LinkMember(DataInit):
             yield Err(f"{log_prefix} Error: {tags_result.err_value}")
         else:
             self.fetched_tags_link = [tag['tag']['label'] for tag in tags_result.ok_value]
-        yield Ok(f"{log_prefix} done {self}")
+        yield Ok(f"{log_prefix} Done fetching the link data from Apstra {self}")
 
     @property
     def application_point(self):
@@ -192,11 +197,13 @@ class LinkMember(DataInit):
         return self.fetched_evpn_interfaces['id'] if self.fetched_evpn_interface else self.fetched_switch_id
 
     @property
-    def link_spec(self):
+    def link_spec(self) -> Result[Ok, Err]:
         """
         Return the link spec for the link member
         """
         transformation_id_result = self.bp.get_transformation_id(self.switch, self.switch_ifname , self.speed)
+        if isinstance(transformation_id_result, Err):
+            return Err(f"Error: {transformation_id_result.err_value}")
         link_spec = {
             'switch': {
                 'system_id': self.fetched_switch_id,
@@ -209,7 +216,7 @@ class LinkMember(DataInit):
             'lag_mode': None,
             'link_group_label': None
         }
-        return link_spec
+        return Ok(link_spec)
 
     @property
     def rename_spec(self):
@@ -328,7 +335,7 @@ class LinkGroup(DataInit):
             if isinstance(ct_result, Err):              
                 yield Err(f"{log_prefix} Error: {ct_result.err_value}")
             self.fetched_ct_names = [x['CT_NODE']['label'] for x in ct_result.ok_value]
-        yield Ok(f"{log_prefix} done {self}")
+        yield Ok(f"{log_prefix} Done fetching the link group data from Apstra {self}")
         
     def form_lacp(self):
         """
@@ -360,14 +367,18 @@ class LinkGroup(DataInit):
             yield Ok(f"{log_prefix} done")
 
     @property
-    def link_spec(self) -> List[Dict[str, Any]]:
+    def link_spec(self) -> Generator[Any, Any, Any]:
         """
         Return the link spec for the link group gathered from the links
         """
         data = []
         for member in self.members:
-            data.append(member.link_spec)
-        return data
+            if isinstance(member.link_spec, Ok):
+                data.append(member.link_spec.ok_value)
+            # TODO: handle Err
+            else:
+                yield Err(f"Error: {member.link_spec.err_value}")
+        yield Ok(data)
     
     @property
     def speed_count(self) -> List[str]:
@@ -448,7 +459,7 @@ class GenericSystem(DataInit):
     """
     Data class for a generic system.
     """
-    server: str
+    server: str          # the label of the generic system
     ext: Optional[bool]  # TBD: the external flag for the generic system
     deploy_mode: Optional[str] # the deploy flag for the generic system
     tags_server: Optional[List[str]]
@@ -460,6 +471,7 @@ class GenericSystem(DataInit):
     fetched_external_flag: Optional[bool] = None  # the fetched external flag from the apstra controller
     fetched_deploy_mode: Optional[bool] = None  # the fetched deploy flag from the apstra controller
     bp: CkApstraBlueprint = field(default=None, repr=False)  # the apstra blueprint to be used for fetching the data
+    debug_data: Dict[str, Any] = field(default=None, repr=False) # debugging purpose - capture initial data
 
     log_prefix: str = field(default='', repr=False)  # not to print in __repr__
     
@@ -470,6 +482,7 @@ class GenericSystem(DataInit):
         """
         Initialize the generic system with the given input dict.
         """
+        self.debug_data = data
         super().__init__(data)
         if self.tags_server and isinstance(self.tags_server, str):
             self.tags_server = self.tags_server.split(',')
@@ -528,9 +541,9 @@ class GenericSystem(DataInit):
             yield Err(f"{log_prefix} Error: {tags_result.err_value}")
         else:
              self.fetched_server_tags = [tag['tag']['label'] for tag in tags_result.ok_value]
-             yield Ok(f"{log_prefix} {self.fetched_server_tags=}")
+             yield Ok(f"{log_prefix} Done fetching the generic system tags from Apstra {self.fetched_server_tags=}")
 
-        yield f"{log_prefix} done {self}"
+        yield f"{log_prefix} Done fetching the generic system data from Apstra {self}"
 
     @property
     def system_type(self):
@@ -541,6 +554,7 @@ class GenericSystem(DataInit):
         if self.gs_id:
             yield Ok(f"{log_prefix} present. No need to create this. Skipping")
             return
+        yield Ok(f"{log_prefix} Absent. Do need to create this")
         speed_count = []
         for lg in self.link_groups:
             sc = lg.speed_count
@@ -590,7 +604,11 @@ class GenericSystem(DataInit):
             }],
         }
         for lg in self.link_groups:
-            generic_system_spec['links'].extend(lg.link_spec)
+            for res in lg.link_spec:
+                if isinstance(res, Ok):
+                    generic_system_spec['links'].extend(res.ok_value)
+                else:
+                    yield Err(f"{log_prefix} Error: LinkGroup Error: {res.err_value}")
         # creating the generic system
         yield Ok(f"{log_prefix} creating {generic_system_spec=}")
         generic_system_created_result = self.bp.add_generic_system(generic_system_spec)
@@ -814,63 +832,70 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
         The each list represents a link in the generic system. They keys are GsCsvKeys.
 
     """
-    func_name = "add_generic_systems"
+    log_prefix = "::add_generic_systems()"
+    yield Ok(f"{log_prefix} ######## {generic_system_rows=} begin")
 
     # build data classes for the server blueprints, the generic systems and the links
     for row in generic_system_rows:
         _ = ServerBlueprint(row)
     blueprints_string = f"blueprints {list(ServerBlueprint._bps.keys())}"
-    yield Ok(f"{func_name} {blueprints_string}")
+    yield Ok(f"{log_prefix} Begin adding generic system by pulling blueprint data from input data - {blueprints_string}")
+
+    for bp_label, sbp in ServerBlueprint._bps.items():
+        for gs, gs_data in sbp.servers.items():
+            yield Ok(f"{log_prefix} ######## DEBUG gs.deubg_data {gs}: {gs_data.debug_data}")
 
     # fetch the blueprints from the apstra server and store them in the data classes
     for bp_label, sbp in ServerBlueprint._bps.items():
-        # yield Ok(f"{func_name} fetching {bp_label=} {sbp=}")
+        # yield Ok(f"{log_prefix} fetching {bp_label=} {sbp=}")
         for res in sbp.fetch_apstra(apstra_session):
             yield res
-    yield Ok(f"{func_name} fetched {blueprints_string}")
+        yield Ok(f"{log_prefix} Done fetching data from Apstra of blueprint {bp_label}")
 
     # create the generic systems and the links
     for bp_label, sbp in ServerBlueprint._bps.items():
         # yield Ok(f"{func_name} fetching {bp_label=} {sbp=}")
         for res in sbp.add_generic_systems():
             yield res
-    yield Ok(f"{func_name} generic_systems added {blueprints_string}")
+        yield Ok(f"{log_prefix} Done adding generic_systems of blueprint {bp_label}")
 
     # AGAIN, fetch the blueprints from the apstra server and store them in the data classes
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.fetch_apstra(apstra_session):
             yield res
-    yield Ok(f"{func_name} after generic system creation - fetched {blueprints_string}")
+        yield Ok(f"{log_prefix} Done fetching data from Apstra after generic system creation of blueprint {bp_label}")
 
     # form LACP for the generic systems
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.form_lacp():
             yield res
-    yield Ok(f"{func_name} lacp formed {ServerBlueprint._bps=}")
+        yield Ok(f"{log_prefix} Done LACP for blueprint {bp_label}")
 
     # AGAIN YET, fetch the blueprints from the apstra server and store them in the data classes
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.fetch_apstra(apstra_session):
             yield res
-    yield Ok(f"{func_name} after form lag - fetched {ServerBlueprint._bps=}")
+        yield Ok(f"{log_prefix} Done fetching data from Apstra after form lag for blueprint {bp_label}")
 
     # fix the server interface names
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.rename_interfaces():
             yield res
-    yield Ok(f"{func_name} interfaces renamed for blueprints {blueprints_string}")
+        yield Ok(f"{log_prefix} Done fixing the interfaces names for blueprints {bp_label}")
 
     # fix the connectivity templates
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.add_vlans():
             yield res
-    yield Ok(f"{func_name} vlans added {ServerBlueprint._bps=}")
+        yield Ok(f"{log_prefix} Done adding vlans for blueprints {bp_label}")
 
     # fix the tags
     for bp_label, sbp in ServerBlueprint._bps.items():
         for res in sbp.fix_tags():
             yield res
-    yield Ok(f"{func_name} tags fixed {ServerBlueprint._bps=}")
+        yield Ok(f"{log_prefix} Done fixing tags for blueprint {bp_label}")
+
+    yield Ok(f"{log_prefix} Done adding generic systems for blueprints {blueprints_string}")
 
 
 def get_generic_systems(apstra_session: CkApstraSession, out_csv: str ) -> Generator[Result[str, str], Any, Any]:

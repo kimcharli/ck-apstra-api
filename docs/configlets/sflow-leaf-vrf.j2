@@ -30,6 +30,10 @@ EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_PRIVACY_PROTOCOL: "aes128"
 EF_PROCESSOR_ENRICH_NETIF_SNMP_V3_USERNAME: "sflow-v3"
 EF_PROCESSOR_ENRICH_NETIF_SNMP_VERSION: 3
 
+To avoid clear text password in the configlet, the engine-id of the device is set to a specific value. 
+  1. Generate the authenticaion key and privacy key in a device.
+  2. Capture update the value in the configlet/property-sets.
+
 #}
 {% if role == 'leaf' %}
 routing-options {

@@ -60,11 +60,17 @@ class CliVar:
         return prep_logging(log_level, log_name, self.file_folder)
 
     def load_file(self, file_path, file_format):
+        '''Load the file into self.data_in_file'''
+        self.file_path = file_path
+        self.file_format = file_format
         with open(file_path, 'r') as f:
-            if'file_format' == 'json':
+            if file_format == 'json':
                 self.data_in_file = json.load(f)
-            else:
+            elif file_format == 'yaml':
                 self.data_in_file = yaml.load(f, yaml.SafeLoader)
+            else:
+                self.logger.error(f"File format {file_format} not supported")
+
 
     def get_blueprint(self, bp_name, logger) -> CkApstraBlueprint:
         """ Get the blueprint object. If not found, return None """
@@ -90,6 +96,15 @@ class CliVar:
         with open(file_path, 'w') as f:
             f.write(data)
         self.logger.info(f"File written to {file_path}")
+
+    def read_file(self):
+        '''Read the data from the file'''
+        file_path = os.path.join(self.file_folder, self.file_name)
+        with open(file_path, 'r') as f:
+            data = f.read()
+        self.logger.info(f"File read from {file_path}")
+        return data
+
 
 
 dotenv.load_dotenv()
