@@ -5,7 +5,7 @@ from ck_apstra_api import CkApstraSession, prep_logging
 from . import cliVar
 
 from .blueprint import check_blueprint, export_blueprint_json, import_blueprint_json, print_lldp_data, export_device_configs
-from .virtual_network import export_virtual_network, import_virtual_network, relocate_vn, test_get_temp_vn, assign_vn_to_leaf
+from .virtual_network import export_virtual_network_csv, import_virtual_network_csv, relocate_vn, test_get_temp_vn, assign_vn_to_leaf
 from .system import export_systems, export_generic_system, import_generic_system
 from .ip_link import export_iplink, import_iplink
 from .dci import export_dci, import_dci
@@ -71,8 +71,8 @@ cli.add_command(import_blueprint_json)
 cli.add_command(print_lldp_data)
 cli.add_command(export_device_configs)
 
-cli.add_command(export_virtual_network)
-cli.add_command(import_virtual_network)
+cli.add_command(export_virtual_network_csv)
+cli.add_command(import_virtual_network_csv)
 cli.add_command(relocate_vn)
 cli.add_command(test_get_temp_vn)
 cli.add_command(assign_vn_to_leaf)

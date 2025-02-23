@@ -1,0 +1,6 @@
+vn_node_id,vn_name,rz_name,vn_type,vn_id,reserved_vlan_id,dhcp_service,ipv4_enabled,ipv6_enabled,virtual_gateway_ipv4_enabled,virtual_gateway_ipv6_enabled,ipv4_subnet,ipv6_subnet,virtual_gateway_ipv4,virtual_gateway_ipv6,l3_mtu,bound_to_border_1_pair,bound_to_server_1_pair
+,vn3500,vrf,vxlan,203500,3500,,,,,,,,,,9000,3500,3500
+,vn3501,vrf,vxlan,203501,3501,,,,,,,,,,9000,3501,3501
+,vn3502,vrf,vxlan,203502,3502,,,,,,,,,,9000,3502,3502
+,vn3503,vrf,vxlan,203503,3503,,,,,,,,,,9000,3503,3503
+,vn3504,vrf,vxlan,203504,3504,,,,,,,,,,9000,3504,3504

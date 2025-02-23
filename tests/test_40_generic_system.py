@@ -21,7 +21,7 @@ def load_gs_csv_file(gs_csv) -> list[dict]:
             links_to_add.append(row)
     return links_to_add
 
-def test_21_generic_system(session, load_gs_csv_file):
+def test_40_generic_system(session, load_gs_csv_file):
     # uv run ck-cli import-generic-system --gs-csv-in tests/fixtures/gs_sample.csv
     for res in add_generic_systems(session, load_gs_csv_file):
         if isinstance(res, Ok):

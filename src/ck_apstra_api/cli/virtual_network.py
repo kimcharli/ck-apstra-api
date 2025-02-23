@@ -6,60 +6,50 @@ from . import cliVar, prep_logging
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.option('--vn-csv', type=str, required=True, help='The CSV file path of virtual networks to import from')
+@click.option('--file-name', type=str, envvar='VN_CSV', help='The CSV file path of virtual networks to import from')
 @click.pass_context
-def import_virtual_network(ctx, bp_name, vn_csv: str):
+def import_virtual_network_csv(ctx, bp_name, file_name: str):
     """
     Import virtual networks from a CSV file
     """
-    logger = prep_logging('DEBUG', 'import_virtual_network()')
+    if not file_name:
+        file_name = f"{bp_name}-vn.csv"
+    cliVar.update(bp_name=bp_name, file_name=file_name, caller='import_virtual_network_csv')
+    logger = cliVar.gen_logger('DEBUG', 'import_virtual_network_csv()')
 
     bp = cliVar.get_blueprint(bp_name, logger)
     if not bp:
         return
- 
-    logger.info(f"{bp_name=} {vn_csv=}")
 
-    vn_csv_path = os.path.expanduser(vn_csv)
+    csv_string = cliVar.read_file()
+    logger.info(f"{csv_string=}")
 
-    # # get the list of dictionaries per each virtual network from the Apstra
-    # vn_csv_string = bp.get_item('virtual-networks-csv-bulk')['csv_bulk']
-    # csv_reader = csv.DictReader(io.StringIO(vn_csv_string))
-    # current_vn_dict = [row for row in csv_reader]
-
-    links_to_add = []
-    with open(vn_csv_path, 'r') as csvfile:        
-        # csv_reader = csv.reader(csvfile)
-        # input_vn_dict = [row for row in csv_reader]
-
-        # for row in csv_reader:
-        #     links_to_add.append(dict(zip(headers, row)))
-        csv_string = csvfile.read()
-        imported = bp.patch_virtual_networks_csv_bulk(csv_string)
-        logger.info(f"Virtual Networks of blueprint {bp_name} imported from {vn_csv_path}")
+    patched = bp.patch_virtual_networks_csv_bulk(csv_string)
+    logger.info(f"Virtual Networks of blueprint {bp_name} imported from {file_name} {patched}:{patched.status_code}:{patched.text}")
 
 
 @click.command()
 @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
-@click.option('--vn-csv', type=str, envvar='VN_CSV', help='The CSV file path of virtual networks to export to')
+@click.option('--file-name', type=str, envvar='VN_CSV', help='The CSV file path of virtual networks to export to')
 @click.pass_context
-def export_virtual_network(ctx, bp_name, vn_csv: str):
+def export_virtual_network_csv(ctx, bp_name, file_name: str):
     """
-    Import virtual networks from a CSV file
+    Export  virtual networks data to a CSV file
+
+    Default file name is {bp_name}-vn.csv
     """
-    logger = prep_logging('DEBUG', 'export_virtual_network()')
+    if not file_name:
+        file_name = f"{bp_name}-vn.csv"
+    cliVar.update(bp_name=bp_name, file_name=file_name, caller='export_virtual_network_csv')
+    logger = cliVar.gen_logger('DEBUG', 'export_virtual_network_csv()')
 
     bp = cliVar.get_blueprint(bp_name, logger)
     if not bp:
         return
 
-    logger.info(f"{bp_name=} {vn_csv=}")
-
-    vn_csv_path = os.path.expanduser(vn_csv or f"{bp_name}-vn.csv")
     csv_string = bp.get_item('virtual-networks-csv-bulk')['csv_bulk']
-    with open(vn_csv_path, 'w') as csvfile:
-        csvfile.write(csv_string)
-    logger.info(f"Virtual Networks of blueprint {bp_name} exported to {vn_csv_path}")
+    cliVar.write_file(csv_string)
+    logger.info(f"Virtual Networks of blueprint {bp_name} exported to {file_name}")
 
 
 
