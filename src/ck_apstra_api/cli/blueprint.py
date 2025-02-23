@@ -67,56 +67,17 @@ def import_blueprint_json(ctx, bp_name: str, json_file: str = None):
     logger = prep_logging('DEBUG', 'import_blueprint_json()')
 
     checked_bp = cliVar.get_blueprint(None, logger)
-    breakpoint()
     if checked_bp:
         logger.error(f"Blueprint {bp_name} already exists")
         return
-
-    # logger = prep_logging('DEBUG', 'import_blueprint()')
-
-    # if cliVar.get_blueprint(bp_name, logger):
-    #     logger.error(f"Blueprint {bp_name} already exists")
-    #     return
 
     json_path = os.path.expanduser(json_file)
     with open(json_path, 'r') as f:
         bp_json = f.read()
 
     bp_dict = json.loads(bp_json)
-    # node_list = []
-    # for node_dict in bp_dict['nodes'].values():
-    #     # remove system_id for switches
-    #     if node_dict['type'] == 'system' and node_dict['system_type'] == 'switch' and node_dict['role'] != 'external_router':
-    #         node_dict['system_id'] = None
-    #         node_dict['deploy_mode'] = 'undeploy'
-    #     if node_dict['type'] == 'metadata':
-    #         node_dict['label'] = bp_name     
-    #     for k, v in node_dict.items():
-    #         if k == 'tags':
-    #             if v is None or v == "['null']":
-    #                 node_dict[k] = []
-    #         elif k == 'property_set' and v is None:
-    #             node_dict.update({
-    #                 k: {}
-    #             })
-    #     node_list.append(node_dict)        
-
-    # bp_dict['label'] = bp_name
-
-    # # TODO: just reference copy
-    # relationship_list = [rel_dict for rel_dict in bp_dict['relationships'].values()]
-
-    # bp_spec = { 
-    #     'design': bp_dict['design'], 
-    #     'label': bp_dict['label'], 
-    #     'init_type': 'explicit', 
-    #     'nodes': node_list,
-    #     'relationships': relationship_list
-    # }
-    # bp_created = cliVar.session.post('blueprints', data=bp_spec)
     bp_created = cliVar.session.create_blueprint_json(bp_name, bp_dict)
     logger.info(f"blueprint {bp_name} created: {bp_created}")
-
 
 
 

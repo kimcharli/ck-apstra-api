@@ -1029,5 +1029,6 @@ class CkApstraBlueprint:
     def delete_self(self):
         '''Delete self - Blueprint'''
         deleted = self.session.delete_raw(self.url_prefix)
+        # TODO: optimize
         time.sleep(3)
         return deleted.status_code == 202  # 202 is ACCEPTED

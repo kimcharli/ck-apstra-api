@@ -95,10 +95,6 @@ class LeafSwitch:
                 self.last_error = switch_node_result.err_value
                 return Err(f"LeafSwitch::__init__ {self.switch_label=} not found in blueprint {self.bp.label}")
             self.interfaces = []
-            # for i in range(5):
-            #     time.sleep(1)
-            #     if len(switch_node_result.ok_value):
-            #         break
             if len(switch_node_result.ok_value):
                 self.id = switch_node_result.ok_value[0]['system']['id']
     
@@ -615,7 +611,7 @@ class GenericSystem(DataInit):
         if isinstance(generic_system_created_result, Err):
             yield Err(f"{log_prefix} failed to create {generic_system_created_result.err_value}")
             return
-        time.sleep(1)
+        # time.sleep(1)
         yield Ok(f"{log_prefix} created")
 
     def form_lacp(self):

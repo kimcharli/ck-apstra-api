@@ -18,8 +18,9 @@ def mock_vn_csv_data(mock_bp, mock_vn_in_csv_file):
 
 def test_30_mock_import_virtual_network_csv(session, mock_bp, mock_vn_csv_data):
     # uv run ck-cli --file-folder tests/fixtures import-virtual-network-csv --bp-name _mock --file-name mock-vn-input.csv 
-    _ = mock_bp.patch_virtual_networks_csv_bulk(mock_vn_csv_data)
-    assert True
+    patched = mock_bp.patch_virtual_networks_csv_bulk(mock_vn_csv_data)
+    print(f"patched: {patched}, {patched.text}")
+    assert patched.status_code == 202
 
 
 

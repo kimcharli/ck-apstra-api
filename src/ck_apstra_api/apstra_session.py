@@ -261,6 +261,7 @@ class CkApstraSession:
             'relationships': relationship_list
         }
         bp_created = self.post('blueprints', data=bp_spec)
+        # TODO: check the task status instead of fixed wait
         # may take 6 seconds or more
         time.sleep(10)
         return bp_created.json()['id']
