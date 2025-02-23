@@ -9,7 +9,7 @@ from . import cliVar, prep_logging
 # @click.option('--bp-name', type=str, envvar='BP_NAME', help='Blueprint name')
 @click.option('--file-name', type=str, envvar='FILE_NAME', help='File name for the vlan CT specs')
 @click.pass_context
-def create_single_vlan_connectivity_template(ctx, bp_name: str, file_name: str):
+def create_single_vlan_connectivity_template(ctx, file_name: str):
     """
     Create single vlan connectivity templates
 
@@ -27,8 +27,12 @@ def create_single_vlan_connectivity_template(ctx, bp_name: str, file_name: str):
 
     Skip if the ct already exists
     """
-    cliVar.update(bp_name=bp_name, file_name=file_name, caller='create_single_vlan_connectivity_template')
-    logger = cliVar.gen_logger('DEBUG', 'create_single_vlan_connectivity_template()')
+    func_name = 'create_single_vlan_connectivity_template()'
+    if not file_name:
+        cliVar.update(file_folder='tests/fixtures', file_name='mock-vlan-cts.yaml', caller=func_name)
+    else:
+        cliVar.update(file_name=file_name, caller=func_name)
+    logger = cliVar.gen_logger('DEBUG', func_name)
 
     # bp = cliVar.get_blueprint(bp_name, logger)
     # if not bp:
