@@ -552,21 +552,34 @@ class CkApstraBlueprint:
         new_ct_id = self.add_single_vlan_ct(200000 + vlan_id, vlan_id, is_tagged)
         return new_ct_id
 
-    def add_single_vlan_ct(self, vni: int, vlan_id: int, is_tagged: bool) -> str:
+    def add_single_vlan_ct(self, vni: int, vlan_id: int, is_tagged: bool, ct_label: str = None) -> Generator[Result[str, str], Any, Any]:
         '''
         Create a single VLAN CT
         '''
-        logging.debug(f"{vni=}, {vlan_id=}, {is_tagged=}")
+        # yield Ok(f"add_single_vlan_ct({vni=}, {vlan_id=}, {is_tagged=})")
+        func_name = "add_single_vlan_ct()"
         tagged_type = 'vlan_tagged' if is_tagged else 'untagged'
-        ct_label = f"vn{vlan_id}" if is_tagged else f"vn{vlan_id}-untagged"
+        if ct_label is None:
+            ct_label = f"vn{vlan_id}" if is_tagged else f"vn{vlan_id}-untagged"
+        ct_label_lookup_result = self.query(f"node('ep_endpoint_policy', policy_type_name='batch', label='{ct_label}', name='ct')")
+        if isinstance(ct_label_lookup_result, Err):
+            yield Err(f"{func_name} Error: {ct_label_lookup_result.err_value=}")
+            return
+        if len(ct_label_lookup_result.ok_value) > 0:
+            yield Ok(f"{func_name} Skipping. CT {ct_label=} present")
+            return
         uuid_batch = str(uuid.uuid4())
         uuid_pipeline = str(uuid.uuid4())
         uuid_vlan = str(uuid.uuid4())
-        found_vn_node, error = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
-        if len(found_vn_node) == 0:
-            self.logger.warning(f"virtual network with {vni=} not found")
-            return None
-        vn_id = found_vn_node[0]['vn']['id']
+        vn_lookup_result = self.query(f"node('virtual_network', vn_id='{vni}', name='vn')")
+        if isinstance(vn_lookup_result, Err):
+            yield Err(f"{func_name} Error: {vn_lookup_result.err_value=}")
+            return
+        if len(vn_lookup_result.ok_value) == 0:
+            yield Err(f"{func_name} virtual network with {vni=} not found")
+            return
+        vn_id = vn_lookup_result.ok_value[0]['vn']['id']
+        # yield Ok(f"add_single_vlan_ct() found VN with {vni=}: {vn_id}")
         policy_spec = {
             "policies": [
                 {
@@ -608,7 +621,7 @@ class CkApstraBlueprint:
         url = f"{self.url_prefix}/obj-policy-import"
         result = self.session.session.put(url, json=policy_spec)
         # it will be 204 with b''
-        return uuid_batch
+        yield Ok(f"{func_name} CT {ct_label} created with {uuid_batch}")
 
     def add_multiple_vlan_ct(self, ct_label: str, untagged_vlan_id: int = None, tagged_vlan_ids: list[int] = []) -> str:
         '''
@@ -1032,3 +1045,4 @@ class CkApstraBlueprint:
         # TODO: optimize
         time.sleep(3)
         return deleted.status_code == 202  # 202 is ACCEPTED
+    

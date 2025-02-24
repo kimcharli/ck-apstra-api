@@ -17,6 +17,8 @@ class EnvEnum(StrEnum):
     HOST_USER = 'HOST_USER'
     HOST_PASSWORD = 'HOST_PASSWORD'
     FILE_FOLDER = 'FILE_FOLDER'
+    LOG_FOLDER = 'LOG_FOLDER'
+    FILE_NAME = 'FILE_NAME'
     FILE_FORMAT = 'FILE_FORMAT'
     BP_NAME = 'BP_NAME'
     JSON_FILE = 'JSON_FILE'
@@ -32,7 +34,8 @@ class CliVar:
 
     file_path: str = None
     file_format: str = None
-    file_folder: str = None  # given 
+    file_folder: str = '.'  # default to current folder
+    log_folder: str = '.'  # default to current folder
     file_name: str = None
     bp_name: str = None
     logger: Any = None
@@ -43,21 +46,22 @@ class CliVar:
             'blueprint': {}
         }
 
+    def get_filepath(self):
+        return os.path.join(self.file_folder, self.file_name)
+
     def update(self, **kwargs):
         '''Update the variables with the kwargs'''
+        # TODO: caller process by caller=sys._getframe().f_code.co_name
         for k, v in kwargs.items():
             if hasattr(self, k):
                 setattr(self, k, v)
-                if k == 'file_folder':
-                    self.logger = prep_logging('DEBUG', 'CliVar::', v)
-            elif k in ['caller']:
-                continue
             else:
                 self.logger.warning(f"Attribute {k} not found")
 
     def gen_logger(self, log_level: str, log_name):
         '''Generate the logger'''
-        return prep_logging(log_level, log_name, self.file_folder)
+        self.logger = prep_logging(log_level, 'CliVar::', self.log_folder)
+        return prep_logging(log_level, log_name)
 
     def load_file(self, file_path, file_format):
         '''Load the file into self.data_in_file'''
@@ -92,21 +96,29 @@ class CliVar:
 
     def write_file(self, data):
         '''Write the data to the file'''
-        file_path = os.path.join(self.file_folder, self.file_name)
+        file_path = self.get_filepath()
         with open(file_path, 'w') as f:
             f.write(data)
         self.logger.info(f"File written to {file_path}")
 
     def read_file(self):
-        '''Read the data from the file'''
-        file_path = os.path.join(self.file_folder, self.file_name)
+        '''Read the data from the file and decode based on the file format'''
+        file_path = self.get_filepath()
+        file_extension = file_path.split('.')[-1]
+        self.logger.info(f"Reading file {file_path}, {file_extension=}")
         with open(file_path, 'r') as f:
-            data = f.read()
-        self.logger.info(f"File read from {file_path}")
-        return data
-
+            match file_extension:   # file extension
+                case 'json':
+                    return json.load(f)
+                case 'yaml':
+                    return yaml.safe_load(f)
+                case 'yml':
+                    return yaml.safe_load(f)
+                case _:
+                    # no decoding by default
+                    return f.read()
 
 
 dotenv.load_dotenv()
-cliVar = CliVar()
+cliVar: CliVar = CliVar()
 

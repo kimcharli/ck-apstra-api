@@ -2,6 +2,7 @@
 blueprint: _mock
 tagged_ct_name_format: vn{vlan_id}
 untagged_ct_name_format: vn{vlan_id}-untagged
+vni_base: 200000
 tagged_vlan_ids:
   - 3500
   - 3501

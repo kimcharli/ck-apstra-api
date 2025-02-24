@@ -1,4 +1,5 @@
 import click
+import sys
 
 from ck_apstra_api import CkApstraSession, prep_logging
 
@@ -10,19 +11,20 @@ from .system import export_systems, export_generic_system, import_generic_system
 from .ip_link import export_iplink, import_iplink
 from .dci import export_dci, import_dci
 from .configlet_validate import validate_configlet
-from .vlan_cts import create_single_vlan_connectivity_template
+from .vlan_cts import add_single_vlan_cts
 
 
 
 @click.group()
 @click.option('--host-ip', type=str, envvar='HOST_IP', help='Host IP address')
 @click.option('--host-port', type=int, envvar='HOST_PORT', help='Host port')
-@click.option('--host-user', type=str, envvar='HOST_USER', help='Host username')
+@click.option('--host-user', type=str, envvar='HOST_USER', help='Host username', default='admin')
 @click.option('--host-password', type=str, envvar='HOST_PASSWORD', help='Host password')
 @click.option('--file-folder', type=str, envvar='FILE_FOLDER', help='Folder path to read files from and write files to')
+@click.option('--log-folder', type=str, envvar='LOG_FOLDER', help='Folder path to write log files to')
 @click.version_option(message='%(package)s, %(version)s')
 @click.pass_context
-def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, file_folder: str):
+def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, file_folder: str, log_folder: str):
     """
     A CLI tool for interacting with ck-apstra-api.
 
@@ -35,7 +37,7 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, f
     ctx.obj['HOST_PASSWORD'] = host_password
     ctx.obj['FILE_FOLDER'] = file_folder
 
-    cliVar.update(file_folder=file_folder)
+    cliVar.update(file_folder=file_folder, log_folder=log_folder)
     logger = cliVar.gen_logger('DEBUG', 'cli()')
 
     cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
@@ -89,7 +91,7 @@ cli.add_command(import_dci)
 
 cli.add_command(validate_configlet)
 
-cli.add_command(create_single_vlan_connectivity_template)
+cli.add_command(add_single_vlan_cts)
 
 
 if __name__ == "__main__":
