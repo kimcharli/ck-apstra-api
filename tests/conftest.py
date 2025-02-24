@@ -32,6 +32,7 @@ class Data:
         Data.mock_bp_in_file = 'mock-blueprint-input.json'
         Data.mock_bp_out_file = 'mock-blueprint-output.json'
         Data.mock_vn_in_csv_file = 'mock-vn-input.csv'
+        Data.mock_sngle_vlan_cts_yaml_file = 'mock-vlan-cts.yaml'
 
         Data.apstra_session = CkApstraSession(
             Data.apstra_host,
@@ -73,6 +74,10 @@ def mock_bp_in_path():
 @pytest.fixture(scope="module")
 def mock_vn_in_csv_file():
     return f'tests/fixtures/{Data().mock_vn_in_csv_file}'
+
+@pytest.fixture(scope="module")
+def mock_sngle_vlan_cts_yaml_file():
+    return f'tests/fixtures/{Data().mock_sngle_vlan_cts_yaml_file}'
 
 
 
