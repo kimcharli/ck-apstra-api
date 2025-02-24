@@ -33,7 +33,7 @@ def add_single_vlan_cts(ctx, file_name: str):
     """
     func_name = 'add_single_vlan_cts()'
     if file_name:
-        cliVar.update(file_name=file_name, caller=func_name)
+        cliVar.update(file_name=file_name)
     else:
         cliVar.update(file_folder='tests/fixtures', file_name='mock-vlan-cts.yaml')
     logger = cliVar.gen_logger('DEBUG', func_name)
