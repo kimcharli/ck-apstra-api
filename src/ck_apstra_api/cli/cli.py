@@ -41,7 +41,6 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, f
     logger = cliVar.gen_logger('DEBUG', 'cli()')
 
     cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    breakpoint()
     if cliVar.session.last_error:
         logger.error(f"Session error: {cliVar.session.last_error}")
         return
