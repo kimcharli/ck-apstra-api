@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ck-apstra-api"
-version = "0.5.8"
+version = "0.5.9"
 description = "An implementation to use Apstra API"
 authors = [ {name = "Charlie Kim", email = "ckim@juniper.net"} ]
 readme = "README.md"

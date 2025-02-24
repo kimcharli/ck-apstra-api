@@ -39,7 +39,8 @@ def add_single_vlan_cts(ctx, file_name: str):
     logger = cliVar.gen_logger('DEBUG', func_name)
 
     data = cliVar.read_file()
-    logger.info(f"{cliVar=}\n{data=}")
+    logger.info(f"{cliVar=}")
+    logger.info(f"{data=}")
 
     ck_bp = cliVar.get_blueprint(data['blueprint'], logger)
     if not ck_bp:

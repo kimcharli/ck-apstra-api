@@ -17,11 +17,11 @@ from .vlan_cts import add_single_vlan_cts
 
 @click.group()
 @click.option('--host-ip', type=str, envvar='HOST_IP', help='Host IP address')
-@click.option('--host-port', type=int, envvar='HOST_PORT', help='Host port')
+@click.option('--host-port', type=int, envvar='HOST_PORT', help='Host port', default=443)
 @click.option('--host-user', type=str, envvar='HOST_USER', help='Host username', default='admin')
-@click.option('--host-password', type=str, envvar='HOST_PASSWORD', help='Host password')
-@click.option('--file-folder', type=str, envvar='FILE_FOLDER', help='Folder path to read files from and write files to')
-@click.option('--log-folder', type=str, envvar='LOG_FOLDER', help='Folder path to write log files to')
+@click.option('--host-password', type=str, envvar='HOST_PASSWORD', help='Host password', default='admin')
+@click.option('--file-folder', type=str, envvar='FILE_FOLDER', help='Folder path to read files from and write files to', default='.')
+@click.option('--log-folder', type=str, envvar='LOG_FOLDER', help='Folder path to write log files to', default='.')
 @click.version_option(message='%(package)s, %(version)s')
 @click.pass_context
 def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, file_folder: str, log_folder: str):
@@ -41,6 +41,7 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, f
     logger = cliVar.gen_logger('DEBUG', 'cli()')
 
     cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
+    breakpoint()
     if cliVar.session.last_error:
         logger.error(f"Session error: {cliVar.session.last_error}")
         return
