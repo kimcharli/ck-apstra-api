@@ -40,10 +40,12 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, f
     cliVar.update(file_folder=file_folder, log_folder=log_folder)
     logger = cliVar.gen_logger('DEBUG', 'cli()')
 
-    cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
-    if cliVar.session.last_error:
-        logger.error(f"Session error: {cliVar.session.last_error}")
-        return
+    if host_ip:
+        # ck-cli --help won't have host-ip
+        cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
+        if cliVar.session.last_error:
+            logger.error(f"Session error: {cliVar.session.last_error}")
+            return
 
     pass
 
