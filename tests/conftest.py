@@ -4,8 +4,6 @@ from ck_apstra_api import CkApstraSession
 
 logger = logging.getLogger(__name__)
 
-
-
 class Data:
     apstra_host: str
     apstra_port: int
@@ -17,9 +15,6 @@ class Data:
     mock_bp_name: str = '_mock'
     bp_input_json_file: str = 'mock-blueprint-input.json'
     bp_output_json_file: str = 'mock-blueprint-output.json'
-
-
-    # tor_bp_name: str = 's5'
 
     def __init__(self):
         Data.apstra_host = '10.85.192.53'
@@ -39,50 +34,57 @@ class Data:
             int(Data.apstra_port),
             Data.apstra_user,
             Data.apstra_password)
-    
 
 @pytest.fixture(scope="module")
 def session():
+    """Fixture to create and return an Apstra session."""
     my_session = Data()
     return my_session.apstra_session
 
-
 @pytest.fixture(scope="module")
 def main_bp():
+    """Fixture to return the main blueprint name."""
     return Data().main_bp_name
 
 @pytest.fixture(scope="module")
 def gs_csv():
+    """Fixture to return the GS CSV file name."""
     return Data().gs_cvs
 
 @pytest.fixture(scope="module")
 def mock_bp_name():
+    """Fixture to return the mock blueprint name."""
     return Data().mock_bp_name
 
 @pytest.fixture(scope="module")
 def mock_bp_in_file():
+    """Fixture to return the mock blueprint input file name."""
     return Data().mock_bp_in_file
 
 @pytest.fixture(scope="module")
 def mock_bp_out_file():
+    """Fixture to return the mock blueprint output file name."""
     return Data().mock_bp_out_file
 
 @pytest.fixture(scope="module")
 def mock_bp_in_path():
+    """Fixture to return the path to the mock blueprint input file."""
     return f'tests/fixtures/{Data().mock_bp_in_file}'
 
 @pytest.fixture(scope="module")
 def mock_vn_in_csv_file():
+    """Fixture to return the path to the mock VN input CSV file."""
     return f'tests/fixtures/{Data().mock_vn_in_csv_file}'
 
 @pytest.fixture(scope="module")
 def mock_sngle_vlan_cts_yaml_file():
+    """Fixture to return the path to the mock single VLAN CTS YAML file."""
     return f'tests/fixtures/{Data().mock_sngle_vlan_cts_yaml_file}'
 
-
-
+# Uncomment and use this fixture if needed
 # @pytest.fixture(scope="module")
 # def tor_bp():
+#     """Fixture to return the TOR blueprint name."""
 #     return Data().tor_bp_name
 
 

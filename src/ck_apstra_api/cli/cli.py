@@ -14,7 +14,6 @@ from .configlet_validate import validate_configlet
 from .vlan_cts import add_single_vlan_cts
 
 
-
 @click.group()
 @click.option('--host-ip', type=str, envvar='HOST_IP', help='Host IP address')
 @click.option('--host-port', type=int, envvar='HOST_PORT', help='Host port', default=443)
@@ -24,7 +23,7 @@ from .vlan_cts import add_single_vlan_cts
 @click.option('--log-folder', type=str, envvar='LOG_FOLDER', help='Folder path to write log files to', default='.')
 @click.version_option(message='%(package)s, %(version)s')
 @click.pass_context
-def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, file_folder: str, log_folder: str):
+def cli(ctx, host_ip: str, host_port: int, host_user: str, host_password: str, file_folder: str, log_folder: str):
     """
     A CLI tool for interacting with ck-apstra-api.
 
@@ -45,7 +44,7 @@ def cli(ctx, host_ip: str, host_port: str, host_user: str, host_password: str, f
         cliVar.session = CkApstraSession(host_ip, host_port, host_user, host_password)
         if cliVar.session.last_error:
             logger.error(f"Session error: {cliVar.session.last_error}")
-            return
+            sys.exit(1)  # Exit if there is a session error
 
     pass
 
@@ -65,34 +64,44 @@ def check_apstra(ctx):
     """
     Test the connectivity to the server
     """
-    print(f"version {cliVar.session.version=} {cliVar.session.token=}")
-    cliVar.session.logout()
+    if cliVar.session:
+        print(f"version {cliVar.session.version=} {cliVar.session.token=}")
+        cliVar.session.logout()
+    else:
+        print("No active session found.")
 
 
+# Register blueprint-related commands
 cli.add_command(check_blueprint)
 cli.add_command(export_blueprint_json)
 cli.add_command(import_blueprint_json)
 cli.add_command(print_lldp_data)
 cli.add_command(export_device_configs)
 
+# Register virtual network-related commands
 cli.add_command(export_virtual_network_csv)
 cli.add_command(import_virtual_network_csv)
 cli.add_command(relocate_vn)
 cli.add_command(test_get_temp_vn)
 cli.add_command(assign_vn_to_leaf)
 
+# Register system-related commands
 cli.add_command(export_systems)
 cli.add_command(export_generic_system)
 cli.add_command(import_generic_system)
 
+# Register IP link-related commands
 cli.add_command(export_iplink)
 cli.add_command(import_iplink)
 
+# Register DCI-related commands
 cli.add_command(export_dci)
 cli.add_command(import_dci)
 
+# Register configlet validation command
 cli.add_command(validate_configlet)
 
+# Register VLAN CTS command
 cli.add_command(add_single_vlan_cts)
 
 
