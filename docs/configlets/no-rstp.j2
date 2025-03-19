@@ -5,15 +5,9 @@ To remove RSTP, attach the tag NO_RSTP_TAG to the target interfaces, links, or g
 #}
 {% set NO_RSTP_TAG = "no-rstp" %}
 {% set intfs_to_remove = {} %}
-{% for intf in interface.values() %}{# begin iterate interfaces #}
-{% if 'tags' in intf and NO_RSTP_TAG in intf.tags %}{# begin NO_RSTP_TAG #}
-{% if intf.part_of %}{# begin member interfaces check #}
-{% set _ = intfs_to_remove.update({intf.part_of: ''}) %}
-{% else %}
-{% set _ = intfs_to_remove.update({intf.intfName: ''}) %}
-{% endif %}{# end member interfaces check #}
-{% endif %}{# end NO_RSTP_TAG #}
-{% endfor %}{# end iterate interfaces #}
+{% for intf in interface.values()|selectattr('tags') %}{# begin tagged interfaces #}
+{% set _ = NO_RSTP_TAG in intf.tags and intfs_to_remove.__setitem__(intf.part_of or intf.intfName, '') %}
+{% endfor %}{# end tagged interfaces #}
 {% for intf in intfs_to_remove.keys() %}{# finally render the configuration #}
 delete protocols rstp interface {{ intf }}
 {% endfor %}
