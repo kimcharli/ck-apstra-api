@@ -6,6 +6,7 @@ system {
                 encrypted-password "$6$o0oFDCXs$GVVRn8Rmt/QaDhg0KHmo3mErxBZM4g8xbxOqonmLhpiaPauY2hXbevrNpa7e2I3pKDsgYrnDjEsAC3/KOjpcV1"; ## SECRET-DATA
             }
         }
+        message "BEWARE OF SECURITY";
     }
     services {
         ssh {
@@ -14,6 +15,17 @@ system {
             ciphers [ "aes128-gcm@openssh.com" "aes256-gcm@openssh.com" aes256-ctr ];
             key-exchange [ dh-group14-sha1 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 ];            
         }
+    }
+    domain-search pslab.net;    
+    time-zone America/New_York;
+    syslog {
+        host 10.84.192.10 {
+            any info;
+            routing-instance mgmt_junos;
+        }
+    }
+    name-server {
+        10.85.192.2 routing-instance mgmt_junos;
     }
     ntp {
         server 10.85.130.130 routing-instance mgmt_junos;
