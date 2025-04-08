@@ -1,0 +1,73 @@
+{
+  "label": "RSTP_STATE",
+  "processors": [
+    {
+      "name": "Extensible Service Collector",
+      "type": "extensible_data_collector",
+      "properties": {
+        "service_name": "RSTP_STATE",
+        "service_interval": "120",
+        "value_map": {},
+        "graph_query": [
+          "match(node('system', name='system', deploy_mode='deploy', role=is_in(['leaf', 'access'])))"
+        ],
+        "service_input": "''",
+        "query_group_by": [],
+        "keys": [],
+        "ingestion_filter": {},
+        "data_type": "dynamic",
+        "query_tag_filter": {
+          "filter": {},
+          "operation": "and"
+        },
+        "execution_count": "-1",
+        "system_id": "system.system_id",
+        "query_expansion": {},
+        "enable_streaming": false
+      },
+      "inputs": {},
+      "outputs": {
+        "out": "RSTP STATE OUT"
+      }
+    },
+    {
+      "name": "Match String 1",
+      "type": "match_string",
+      "properties": {
+        "raise_anomaly": true,
+        "graph_query": [],
+        "anomaly_retention_duration": 86400,
+        "enable_streaming": false,
+        "regexp": "\"DIS .*\"",
+        "anomaly_retention_size": 1073741824,
+        "enable_anomaly_logging": false
+      },
+      "inputs": {
+        "in": {
+          "stage": "RSTP STATE OUT",
+          "column": "port_role"
+        }
+      },
+      "outputs": {
+        "out": "Port Role DIS"
+      }
+    }
+  ],
+  "stages": [
+    {
+      "name": "RSTP STATE OUT",
+      "retention_duration": 86400,
+      "units": {
+        "port_role": "",
+        "port_state": ""
+      }
+    },
+    {
+      "name": "Port Role DIS",
+      "retention_duration": 86400,
+      "units": {
+        "value": ""
+      }
+    }
+  ]
+}

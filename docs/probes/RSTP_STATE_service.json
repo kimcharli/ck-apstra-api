@@ -1,0 +1,69 @@
+{
+  "description": "Monitor RSTP states",
+  "application_schema": {
+    "properties": {
+      "key": {
+        "properties": {
+          "interface": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "interface"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "properties": {
+          "port_role": {
+            "type": "string"
+          },
+          "port_state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "port_role",
+          "port_state"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "service_name": "RSTP_STATE",
+  "storage_schema_path": "aos.sdk.telemetry.schemas.iba_data",
+  "collectors": [
+    {
+      "platform": {
+        "os_type": "junos",
+        "os_version": "22.2r2",
+        "family": "junos-ex,junos-qfx",
+        "model": ""
+      },
+      "source_type": "cli",
+      "cli": "show spanning-tree interface",
+      "query": {
+        "accessors": {
+          "interface": "/stp-interface-information/stp-instance/stp-interfaces/stp-interface-entry/interface-name",
+          "port_role": "/stp-interface-information/stp-instance/stp-interfaces/stp-interface-entry/port-role",
+          "port_state": "/stp-interface-information/stp-instance/stp-interfaces/stp-interface-entry/port-state"
+        },
+        "keys": {
+          "interface": "interface"
+        },
+        "values": {
+          "port_role": "port_role",
+          "port_state": "port_state"
+        },
+        "filter": ""
+      },
+      "relaxed_schema_validation": false
+    }
+  ],
+  "version": "version_0"
+}

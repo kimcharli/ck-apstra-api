@@ -21,6 +21,7 @@ system {
     syslog {
         host 10.84.192.10 {
             any info;
+            facility-override local7;
             routing-instance mgmt_junos;
         }
     }
