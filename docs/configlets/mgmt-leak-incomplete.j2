@@ -1,0 +1,56 @@
+
+
+{% set INFRA_VRF = 'corp_trust' %}
+{% set MGMT_SUBNET = '10.85.192.0/26' %}
+{% set INFRA_2_MGMT_POLICY = 'INFR-2-MGMT-LEAKING' %}
+
+
+policy-options {
+    prefix-list INFRA-PREFIX {
+        10.0.0.40/32;
+        10.0.3.14/32;
+    }
+    prefix-list MGMT-PREFIX {
+        10.85.192.0/26;
+        10.85.192.16/32;
+    }
+    policy-statement {{ INFR-2-MGMT-LEAKING }} {
+        term INFRA-PREFIX {
+            from {
+                prefix-list INFRA-PREFIX;
+            }
+            then accept;
+        }
+        term else {
+            then reject;
+        }
+    }
+
+}
+routing-instances {
+    {{ INFRA_VRF }} {
+        routing-options {
+            interface-routes {
+                rib-group inet INFRA-2-MGMT;
+            }
+            interface-routes {
+                rib-group inet INFRA-2-MGMT;
+            }
+            static {
+                rib-group INFRA-2-MGMT;
+                route 10.0.3.14/32 next-hop 10.133.32.1;
+                route 10.85.192.16/32 next-table mgmt_junos.inet.0;
+                route {{ MGMT_SUBNET }} next-table mgmt_junos.inet.0;
+            }
+        }
+    }
+}
+routing-options {
+    rib-groups {
+        INFRA-2-MGMT {
+            import-rib [ {{ INFRA_VRF }}.inet.0 mgmt_junos.inet.0 ];
+            import-policy {{ INFR-2-MGMT-LEAKING }};
+        }
+    }
+}
+
