@@ -1,7 +1,8 @@
-{# mirror the interface with intf_tags 'mirror' #}
+{# mirror the interface using analyzer with intf_tags 'mirror' #}
+{% set mirror_tag = 'mirror' %}
 {% set mirrored_interfaces = [] %}
 {% for intf in interface.values() %}
-{% if 'tags' in intf and 'mirror' in intf['tags'] %}
+{% if 'tags' in intf and mirror_tag in intf['tags'] %}
 {% if intf['part_of'] == '' %}
 {% set mirrored_interfaces = mirrored_interfaces.append(intf['intfName']) %}
 {% else %}
