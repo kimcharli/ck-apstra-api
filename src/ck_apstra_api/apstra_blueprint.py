@@ -322,7 +322,7 @@ class CkApstraBlueprint:
             return Ok([])
         url = f"{self.url_prefix}/switch-system-links"
         created_generic_system = self.session.session.post(url, json=generic_system_spec)
-        if created_generic_system.status_code >= 400:
+        if created_generic_system.status_code != 201:
             # self.logger.error(f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}")
             return Err(f"System not created: {created_generic_system=}, {new_generic_system_label=}, {created_generic_system.text=}")
         # which case?
@@ -386,7 +386,8 @@ class CkApstraBlueprint:
         '''
         if print_prefix:
             self.logger.info(f"{print_prefix}: {spec=}")
-        return self.session.patch_throttled(f"{self.url_prefix}/leaf-server-link-labels", spec=spec, params=params)
+        patched = self.session.patch_throttled(f"{self.url_prefix}/leaf-server-link-labels", spec=spec, params=params)
+        return patched
 
     def patch_node_single(self, node, patch_spec, params=None):
         '''

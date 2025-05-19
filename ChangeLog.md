@@ -1,5 +1,7 @@
 # Change Log
 
+## 0.5.12 2025-05-16
+- revise generic_system to allow form_log pickup
 
 ## 0.5.8 2025-02-23
 - implement add-single-vlan-cts

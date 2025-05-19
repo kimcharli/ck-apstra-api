@@ -142,8 +142,11 @@ class LinkMember(DataInit):
         elif self.tags_link == '':
             self.tags_link = []
         self.ifname = self.ifname.strip()
+        # add hints for the link
+        if self.ifname and self.ifname not in self.tags_link:
+            self.tags_link.append(self.ifname)
         self.speed = self.speed.upper()
-        self.log_prefix = f"LinkMember({self.switch}:{self.switch_ifname}:{self.ifname})"
+        self.log_prefix = f"LinkMember({data[GsCsvKeys.SERVER]}:{self.ifname}:{self.switch}:{self.switch_ifname})"
 
     # TODO: init to [] for fetched_tags_link
     def __post_init__(self):
@@ -249,8 +252,10 @@ class LinkMember(DataInit):
         tags_to_add = [x for x in self.tags_link if x not in self.fetched_tags_link]
         tags_to_remove = [x for x in self.fetched_tags_link if x not in self.tags_link]
         if len(tags_to_add) or len(tags_to_remove):
-            patched = self.bp.post_tagging(self.fetched_link_id, tags_to_add, tags_to_remove)
+            _ = self.bp.post_tagging(self.fetched_link_id, tags_to_add, tags_to_remove)
         yield Ok(f"{log_prefix} done - tags {self.tags_link}: added {tags_to_add}, removed {tags_to_remove}")
+
+
 @dataclass
 class LinkGroup(DataInit):
     """
@@ -284,7 +289,7 @@ class LinkGroup(DataInit):
         elif not self.ct_names:
             self.ct_names = []
         self.fetched_ct_names = []
-        self.log_prefix = f"LinkGroup({self.ae})"
+        self.log_prefix = f"LinkGroup({data[GsCsvKeys.SERVER]}:{self.ae})"
         # logging.warning(f"LinkGroup::init added LinkMember {self.members=}")
 
     def load_link_member(self, data: Dict[str, Any]):
@@ -333,11 +338,11 @@ class LinkGroup(DataInit):
             self.fetched_ct_names = [x['CT_NODE']['label'] for x in ct_result.ok_value]
         yield Ok(f"{log_prefix} Done fetching the link group data from Apstra {self}")
         
-    def form_lacp(self):
+    def form_lag(self):
         """
-        Form the LACP for the link group
+        Form the LAG for the link group
         """
-        log_prefix = f"{self.log_prefix}::form_lacp()"
+        log_prefix = f"{self.log_prefix}::form_lag()"
 
         if not self.lag_mode:
             # None or ''
@@ -354,11 +359,11 @@ class LinkGroup(DataInit):
         if len(lag_spec['links']) == 0:
             yield Err(f"{log_prefix} has no live links. Skipping {lag_spec=}")
             return
-        # update LACP
+        # update LAG
         lag_updated = self.bp.patch_leaf_server_link_labels(lag_spec)
         if lag_updated:
             # It is expected to be None
-            yield Err(f"Unexpected return: LACP updated {self.lag_mode=} in blueprint {self.bp.label}: {lag_updated}")
+            yield Err(f"Unexpected return: LAG updated {self.lag_mode=} in blueprint {self.bp.label}: {lag_updated}")
         else:
             yield Ok(f"{log_prefix} done")
 
@@ -426,7 +431,11 @@ class LinkGroup(DataInit):
         """
         log_prefix = f"{self.log_prefix}::add_vlans()"
         vlans_to_add = [x for x in self.ct_names if x not in self.fetched_ct_names]
-        yield Ok(f"{log_prefix} {self.ae=} {vlans_to_add=}")
+        # ae_id should be present if the link group is created
+        if self.fetched_ae_id is None:
+            yield Err(f"{log_prefix} {self.ae=} not found in blueprint {self.bp.label}")
+            return
+        yield Ok(f"{log_prefix} {self.ae=} {vlans_to_add=} {self.fetched_ae_id=}")
         ct_ids_to_add = []
         for res in self._get_ct_ids(vlans_to_add):
             if isinstance(res, Err):
@@ -614,12 +623,12 @@ class GenericSystem(DataInit):
         # time.sleep(1)
         yield Ok(f"{log_prefix} created")
 
-    def form_lacp(self):
+    def form_lag(self):
         """
-        Form the LACP for the generic system
+        Form the LAG for the generic system
         """
         for lg in self.link_groups:
-            for res in lg.form_lacp():
+            for res in lg.form_lag():
                 yield res
 
     def rename_interfaces(self):
@@ -782,12 +791,12 @@ class ServerBlueprint(DataInit):
             for res in generic_system.create():
                 yield res
 
-    def form_lacp(self):
+    def form_lag(self):
         """
-        Form the LACP for the generic system
+        Form the LAG for the generic system
         """
         for generic_system in self.servers.values():
-            for res in generic_system.form_lacp():
+            for res in generic_system.form_lag():
                 yield res
     
     def rename_interfaces(self):
@@ -861,11 +870,14 @@ def add_generic_systems(apstra_session: CkApstraSession, generic_system_rows: li
             yield res
         yield Ok(f"{log_prefix} Done fetching data from Apstra after generic system creation of blueprint {bp_label}")
 
-    # form LACP for the generic systems
+    # form LAG for the generic systems
     for bp_label, sbp in ServerBlueprint._bps.items():
-        for res in sbp.form_lacp():
+        for res in sbp.form_lag():
             yield res
-        yield Ok(f"{log_prefix} Done LACP for blueprint {bp_label}")
+        yield Ok(f"{log_prefix} Done LAG for blueprint {bp_label}")
+
+    # form_lag may need some time to catch up
+    time.sleep(3)
 
     # AGAIN YET, fetch the blueprints from the apstra server and store them in the data classes
     for bp_label, sbp in ServerBlueprint._bps.items():
