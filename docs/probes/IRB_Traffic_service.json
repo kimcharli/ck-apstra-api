@@ -1,0 +1,69 @@
+{
+  "description": "",
+  "application_schema": {
+    "properties": {
+      "key": {
+        "properties": {
+          "IRB_subinterface": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "IRB_subinterface"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "properties": {
+          "in_packets": {
+            "type": "integer"
+          },
+          "out_packets": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "in_packets",
+          "out_packets"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "service_name": "IRB-subinterfaces",
+  "storage_schema_path": "aos.sdk.telemetry.schemas.iba_data",
+  "collectors": [
+    {
+      "platform": {
+        "os_type": "junos",
+        "os_version": "21.2r2",
+        "family": "junos-qfx",
+        "model": ""
+      },
+      "source_type": "cli",
+      "cli": "show interfaces irb",
+      "query": {
+        "accessors": {
+          "IRB_subinterface": "/interface-information/physical-interface/logical-interface/name",
+          "in_packets": "/interface-information/physical-interface/logical-interface/traffic-statistics/input-packets",
+          "out_packets": "/interface-information/physical-interface/logical-interface/traffic-statistics/output-packets"
+        },
+        "keys": {
+          "IRB_subinterface": "IRB_subinterface"
+        },
+        "values": {
+          "in_packets": "int(in_packets)",
+          "out_packets": "int(out_packets)"
+        },
+        "filter": ""
+      },
+      "relaxed_schema_validation": true
+    }
+  ],
+  "version": "version_0"
+}

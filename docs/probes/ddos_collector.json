@@ -1,0 +1,61 @@
+{
+  "description": "",
+  "application_schema": {
+    "properties": {
+      "key": {
+        "properties": {
+          "group_name": {
+            "type": "string"
+          },
+          "received": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_name",
+          "received"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "service_name": "ddos2",
+  "storage_schema_path": "aos.sdk.telemetry.schemas.iba_integer_data",
+  "collectors": [
+    {
+      "platform": {
+        "os_type": "junos",
+        "os_version": "22.2r2",
+        "family": "junos-qfx",
+        "model": ""
+      },
+      "source_type": "cli",
+      "cli": "show ddos-protection protocols statistics",
+      "query": {
+        "accessors": {
+          "group_name": "/ddos-protocols-information/ddos-protocol-group/group-name",
+          "received": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/protocol-states-locale",
+          "value": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-statistics/packet-received"
+        },
+        "keys": {
+          "group_name": "group_name",
+          "received": "received"
+        },
+        "values": {
+          "value": "int(value)"
+        },
+        "filter": "keys['received'].startswith('FPC') and values['value']"
+      },
+      "relaxed_schema_validation": true
+    }
+  ],
+  "version": "version_0"
+}

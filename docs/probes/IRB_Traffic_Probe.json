@@ -1,0 +1,72 @@
+{
+  "label": "IRB Traffic",
+  "processors": [
+    {
+      "name": "IRB Traffic",
+      "type": "extensible_data_collector",
+      "properties": {
+        "service_name": "IRB-subinterfaces",
+        "service_interval": "120",
+        "value_map": {},
+        "graph_query": [
+          "match(node('system', name='system', deploy_mode='deploy', role=is_in(['leaf', 'access', 'spine', 'superspine'])))"
+        ],
+        "service_input": "''",
+        "query_group_by": [],
+        "keys": [],
+        "ingestion_filter": {},
+        "data_type": "dynamic",
+        "query_tag_filter": {
+          "filter": {},
+          "operation": "and"
+        },
+        "execution_count": "-1",
+        "system_id": "system.system_id",
+        "query_expansion": {},
+        "enable_streaming": false
+      },
+      "inputs": {},
+      "outputs": {
+        "out": "IRB Traffic"
+      }
+    },
+    {
+      "name": "Sum of input packets",
+      "type": "sum",
+      "properties": {
+        "group_by": [
+          "IRB_subinterface"
+        ],
+        "enable_streaming": false
+      },
+      "inputs": {
+        "in": {
+          "stage": "IRB Traffic",
+          "column": "in_packets"
+        }
+      },
+      "outputs": {
+        "out": "Sum of input packets"
+      }
+    },
+    {
+      "name": "out-packets",
+      "type": "sum",
+      "properties": {
+        "group_by": [
+          "IRB_subinterface"
+        ],
+        "enable_streaming": false
+      },
+      "inputs": {
+        "in": {
+          "stage": "IRB Traffic",
+          "column": "out_packets"
+        }
+      },
+      "outputs": {
+        "out": "Sum of out-packets"
+      }
+    }
+  ]
+}
