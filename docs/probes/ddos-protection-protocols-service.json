@@ -1,0 +1,111 @@
+{
+  "description": "",
+  "application_schema": {
+    "properties": {
+      "key": {
+        "properties": {
+          "instance": {
+            "type": "string"
+          },
+          "protocol_group": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance",
+          "protocol_group"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "properties": {
+          "arrival_max": {
+            "type": "integer"
+          },
+          "arrival_rate": {
+            "type": "integer"
+          },
+          "bandwidth": {
+            "type": "integer"
+          },
+          "burst": {
+            "type": "integer"
+          },
+          "dropped": {
+            "type": "integer"
+          },
+          "dropped_other": {
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "string"
+          },
+          "received": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "arrival_max",
+          "arrival_rate",
+          "bandwidth",
+          "burst",
+          "dropped",
+          "dropped_other",
+          "enabled",
+          "received"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "service_name": "ddos-protection-protocols",
+  "storage_schema_path": "aos.sdk.telemetry.schemas.iba_data",
+  "collectors": [
+    {
+      "platform": {
+        "os_type": "junos",
+        "os_version": "21.2r2",
+        "family": "junos-qfx",
+        "model": ""
+      },
+      "source_type": "cli",
+      "cli": "show ddos-protection protocols",
+      "query": {
+        "accessors": {
+          "received": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-statistics/packet-received",
+          "instance": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/protocol-states-locale",
+          "dropped": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-statistics/packet-dropped",
+          "bandwidth": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-parameters/policer-bandwidth",
+          "burst": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-parameters/policer-burst",
+          "arrival_rate": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-statistics/packet-arrival-rate",
+          "arrival_max": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-statistics/packet-arrival-rate-max",
+          "protocol_group": "/ddos-protocols-information/ddos-protocol-group/group-name",
+          "enabled": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-parameters/policer-enable",
+          "dropped_other": "/ddos-protocols-information/ddos-protocol-group/ddos-protocol/ddos-instance/ddos-instance-statistics/packet-dropped-others"
+        },
+        "keys": {
+          "instance": "instance",
+          "protocol_group": "protocol_group"
+        },
+        "values": {
+          "arrival_max": "int(arrival_max)",
+          "arrival_rate": "int(arrival_rate)",
+          "bandwidth": "int(bandwidth)",
+          "burst": "int(burst)",
+          "dropped": "int(dropped)",
+          "dropped_other": "int(dropped_other)",
+          "enabled": "enabled",
+          "received": "int(received)"
+        },
+        "filter": ""
+      },
+      "relaxed_schema_validation": true
+    }
+  ],
+  "version": "version_0"
+}
