@@ -1,0 +1,15 @@
+{% set SN_TO_LRM_ID = { 
+  'XH3119430106': 'ps-QFX5120-48Y-8C-r002',
+  'XH3119430153': 'ps-QFX5120-48Y-8C-r001',
+  'EK069': 'ps-QFX10002-36Q-r004',
+  'FQ824': 'ps-QFX10002-36Q-r003',
+  'TA3717380282': 'ps-QFX5100-48S-6Q-r001',
+  'TA3717380176': 'ps-QFX5100-48S-6Q-r002',
+  'AN260': 'ps-MX80-r003',
+  'AN345': 'ps-MX80-r004'
+  } 
+%}
+{% set LRM_ID = SN_TO_LRM_ID[device_sn]|default('MISSING') %}
+{# if LRM_ID != 'MISSING' #}
+set snmp description "{{ LRM_ID }}"
+{# endif #}

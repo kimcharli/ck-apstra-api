@@ -4,16 +4,6 @@ Configure sflow on the activive interfaces on leaf switches.
   Every leaf should have FIS routing zone. As such, a VN of FIS needs to be on every leaf. 
   The engine-id is set to 8888. This is to use the same authentication and privacy key.
   
-Example property set:
-    sflow_collector: 10.3.33.33
-    sflow_port: 6343
-    sflow_rz: FIS
-    snmp_versin: 3     ## 2 or 3
-    v2_community: sFlow-collector
-    v3_user: sflow-v3
-    v3_auth_key: $9$ayJjHq.5T36f5Qn/CB1-Vbs2aiHmF39mP0BIEyrvWLx7V4aZUHqJZ/CAu1IwY2gUj5QF6/tQz6ApuEh4aJUDk.mTQ36HkAp0OcSwY2oaUP5QF69wYmfTz6/Lx7-s2goJiHmM8GDHkTQcyrlLxYgoji.X7jHkqf5Fn/CO1IEclvWOBdbs2GUp0OIyl
-    v3_priv_key: $9$DKkfTz36pO1/90IhSMWoJZDi.z36/Apn68XxNbwfTQz/CuO1creRESeM87Nmf5T69AtOhclu0-Vw2aJGDiHP56/tu0IHq
-
 Test command example:
     snmpwalk -v3  -l authNoPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv 10.85.192.16 .1.3.6.1.2.1.2.1
     snmpwalk -v3  -l authPriv -u sflow-v3 -a SHA-256 -A zaq12wsxcde34rfv -x AES-128 -X vfr43edcxsw21qaz 10.85.192.16 .1.3.6.1.2.1
@@ -35,6 +25,18 @@ To avoid clear text password in the configlet, the engine-id of the device is se
   2. Capture update the value in the configlet/property-sets.
 
 #}
+
+{# variables - can be set in the property set #}
+{% set role='leaf' %}
+{% set sflow_collector='10.85.192.52' %}
+{% set sflow_port=6343 %}
+{% set sflow_rz='mgmt_junos' %}
+{% set snmp_version=3 %}
+{% set v2_community='sFlow-collector' %}
+{% set v3_user='sflow-v3' %}
+{% set v3_auth_key='$9$ayJjHq.5T36f5Qn/CB1-Vbs2aiHmF39mP0BIEyrvWLx7V4aZUHqJZ/CAu1IwY2gUj5QF6/tQz6ApuEh4aJUDk.mTQ36HkAp0OcSwY2oaUP5QF69wYmfTz6/Lx7-s2goJiHmM8GDHkTQcyrlLxYgoji.X7jHkqf5Fn/CO1IEclvWOBdbs2GUp0OIyl' %}
+{% set v3_priv_key='$9$DKkfTz36pO1/90IhSMWoJZDi.z36/Apn68XxNbwfTQz/CuO1creRESeM87Nmf5T69AtOhclu0-Vw2aJGDiHP56/tu0IHq' %}    
+
 {% if role == 'leaf' %}
 routing-options {
     static {
