@@ -1,0 +1,101 @@
+{
+  "JNP48Y8C-CHAS": {
+    "dual-routing-engine": false,
+    "junos-image": "http://10.85.192.45/jinstall-host-qfx-5e-x86-64-23.4R2-S4.11-secure-signed.tgz",
+    "junos-versions": [
+      "22.4R2-S2.6",
+      "22.2R2-S2.3",
+      "23.4R2-S4.11"
+    ]
+  },
+  "QFX10002-36Q": {
+    "dual-routing-engine": false,
+    "junos-image": "https://10.85.192.45/jinstall-host-qfx-10-f-x86-64-23.4R2-S4.11-secure-signed.tgz",
+    "junos-versions": [
+      "22.4R3-S2.11",
+      "22.2R2-S2.3",
+      "23.4R2-S4.11"
+    ]
+  },
+  "QFX5100-48S-6Q": {
+    "dual-routing-engine": false,
+    "junos-image": "http://10.85.192.45/jinstall-host-qfx-5e-x86-64-23.4R2-S4.11-secure-signed.tgz",
+    "junos-versions": [
+      "22.4R2-S2.6",
+      "22.2R2-S2.3",
+      "23.4R2-S4.11"
+    ]
+  },
+  "QFX5130-32CD": {
+    "dual-routing-engine": false,
+    "junos-evo-image": "https://10.85.192.45/junos-evo-install-qfx-ms-x86-64-23.4R2-S4.11-EVO.iso",
+    "junos-evo-versions": [
+      "22.4R3.23-EVO",
+      "23.4R2-S4.11-EVO"
+    ],
+    "system-agent-params": {
+      "agent_type": "offbox",
+      "job_on_create": "install"
+    }
+  },
+  "defaults": {
+    "device-root-password": "admin",
+    "device-user": "aosadmin",
+    "device-user-password": "aosadmin",
+    "dual-routing-engine": false,
+    "eos-image": "aos_eos_image.bin",
+    "eos-versions": [
+      "eos-version1",
+      "eos-version2"
+    ],
+    "junos-evo-image": "http://server_address/path/to/install_package_name.tgz",
+    "junos-evo-versions": [
+      "junos-evo-version1"
+    ],
+    "junos-image": "http://server_address/path/to/jinstall_package_name.tgz",
+    "junos-versions": [
+      "junos-version1",
+      "junos-version2"
+    ],
+    "management-subnet-prefixlen": 0,
+    "nxos-image": "aos_nxos_image.bin",
+    "nxos-versions": [
+      "nxos-version1"
+    ],
+    "sonic-image": "http://server_address/path/to/sonic_package_name.bin",
+    "sonic-versions": [
+      "sonic-version1",
+      "sonic-version2"
+    ],
+    "system-agent-params": {
+      "agent_type": "onbox"
+    }
+  },
+  "eos": {
+    "custom-config": "eos_custom.sh"
+  },
+  "junos": {
+    "device-root-password": "root123",
+    "device-user-password": "aosadmin123",
+    "system-agent-params": {
+      "agent_type": "offbox",
+      "job_on_create": "install",
+      "platform": "junos"
+    }
+  },
+  "junos-evo": {
+    "device-root-password": "root123",
+    "device-user-password": "aosadmin123",
+    "system-agent-params": {
+      "agent_type": "offbox",
+      "job_on_create": "install",
+      "platform": "junos"
+    }
+  },
+  "nxos": {
+    "device-root-password": "admin123",
+    "system-agent-params": {
+      "agent_type": "onbox"
+    }
+  }
+}

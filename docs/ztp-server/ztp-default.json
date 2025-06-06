@@ -1,0 +1,62 @@
+{
+  "defaults": {
+    "device-root-password": "admin",
+    "device-user": "aosadmin",
+    "device-user-password": "aosadmin",
+    "dual-routing-engine": false,
+    "eos-image": "aos_eos_image.bin",
+    "eos-versions": [
+      "eos-version1",
+      "eos-version2"
+    ],
+    "junos-evo-image": "http://server_address/path/to/install_package_name.tgz",
+    "junos-evo-versions": [
+      "junos-evo-version1"
+    ],
+    "junos-image": "http://server_address/path/to/jinstall_package_name.tgz",
+    "junos-versions": [
+      "junos-version1",
+      "junos-version2"
+    ],
+    "management-subnet-prefixlen": 0,
+    "nxos-image": "aos_nxos_image.bin",
+    "nxos-versions": [
+      "nxos-version1"
+    ],
+    "sonic-image": "http://server_address/path/to/sonic_package_name.bin",
+    "sonic-versions": [
+      "sonic-version1",
+      "sonic-version2"
+    ],
+    "system-agent-params": {
+      "agent_type": "onbox"
+    }
+  },
+  "eos": {
+    "custom-config": "eos_custom.sh"
+  },
+  "junos": {
+    "device-root-password": "root123",
+    "device-user-password": "aosadmin123",
+    "system-agent-params": {
+      "agent_type": "offbox",
+      "job_on_create": "install",
+      "platform": "junos"
+    }
+  },
+  "junos-evo": {
+    "device-root-password": "root123",
+    "device-user-password": "aosadmin123",
+    "system-agent-params": {
+      "agent_type": "offbox",
+      "job_on_create": "install",
+      "platform": "junos"
+    }
+  },
+  "nxos": {
+    "device-root-password": "admin123",
+    "system-agent-params": {
+      "agent_type": "onbox"
+    }
+  }
+}
