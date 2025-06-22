@@ -4,6 +4,7 @@ system {
             class super-user;
             authentication {
                 encrypted-password "$6$o0oFDCXs$GVVRn8Rmt/QaDhg0KHmo3mErxBZM4g8xbxOqonmLhpiaPauY2hXbevrNpa7e2I3pKDsgYrnDjEsAC3/KOjpcV1"; ## SECRET-DATA
+                ssh-ed25519 "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBtWQrJyUW+EMN3cC+9fzmWEBh4GpT5+SlenOZ3QD7ik ckim@ckim-mbp"; ## SECRET-DATA
             }
         }
         message "BEWARE OF SECURITY";
@@ -13,7 +14,10 @@ system {
             sftp-server;
         {# aes256-cbc is depricated #}
             ciphers [ "aes128-gcm@openssh.com" "aes256-gcm@openssh.com" aes256-ctr ];
-            key-exchange [ dh-group14-sha1 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 ];            
+            key-exchange [ dh-group14-sha1 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 ];
+            hostkey-algorithm-list {
+                ed25519;
+            }            
         }
     }
     domain-search pslab.net;    
