@@ -1,5 +1,8 @@
 {# mirror the interface using analyzer with intf_tags 'mirror' #}
+{# property sets #}
+{% set collector_ip = '192.168.0.2' %}
 {% set mirror_tag = 'mirror' %}
+{# build variables for the script #}
 {% set mirrored_interfaces = [] %}
 {% for intf in interface.values() %}
 {% if 'tags' in intf and mirror_tag in intf['tags'] %}
@@ -10,6 +13,7 @@
 {% endif %}
 {% endif %}
 {% endfor %}
+{# scripts starts here #}
 {% if mirrored_interfaces|length %}
 forwarding-options {
     analyzer {
@@ -27,7 +31,7 @@ forwarding-options {
                 }
             }
             output {
-                ip-address 192.168.0.2;
+                ip-address {{ collector_ip }};
             }
         }
     }    

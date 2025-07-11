@@ -1,26 +1,39 @@
-{# v1.0.0 2024-09-16 #}
+{# v1.0.1 2025-07-08 #}
 {# configlet name: re-protect #}
 {# configlet description: Apply a basic set of firewall filters to protect the routing engine #}
 {# configlet scope: role in all #}
+{# property sets #}
+{% set ssh_whitelist = [ "10.85.192.0/26", "10.104.0.0/16" ] %}
+{% set apstra_servers = [ "10.85.192.45/32", "10.85.192.46/32", "10.85.192.59/32" ] %}
+{# script starts here #}
 policy-options {
     prefix-list ssh-whitelist {
-        10.85.192.0/26;
-        10.104.0.0/16;
+{% for i in ssh_whitelist %}
+        {{ i }};
+{% endfor %}
     }
     prefix-list apstra-servers {
-        10.85.192.45/32;
+{% for i in apstra_servers %}
+        {{ i }};
+{% endfor %}
     }
-    prefix-list bgp-neighbors-global {
+    prefix-list bgp-neighbors {
         apply-path "protocols bgp group <*> neighbor <*>";
     }
-    prefix-list bgp-neighbors-ri {
-        apply-path "routing-instances <*> protocols bgp group <*> neighbor <*>";
+    prefix-list snmp-community-clients {
+        apply-path "snmp community <*> clients <*>";
+    }
+    prefix-list snmp-target-address {
+        apply-path "snmp v3 target-address <*> address <*>";
+    }
+    prefix-list ipv4-interfaces {
+        apply-path "interfaces <*> unit <*> family inet address <*>";
     }
 }
 firewall {
     family inet {
         filter re-protect {
-            term ssh-allow {
+            term allow-ssh {
                 from {
                     source-prefix-list {
                         ssh-whitelist;
@@ -29,41 +42,79 @@ firewall {
                     protocol tcp;
                     destination-port [ ssh 830 ];
                 }
-                then accept;
+                then {
+                    count allow-ssh;
+                    accept;
+                }
             }
-            term ssh-deny {
+            term deny-ssh {
                 from {
                     protocol tcp;
                     destination-port [ ssh 830 ];
                 }
                 then {
+                    count deny-ssh;
                     discard;
                 }
             }
-            term bgp-allow {
+            term allow-bgp {
                 from {
                     source-prefix-list {
-                        bgp-neighbors-global;
-                        bgp-neighbors-ri;
+                        bgp-neighbors;
                     }
                     protocol tcp;
                     destination-port bgp;
                 }
-                then accept;
+                then {
+                    count allow-bgp;
+                    accept;
+                }
             }
-            term bgp-deny {
+            term deny-bgp {
                 from {
                     protocol tcp;
                     destination-port bgp;
                 }
                 then {
+                    count deny-bgp;
                     discard;
+                }
+            }
+            term allow-snmp {
+                from {
+                    source-prefix-list {
+                        snmp-community-clients;
+                    }
+                    destination-prefix-list {
+                        ipv4-interfaces;
+                    }
+                    protocol udp;
+                    destination-port snmp;
+                }
+                then {
+                    policer snmp-limit-5m;
+                    count allow-snmp;
                 }
             }
             term else {
                 then accept;
             }
+            term default-deny {
+                then {
+                    count default-deny;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
         }
+    }
+    policer snmp-limit-5m {
+        if-exceeding {
+            bandwidth-limit 5m;
+            burst-size-limit 625k;
+        }
+        then discard;
     }
 }
 interfaces {
