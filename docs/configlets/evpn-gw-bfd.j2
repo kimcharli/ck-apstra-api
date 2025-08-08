@@ -1,0 +1,11 @@
+{# Add BFD configuration on DCI EVPN GW sessions #}
+{# apply to border leafs. It is ok to apply all the switches though #}
+{# tested with 4.2.1.1-10, and 6.0.0-189 #}
+{# 2025-08-08 ckim #}
+{% set EVPN_GW_GROUP = "evpn-gw" %}
+{% set EVPN_GW_ROLE = "leaf_remote_gw" %}
+{% set DCI_SESSIONS = bgp_sessions.values() | selectattr('role', 'eq', EVPN_GW_ROLE) | list %}
+{% if DCI_SESSIONS | length %}
+set protocols bgp group {{ EVPN_GW_GROUP }} bfd-liveness-detection minimum-interval 1000
+set protocols bgp group {{ EVPN_GW_GROUP }} bfd-liveness-detection multiplier 3
+{% endif %}
