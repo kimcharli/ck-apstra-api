@@ -1,0 +1,15 @@
+{# Apply Juniper Device licenses in configuration mode #}
+{# for all the switches #}
+{% set SN_2_LICENSE_MAP = {
+    'XH3119430106': "E20191218001 AAAAAA BBBBB CCCCC DDDDD EEEEE FFFFF GGGGG HHHHH IIIII JJJJJJ KKKKKK LLLLLL MMMMMM NNNNN OOOOO PPPPP RRRRR SSSSS TTTTT UUUUU",
+} %}
+{% set MY_LICENSE = SN_2_LICENSE_MAP.get(device_sn, '') %}
+{% if MY_LICENSE %}
+system {
+  license {
+    keys {
+      key "{{ MY_LICENSE }}";
+    }
+  }
+}
+{% endif %}
