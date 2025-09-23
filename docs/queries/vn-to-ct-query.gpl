@@ -1,0 +1,4 @@
+node('virtual_network', name='virtual_network')
+  .in_(type=is_in(['attached_tagged_vlans', 'vn_to_attach', 'attached_untagged_vlan'])).node('ep_endpoint_policy', name='vlan')
+  .in_('ep_first_subpolicy').node(name='pipeline').in_('ep_subpolicy').node('ep_endpoint_policy', policy_type_name='batch', name='CT')
+  
