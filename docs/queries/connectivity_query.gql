@@ -1,0 +1,14 @@
+match(
+  node('system', system_type='switch'{switch_filter}, name='switch')
+    .out('hosted_interfaces').node('interface', if_type='ethernet', name='intf1')
+    .out('link').node('link', name='link1')
+    .in_('link').node(name='intf2')
+    .in_('hosted_interfaces').node('system', system_type='server', name='server'),
+  optional(
+    node(name='intf1').in_('composed_of').node('interface', name='ae1' )
+      .in_('composed_of').node('interface', name='evpn1')
+  ),
+  optional(
+    node(name='intf1').in_('composed_of').node('interface', name='ae1' )
+  )
+)

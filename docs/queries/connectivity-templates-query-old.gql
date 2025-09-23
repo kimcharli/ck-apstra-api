@@ -1,0 +1,10 @@
+match(
+  node('system', system_type='switch'{switch_filter}, name='switch')
+    .out('part_of_redundancy_group').node('redundancy_group', name='rg1')
+    .out('hosted_interfaces').node('interface', name='evpn1')
+    .out('ep_member_of').node('ep_group')
+    .in_('ep_affected_by').node('ep_application_instance')
+    .out('ep_top_level').node('ep_endpoint_policy', policy_type_name='batch', name='CT'),
+  node(name='evpn1').out('composed_of').node('interface', name='ae1')
+    .out('composed_of').node('interface', name='intf1')
+).distinct(['intf1'])

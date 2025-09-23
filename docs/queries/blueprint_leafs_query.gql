@@ -1,0 +1,1 @@
+match(node('system', system_type='switch', role='leaf', name='leaf_switch'))

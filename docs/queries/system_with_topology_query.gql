@@ -1,0 +1,6 @@
+match(
+  node('system', label='{server_name}', name='system')
+    .out().node('pod', name='pod'),
+  node(name='system')
+    .out().node('rack', name='rack')
+)

@@ -1,0 +1,5 @@
+match(
+  node('interface', ipv4_addr='{ip_address}', name='intf').in_().node('system', name='system')
+    .out().node('pod', name='pod'),
+  node(name='system').out().node('rack', name='rack')
+)
