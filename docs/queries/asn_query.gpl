@@ -1,0 +1,1 @@
+node('domain', domain_id='4200000011', name='domain').out('composed_of_systems').node('system', label='server_1', name='system')
