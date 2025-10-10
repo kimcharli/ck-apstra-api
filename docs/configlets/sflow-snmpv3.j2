@@ -24,6 +24,9 @@ To avoid clear text password in the configlet, the engine-id of the device is se
   1. Generate the authenticaion key and privacy key in a device.
   2. Capture update the value in the configlet/property-sets.
 
+2025-10-08 enable interface to spines as well. 
+    #### keys regenerated for 23.4R2-S4.11. Is the key dependant to version?
+
 #}
 
 {# variables - can be set in the property set #}
@@ -34,10 +37,10 @@ To avoid clear text password in the configlet, the engine-id of the device is se
 {% set snmp_version=3 %}
 {% set v2_community='sFlow-collector' %}
 {% set v3_user='sflow-v3' %}
-{% set v3_auth_key='$9$ayJjHq.5T36f5Qn/CB1-Vbs2aiHmF39mP0BIEyrvWLx7V4aZUHqJZ/CAu1IwY2gUj5QF6/tQz6ApuEh4aJUDk.mTQ36HkAp0OcSwY2oaUP5QF69wYmfTz6/Lx7-s2goJiHmM8GDHkTQcyrlLxYgoji.X7jHkqf5Fn/CO1IEclvWOBdbs2GUp0OIyl' %}
-{% set v3_priv_key='$9$DKkfTz36pO1/90IhSMWoJZDi.z36/Apn68XxNbwfTQz/CuO1creRESeM87Nmf5T69AtOhclu0-Vw2aJGDiHP56/tu0IHq' %}    
+{% set v3_auth_key='$9$wdsJGik.F69s2n/9tOBNdVsoJqmf6Ct.mT36/tpWLX7-w2gJiqm2gz3/9pudbwYJGk.PTFnwY4ZDjq.BIRhlKMWxN-wleYg4JDjmfTzF/BIESyK0OEyleXxGDjkfT3nCOBE6/0IEcleX7-b4aik.5T3s2Tz3nCA7-dbs4UjHq.5-VP5F39CuO1hev' %}
+{% set v3_priv_key='$9$j/HP5n6A0ORpu-VwsJZ69CpIEyrvL7-cSlM8LN-qmPTQnp0Byev0OEyevLXUjiqmTAp0BRhpudbws4oDikPFnpu1ESrmf' %}    
 
-{% if role == 'leaf' %}
+{% if not os_version.endswith("-EVO") %}
 routing-options {
     static {
         route {{sflow_collector}}/32 next-table {{sflow_rz}}.inet.0;
@@ -58,13 +61,10 @@ protocols {
         collector {{sflow_collector}} {
             udp-port {{sflow_port}};
         }
-    {% for intf_name in interface.values() 
-        | rejectattr('switch_port_mode', 'equalto', 'subinterface') 
-        | rejectattr('is_port_channel') 
-        | selectattr('role', 'in', '["l2edge", "l3edge"]') 
-        | map(attribute='intfName') 
-        | list %}
-        interfaces {{ intf_name }};
+    {% for interface, settings in portSetting.items() %}
+        {% if settings['state'] == 'active' %}
+        interfaces {{ interface }};
+        {% endif %}
     {% endfor %}
     }
 }
