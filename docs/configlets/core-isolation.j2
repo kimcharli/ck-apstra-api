@@ -1,0 +1,17 @@
+{# 
+https://www.juniper.net/documentation/us/en/software/junos/evpn/topics/concept/evpn-core-isolation-interface-shutdown-service-tracking.html
+#}
+{% set NETWORK_ISOLATION_GROUP = 'NET-ISOLATION' %}
+{% set HOLD_TIME_UP = 120000 %}{# ms #}
+{% set SERVICE_TRACKING_ACTION = 'link-down' %}{# link-down, lacp-out-of-sync #}
+{% set l2edges = interface.values() | selectattr('role', 'eq', 'l2edge') | map(attribute='intfName') | list %}
+{% if role in ['leaf', 'access'] and os in ['Junos'] %}{# leaf and junos #}
+{% if l2edges and os_version > "23.2R1" %}{# version new #}
+set protocols network-isolation group {{ NETWORK_ISOLATION_GROUP }} detection hold-time up {{ HOLD_TIME_UP }}
+set protocols network-isolation group {{ NETWORK_ISOLATION_GROUP }} detection service-tracking core-isolation
+set protocols network-isolation group {{ NETWORK_ISOLATION_GROUP }} service-tracking-action {{ SERVICE_TRACKING_ACTION }}
+{% for intf in l2edges %}
+set interfaces {{ intf }} network-isolation-profile {{ NETWORK_ISOLATION_GROUP }}
+{% endfor %}
+{% endif %} {# version #}
+{% endif %} {# leaf and junos #}

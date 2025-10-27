@@ -480,6 +480,11 @@ ck-apstra-api-py3.11ckim@ckim-mbp:ck-apstra-api %
 [Example csv file](./tests/fixtures/iplink_ct_sample.csv)
 
 
+## Configlets
+
+This project includes a collection of configlets to perform various network configurations. For more details, please see the [Configlets README](./docs/configlets/README.md).
+
+
 ## Misc
 
 This repository is maintained on a best-effort basis. Comments and bug reports are encouraged and welcomed.
