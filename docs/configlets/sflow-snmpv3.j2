@@ -30,7 +30,7 @@ To avoid clear text password in the configlet, the engine-id of the device is se
 #}
 
 {# variables - can be set in the property set #}
-{% set role='leaf' %}
+{% set LEAF_ONLY = false %}
 {% set sflow_collector='10.85.192.52' %}
 {% set sflow_port=6343 %}
 {% set sflow_rz='mgmt_junos' %}
@@ -40,6 +40,7 @@ To avoid clear text password in the configlet, the engine-id of the device is se
 {% set v3_auth_key='$9$wdsJGik.F69s2n/9tOBNdVsoJqmf6Ct.mT36/tpWLX7-w2gJiqm2gz3/9pudbwYJGk.PTFnwY4ZDjq.BIRhlKMWxN-wleYg4JDjmfTzF/BIESyK0OEyleXxGDjkfT3nCOBE6/0IEcleX7-b4aik.5T3s2Tz3nCA7-dbs4UjHq.5-VP5F39CuO1hev' %}
 {% set v3_priv_key='$9$j/HP5n6A0ORpu-VwsJZ69CpIEyrvL7-cSlM8LN-qmPTQnp0Byev0OEyevLXUjiqmTAp0BRhpudbws4oDikPFnpu1ESrmf' %}    
 
+{% if not LEAF_ONLY or role == 'leaf' %}{# CHECK LEAF #}
 {% if not os_version.endswith("-EVO") %}
 routing-options {
     static {
@@ -125,3 +126,4 @@ snmp {
     routing-instance-access;
 }
 {% endif %}
+{% endif %}{# CHECK LEAF #}

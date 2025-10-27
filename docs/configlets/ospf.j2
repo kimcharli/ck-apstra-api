@@ -1,3 +1,6 @@
+{% set OSPF_TRACE_ENABLE = true %}
+{% set OSPF_VRF = 'corp_trust' %}
+{% if OSPF_VRF in security_zones %}{# VRG in #}
 set interfaces irb.20 family inet mtu 1500
 set interfaces irb.910 family inet mtu 1500
 set interfaces irb.912 family inet mtu 1500
@@ -11,15 +14,20 @@ set policy-options policy-statement Export_To_OSPF term irbs from protocol stati
 set policy-options policy-statement Export_To_OSPF term irbs then accept
 set policy-options community FROM_OSPF members 7:30003
 {% for vrf in security_zones.values() %}
-{% if vrf['vrf_name'] == 'corp_trust' %}
-set routing-instances {{ vrf['vrf_name'] }} routing-options router-id {{ vrf['loopback_ip'] }}
-set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface {{ vrf['loopback_intf'] }} passive
-set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface irb.20 mtu 1500
-set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface irb.910 mtu 1500
-set routing-instances {{ vrf['vrf_name'] }} protocols ospf area 0.0.0.1 interface irb.912 mtu 1500
-set routing-instances {{ vrf['vrf_name'] }} protocols ospf export Export_To_OSPF
-delete routing-instances {{ vrf['vrf_name'] }} protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
-set routing-instances {{ vrf['vrf_name'] }} protocols evpn ip-prefix-routes export Import_From_OSPF 
-set routing-instances {{ vrf['vrf_name'] }} protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
+{% if vrf['vrf_name'] == OSPF_VRF %}
+set routing-instances {{ OSPF_VRF }} routing-options router-id {{ vrf['loopback_ip'] }}
+set routing-instances {{ OSPF_VRF }} protocols ospf area 0.0.0.1 interface {{ vrf['loopback_intf'] }} passive
+set routing-instances {{ OSPF_VRF }} protocols ospf area 0.0.0.1 interface irb.20 mtu 1500
+set routing-instances {{ OSPF_VRF }} protocols ospf area 0.0.0.1 interface irb.910 mtu 1500
+set routing-instances {{ OSPF_VRF }} protocols ospf area 0.0.0.1 interface irb.912 mtu 1500
+set routing-instances {{ OSPF_VRF }} protocols ospf export Export_To_OSPF
+{% if OSPF_TRACE_ENABLE %}
+set routing-instances {{ OSPF_VRF }} protocols ospf traceoptions file ospf-trace.log 
+set routing-instances {{ OSPF_VRF }} protocols ospf traceoptions flag all receive send detail
+{% endif %}
+delete routing-instances {{ OSPF_VRF }} protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
+set routing-instances {{ OSPF_VRF }} protocols evpn ip-prefix-routes export Import_From_OSPF 
+set routing-instances {{ OSPF_VRF }} protocols evpn ip-prefix-routes export BGP-AOS-Policy-corp_trust 
 {% endif %}
 {% endfor %}
+{% endif %}{# VRF in #}
