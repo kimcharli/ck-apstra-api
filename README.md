@@ -482,7 +482,7 @@ ck-apstra-api-py3.11ckim@ckim-mbp:ck-apstra-api %
 
 ## Configlets
 
-This project includes a collection of configlets to perform various network configurations. For more details, please see the [Configlets README](./docs/configlets/README.md).
+The configlet files have moved to a new repository. Please find them here: [jinja2-tester/apstra_configlets](https://github.com/kimcharli/jinja2-tester/tree/main/apstra_configlets)
 
 
 ## Misc
