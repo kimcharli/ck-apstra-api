@@ -1,0 +1,158 @@
+{
+  "Dhcp4": {
+    "interfaces-config": {
+      "interfaces": [
+        "eth0"
+      ]
+    },
+    "control-socket": {
+      "socket-type": "unix",
+      "socket-name": "/dhcp/control_socket/kea4-ctrl-socket"
+    },
+    "lease-database": {
+      "type": "memfile",
+      "name": "/logs/dhcpd.leases",
+      "lfc-interval": 3600
+    },
+    "option-data": [
+      {
+        "name": "domain-search",
+        "code": 119,
+        "data": "pslab.net"
+      },
+      {
+        "name": "domain-name",
+        "code": 15,
+        "data": "pslab.net"
+      },
+      {
+        "name": "domain-name-servers",
+        "code": 6,
+        "data": "10.85.192.2, 10.85.128.33"
+      },
+      {
+        "name": "tftp-server-name",
+        "code": 66,
+        "data": "10.85.192.45"
+      }
+    ],
+    "option-def": [
+      {
+        "code": 239,
+        "name": "ztp_provisioning_script_url",
+        "space": "dhcp4",
+        "type": "string"
+      },
+      {
+        "code": 1,
+        "encapsulate": "",
+        "name": "config-file-name",
+        "space": "vendor-encapsulated-options-space",
+        "type": "string"
+      }
+    ],
+    "client-classes": [
+      {
+        "name": "arista",
+        "option-data": [
+          {
+            "code": 67,
+            "data": "ztp.py",
+            "name": "boot-file-name",
+            "space": "dhcp4"
+          }
+        ],
+        "test": "substring(option[60].hex,0,6) == 'Arista'"
+      },
+      {
+        "name": "cisco",
+        "option-data": [
+          {
+            "code": 67,
+            "data": "ztp.py",
+            "name": "boot-file-name",
+            "space": "dhcp4"
+          }
+        ],
+        "test": "substring(option[60].hex,0,5) == 'Cisco'"
+      },
+      {
+        "name": "sonic",
+        "option-data": [
+          {
+            "code": 239,
+            "data": "http://10.85.192.45/ztp.py",
+            "name": "ztp_provisioning_script_url",
+            "space": "dhcp4"
+          }
+        ],
+        "test": "substring(option[61].hex,0,5) == 'SONiC'"
+      },
+      {
+        "name": "juniper",
+        "option-data": [
+          {
+            "code": 1,
+            "data": "junos_apstra_ztp_bootstrap.sh",
+            "name": "config-file-name",
+            "space": "vendor-encapsulated-options-space"
+          },
+          {
+            "code": 43
+          }
+        ],
+        "test": "(substring(option[60].hex,0,7) == 'Juniper') and (not (substring(option[77].hex,-4,all) == '-EVO'))"
+      },
+      {
+        "name": "juniper-evo",
+        "option-data": [
+          {
+            "code": 1,
+            "data": "ztp_py3.py",
+            "name": "config-file-name",
+            "space": "vendor-encapsulated-options-space"
+          },
+          {
+            "code": 43
+          }
+        ],
+        "test": "(substring(option[60].hex,0,7) == 'Juniper') and (substring(option[77].hex,-4,all) == '-EVO')"
+      }
+    ],
+    "subnet4": [
+      {
+        "subnet": "10.85.192.0/26",
+        "id": 1,
+        "option-data": [
+          {
+            "code": 3,
+            "data": "10.85.192.1",
+            "name": "routers"
+          }
+        ],
+        "pools": [
+          {
+            "pool": "10.85.192.30 - 10.85.192.60"
+          }
+        ]
+      }
+    ],
+    "valid-lifetime": 7200,
+    "max-valid-lifetime": 9200,
+    "match-client-id": false,
+    "loggers": [
+      {
+        "name": "kea-dhcp4",
+        "output_options": [
+          {
+            "output": "syslog:local7"
+          }
+        ],
+        "severity": "DEBUG",
+        "debuglevel": 15
+      }
+    ],
+    "reservations-global": false,
+    "reservations-in-subnet": false
+  }
+}
