@@ -1,0 +1,29 @@
+{
+  "label": "ASN-hosts",
+  "processors": [
+    {
+      "name": "Generic Graph Collector",
+      "type": "generic_graph_collector",
+      "properties": {
+        "value_map": {},
+        "system": "system.label",
+        "graph_query": [
+          "node('domain', name='domain').out('composed_of_systems').node('system', name='system')"
+        ],
+        "query_group_by": [],
+        "data_type": "text",
+        "query_tag_filter": {
+          "filter": {},
+          "operation": "and"
+        },
+        "query_expansion": {},
+        "enable_streaming": false,
+        "value": "domain.domain_id"
+      },
+      "inputs": {},
+      "outputs": {
+        "out": "Generic Graph Collector"
+      }
+    }
+  ]
+}
