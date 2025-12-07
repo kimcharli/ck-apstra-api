@@ -1,0 +1,34 @@
+{
+  "label": "Interface-IPs",
+  "processors": [
+    {
+      "name": "Generic Graph Collector",
+      "type": "generic_graph_collector",
+      "properties": {
+        "value_map": {},
+        "system": "system.label",
+        "graph_query": [
+          "node('system', name='system').out('hosted_interfaces').node('interface', ipv4_addr=not_none(), if_name=not_none(), name='interface')",
+          "node('system', name='system').out('hosted_interfaces').node('interface', ipv6_addr=not_none(), if_name=not_none(), name='interface')"
+        ],
+        "query_group_by": [
+          "system",
+          "interface"
+        ],
+        "data_type": "text",
+        "query_tag_filter": {
+          "filter": {},
+          "operation": "and"
+        },
+        "interface": "interface.if_name",
+        "query_expansion": {},
+        "enable_streaming": false,
+        "value": "\"{0}|{1}\".format(interface.ipv4_addr or 'None', interface.ipv6_addr or 'None')"
+      },
+      "inputs": {},
+      "outputs": {
+        "out": "Generic Graph Collector"
+      }
+    }
+  ]
+}
