@@ -1,3 +1,5 @@
+# moving to https://github.com/kimcharli/jinja2-tester/tree/main/apstra_configlets
+
 # Configlets
 
 This project includes a collection of configlets to perform various network configurations. They are categorized as follows:
