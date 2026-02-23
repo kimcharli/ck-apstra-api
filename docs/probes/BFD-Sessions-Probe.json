@@ -34,11 +34,11 @@
       "name": "Match String",
       "type": "match_string",
       "properties": {
-        "raise_anomaly": false,
+        "raise_anomaly": true,
         "graph_query": [],
         "anomaly_retention_duration": 86400,
         "enable_streaming": false,
-        "regexp": "\"^(?!Up).*\"",
+        "regexp": "\"Down\"",
         "anomaly_retention_size": 1073741824,
         "enable_anomaly_logging": false
       },
