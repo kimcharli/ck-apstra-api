@@ -1,0 +1,119 @@
+{
+  "description": "",
+  "application_schema": {
+    "properties": {
+      "key": {
+        "properties": {
+          "neighbor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "neighbor"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "properties": {
+          "detect_time": {
+            "type": "string"
+          },
+          "interface": {
+            "type": "string"
+          },
+          "multiplier": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "transmit_interval": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "detect_time",
+          "interface",
+          "multiplier",
+          "state",
+          "transmit_interval"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "service_name": "bfd-sessions",
+  "storage_schema_path": "aos.sdk.telemetry.schemas.iba_data",
+  "collectors": [
+    {
+      "platform": {
+        "os_type": "junos_evo",
+        "os_version": "21.2r2",
+        "family": "acx-qfx-7k,qfx-ms-fixed",
+        "model": ""
+      },
+      "source_type": "cli",
+      "cli": "show bfd session",
+      "query": {
+        "accessors": {
+          "neighbor": "/bfd-session-information/bfd-session/session-neighbor",
+          "detect_time": "/bfd-session-information/bfd-session/session-detection-time",
+          "interface": "/bfd-session-information/bfd-session/session-interface",
+          "multiplier": "/bfd-session-information/bfd-session/detection-multiplier",
+          "state": "/bfd-session-information/bfd-session/session-state",
+          "transmit_interval": "/bfd-session-information/bfd-session/session-transmission-interval"
+        },
+        "keys": {
+          "neighbor": "neighbor"
+        },
+        "values": {
+          "detect_time": "detect_time",
+          "interface": "interface",
+          "multiplier": "multiplier",
+          "state": "state",
+          "transmit_interval": "transmit_interval"
+        },
+        "filter": ""
+      },
+      "relaxed_schema_validation": true
+    },
+    {
+      "platform": {
+        "os_type": "junos",
+        "os_version": "21.2r2",
+        "family": "junos-qfx",
+        "model": ""
+      },
+      "source_type": "cli",
+      "cli": "show bfd session",
+      "query": {
+        "accessors": {
+          "neighbor": "/bfd-session-information/bfd-session/session-neighbor",
+          "detect_time": "/bfd-session-information/bfd-session/session-detection-time",
+          "interface": "/bfd-session-information/bfd-session/session-interface",
+          "multiplier": "/bfd-session-information/bfd-session/detection-multiplier",
+          "state": "/bfd-session-information/bfd-session/session-state",
+          "transmit_interval": "/bfd-session-information/bfd-session/session-transmission-interval"
+        },
+        "keys": {
+          "neighbor": "neighbor"
+        },
+        "values": {
+          "detect_time": "detect_time",
+          "interface": "interface",
+          "multiplier": "multiplier",
+          "state": "state",
+          "transmit_interval": "transmit_interval"
+        },
+        "filter": ""
+      },
+      "relaxed_schema_validation": true
+    }
+  ],
+  "version": "version_0"
+}
